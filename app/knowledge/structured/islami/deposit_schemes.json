@@ -1,0 +1,886 @@
+{
+  "deposit_schemes": [
+    {
+      "id": "ISLAMI_SCHEME_001",
+      "name": "Prime Hasanah Monthly Income Scheme",
+      "category": "Deposit Scheme",
+      "type": "lump_sum_monthly_income",
+      "tagline": "Steady Every Step, Reached New Heights",
+      "overview": "Lump-sum single deposit scheme offering fixed monthly income stream for selected tenure (1/3/5 years), following Islamic Mudaraba principles",
+      "markdown_ref": "/app/knowledge/products/islami/save/deposit_schemes/prime_hasanah_monthly_income_scheme.md",
+      "json_ref": "ISLAMI_SCHEME_001",
+      "operating_principle": "Mudaraba",
+      "shariah_compliant": true,
+      "features": [
+        "Fixed monthly income stream",
+        "Like a pension payment",
+        "Principal fully returned at maturity",
+        "Islamic Mudaraba principle",
+        "3 flexible tenor options",
+        "Minimum BDT 1 lakh deposit",
+        "No maximum limit",
+        "Auto-renewal option available",
+        "Qard/FO facility access"
+      ],
+      "tenors": [1, 3, 5],
+      "profit_rate_by_tenor": {
+        "1": {
+          "rate": 9.0,
+          "monthly_per_lac": 750,
+          "description": "1-year at 9% = BDT 750/month per lakh"
+        },
+        "3": {
+          "rate": 7.0,
+          "monthly_per_lac": 583.33,
+          "description": "3-year at 7% = BDT 583.33/month per lakh"
+        },
+        "5": {
+          "rate": 7.0,
+          "monthly_per_lac": 583.33,
+          "description": "5-year at 7% = BDT 583.33/month per lakh"
+        }
+      },
+      "min_lump_sum": 100000,
+      "min_lump_sum_multiple": 100000,
+      "max_lump_sum": "unlimited",
+      "monthly_income_payment": true,
+      "principal_protection": "full_return_at_maturity",
+      "auto_renewal": "available",
+      "qard_fo_facility": {
+        "available": true,
+        "max_percentage": 100,
+        "description": "Up to scheme deposit value"
+      },
+      "target_audience": [
+        "Retirees",
+        "Pensioners",
+        "Income-seeking investors",
+        "Those with lump-sum corpus",
+        "Islamic investment preference"
+      ],
+      "documents_required": [
+        "Completed Personal Savings Scheme Account Opening Form",
+        "Active linked Current/Savings account",
+        "NID/Passport/Birth Certificate",
+        "Guardian documents (if minor)",
+        "Nominee information"
+      ]
+    },
+    {
+      "id": "ISLAMI_SCHEME_002",
+      "name": "Prime Hasanah Laksma Puron DPS",
+      "category": "Deposit Scheme",
+      "type": "goal_based_recurring_deposit",
+      "tagline": "Aimed for Sky, Crossed the Limit",
+      "overview": "Goal-based monthly installment scheme where you set target amount and save systematically over 3-5 year tenors at 6% fixed profit",
+      "markdown_ref": "/app/knowledge/products/islami/save/deposit_schemes/prime_hasanah_laksma_puron_dps.md",
+      "json_ref": "ISLAMI_SCHEME_002",
+      "operating_principle": "Mudaraba",
+      "shariah_compliant": true,
+      "features": [
+        "Goal-based saving approach",
+        "You set your target amount",
+        "Custom monthly installments",
+        "Fixed 6% profit all tenors",
+        "3/4/5 year tenor options",
+        "Multiple schemes allowed",
+        "Automatic monthly deduction",
+        "Qard/FO facility available",
+        "Islamic Mudaraba principle"
+      ],
+      "tenors": [3, 4, 5],
+      "interest_rate": 6.0,
+      "interest_type": "fixed",
+      "interest_payment_frequency": "at_maturity",
+      "goal_based": true,
+      "goal_amounts_supported": [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000],
+      "monthly_installment_calculation": "based_on_goal_and_tenor",
+      "min_age": 18,
+      "multiple_schemes_allowed": true,
+      "automatic_monthly_deduction": true,
+      "qard_fo_facility": {
+        "available": true,
+        "max_percentage": 100,
+        "description": "Up to scheme value"
+      },
+      "target_audience": [
+        "Goal-focused savers",
+        "Education planners",
+        "Wedding planners",
+        "Home buyers",
+        "Entrepreneurs",
+        "Systematic savers"
+      ],
+      "documents_required": [
+        "Passport size photographs (depositor and nominee)",
+        "NID/Passport/Birth Registration Certificate",
+        "Minor account formalities (if applicable)",
+        "Active linked CASA account",
+        "Separate scheme opening form for each goal"
+      ]
+    },
+    {
+      "id": "ISLAMI_SCHEME_003",
+      "name": "Prime Hasanah Hajj Scheme",
+      "category": "Deposit Scheme",
+      "type": "purpose_specific_hajj_savings",
+      "tagline": "Journey to Connect, Step by Step",
+      "overview": "Purpose-specific Islamic savings scheme dedicated to Hajj pilgrimage with flexible 1-10 year tenors and estimated annual Hajj costs included",
+      "markdown_ref": "/app/knowledge/products/islami/save/deposit_schemes/prime_hasanah_hajj_scheme.md",
+      "json_ref": "ISLAMI_SCHEME_003",
+      "operating_principle": "Mudaraba",
+      "shariah_compliant": true,
+      "purpose_specific": "Hajj_Pilgrimage",
+      "features": [
+        "Purpose-specific for Hajj saving",
+        "Flexible 1-10 year tenors",
+        "Monthly installment system",
+        "Daily profit calculation",
+        "Islamic Mudaraba principle",
+        "Estimated Hajj costs provided",
+        "Inter-branch transfer allowed",
+        "Individual account only (no joint)",
+        "Aligned with Hajj timeline"
+      ],
+      "tenors": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      "daily_profit_calculation": true,
+      "individual_account_only": true,
+      "inter_branch_transferable": true,
+      "monthly_installments_2025": {
+        "1_year": {
+          "installment": 49800,
+          "estimated_maturity": 620000,
+          "hajj_year": 2026
+        },
+        "2_years": {
+          "installment": 24800,
+          "estimated_maturity": 640000,
+          "hajj_year": 2027
+        },
+        "3_years": {
+          "installment": 16500,
+          "estimated_maturity": 660000,
+          "hajj_year": 2028
+        },
+        "4_years": {
+          "installment": 12300,
+          "estimated_maturity": 680000,
+          "hajj_year": 2029
+        },
+        "5_years": {
+          "installment": 9800,
+          "estimated_maturity": 700000,
+          "hajj_year": 2030
+        },
+        "6_years": {
+          "installment": 8100,
+          "estimated_maturity": 720000,
+          "hajj_year": 2031
+        },
+        "7_years": {
+          "installment": 6900,
+          "estimated_maturity": 740000,
+          "hajj_year": 2032
+        },
+        "8_years": {
+          "installment": 6000,
+          "estimated_maturity": 760000,
+          "hajj_year": 2033
+        },
+        "9_years": {
+          "installment": 5200,
+          "estimated_maturity": 780000,
+          "hajj_year": 2034
+        },
+        "10_years": {
+          "installment": 4700,
+          "estimated_maturity": 800000,
+          "hajj_year": 2035
+        }
+      },
+      "min_age": 18,
+      "religion_requirement": "Muslim_faith_for_Hajj",
+      "estimated_hajj_cost_range": {
+        "min": 620000,
+        "max": 800000,
+        "currency": "BDT"
+      },
+      "target_audience": [
+        "Aspiring pilgrims",
+        "Muslim faith individuals",
+        "Mid-career professionals",
+        "Business owners",
+        "Retirees wanting Hajj",
+        "Young adults",
+        "Parents planning for children"
+      ],
+      "documents_required": [
+        "Passport size photographs (depositor and nominee)",
+        "NID/Passport/Birth Registration Certificate",
+        "Minor account formalities (if applicable)",
+        "Active linked CASA account",
+        "Personal Saving Scheme opening form"
+      ]
+    },
+    {
+      "id": "ISLAMI_SCHEME_004",
+      "name": "Prime Hasanah Term Deposit",
+      "category": "Deposit Scheme",
+      "type": "flexible_tenor_fixed_deposit",
+      "tagline": "Saving Today, For A Comfortable Tomorrow",
+      "overview": "Flexible tenure fixed deposit (1-36 months) with attractive profit rates, term deposit receipts, and auto-renewal options following Islamic Mudaraba principles",
+      "markdown_ref": "/app/knowledge/products/islami/save/deposit_schemes/prime_hasanah_term_deposit.md",
+      "json_ref": "ISLAMI_SCHEME_004",
+      "operating_principle": "Mudaraba",
+      "shariah_compliant": true,
+      "features": [
+        "Flexible tenure 1-36 months",
+        "Attractive provisional profit rates",
+        "Term Deposit Receipts issued",
+        "Minimum BDT 10,000 deposit",
+        "Auto-renewal with/without profit",
+        "Investment facility up to 90%",
+        "Islamic Mudaraba principle",
+        "Customizable timeline"
+      ],
+      "tenor_range": {
+        "min_months": 1,
+        "max_months": 36
+      },
+      "interest_rate_range": {
+        "min": 7.5,
+        "max": 8.75
+      },
+      "interest_type": "fixed",
+      "min_deposit": 10000,
+      "min_deposit_multiple": 10000,
+      "max_deposit": "unlimited",
+      "term_deposit_receipt": true,
+      "auto_renewal_options": [
+        "with_interest",
+        "principal_only",
+        "manual"
+      ],
+      "investment_facility": {
+        "available": true,
+        "max_percentage": 90,
+        "description": "Loan/overdraft facility up to 90%"
+      },
+      "target_audience": [
+        "Short-term savers",
+        "Medium-term planners",
+        "Conservative investors",
+        "Flexible timeline seekers",
+        "Business owners"
+      ],
+      "documents_required": [
+        "Passport size photographs (depositor and nominee)",
+        "NID/Passport/Birth Registration Certificate",
+        "Minor account formalities (if applicable)",
+        "Active linked CASA account",
+        "Completed Term Deposit opening form"
+      ]
+    },
+    {
+      "id": "ISLAMI_SCHEME_005",
+      "name": "Prime Hasanah Deposit Premium Scheme",
+      "category": "Deposit Scheme",
+      "type": "recurring_deposit_premium",
+      "tagline": "Premium Returns for Monthly Savers",
+      "overview": "Monthly installment recurring deposit scheme (BDT 500-120K/month) offering 9% fixed profit across 3/5/7/10 year tenors with impressive maturity values",
+      "markdown_ref": "/app/knowledge/products/islami/save/deposit_schemes/prime_hasanah_deposit_premium_scheme.md",
+      "json_ref": "ISLAMI_SCHEME_005",
+      "operating_principle": "Mudaraba",
+      "shariah_compliant": true,
+      "features": [
+        "Monthly installment system",
+        "Fixed 9% profit all tenors",
+        "BDT 500-120,000 per month",
+        "Flexible 3/5/7/10 year tenors",
+        "Impressive maturity values",
+        "Favorable early encashment rules",
+        "Investment facility up to 90%",
+        "Islamic Mudaraba principle"
+      ],
+      "tenors": [3, 5, 7, 10],
+      "interest_rate": 9.0,
+      "interest_type": "fixed",
+      "interest_payment_frequency": "at_maturity",
+      "min_monthly_installment": 500,
+      "max_monthly_installment": 120000,
+      "monthly_installment_multiple": 500,
+      "automatic_monthly_deduction": true,
+      "maturity_values": {
+        "3_years": {
+          "500_monthly": 20700,
+          "1000_monthly": 41400,
+          "5000_monthly": 207000,
+          "10000_monthly": 414000,
+          "50000_monthly": 2070000
+        },
+        "5_years": {
+          "500_monthly": 37925,
+          "1000_monthly": 75850,
+          "5000_monthly": 379250,
+          "10000_monthly": 758500,
+          "50000_monthly": 3792500
+        },
+        "7_years": {
+          "500_monthly": 58500,
+          "1000_monthly": 117000,
+          "5000_monthly": 585000,
+          "10000_monthly": 1170000,
+          "50000_monthly": 5850000
+        },
+        "10_years": {
+          "500_monthly": 97110,
+          "1000_monthly": 194220,
+          "5000_monthly": 971100,
+          "10000_monthly": 1942200,
+          "50000_monthly": 9711000
+        }
+      },
+      "early_encashment_rules": {
+        "before_12_months": "No profit",
+        "before_36_months": "Savings account rate (2-4%)",
+        "before_60_months": "36m at 9% + remainder at savings rate",
+        "before_84_months": "60m at 9% + remainder at savings rate",
+        "before_120_months": "84m at 9% + remainder at savings rate"
+      },
+      "investment_facility": {
+        "available": true,
+        "max_percentage": 90,
+        "description": "Up to 90% of deposits"
+      },
+      "target_audience": [
+        "Salaried employees",
+        "Business owners",
+        "Professionals and entrepreneurs",
+        "Goal-based savers",
+        "Wealth builders"
+      ],
+      "documents_required": [
+        "Completed Personal Savings Scheme Account Opening Form",
+        "Active linked Current/Savings account",
+        "NID/Passport/Birth Certificate",
+        "Guardian documents (if minor)",
+        "Nominee information"
+      ]
+    },
+    {
+      "id": "ISLAMI_SCHEME_006",
+      "name": "Prime Hasanah Edu DPS",
+      "category": "Deposit Scheme",
+      "type": "monthly_installment_education",
+      "tagline": "Education Investment, Future Security",
+      "overview": "Education-focused monthly installment scheme offering 9% profit across 5/10/15/20 year tenors, designed to build education funds for children",
+      "markdown_ref": "/app/knowledge/products/islami/save/deposit_schemes/prime_hasanah_edu_dps.md",
+      "json_ref": "ISLAMI_SCHEME_006",
+      "operating_principle": "Mudaraba",
+      "shariah_compliant": true,
+      "purpose": "education",
+      "features": [
+        "Education-focused monthly installments",
+        "Long tenors matching education timeline",
+        "Fixed 9% profit rate guaranteed",
+        "Flexible BDT 500 to 120,000/month",
+        "Tiered early encashment rules",
+        "Investment/overdraft facility up to 90%",
+        "Islamic Mudaraba principle",
+        "Systematic discipline for education savings",
+        "Can be opened for minors"
+      ],
+      "tenors": [5, 10, 15, 20],
+      "profit_rate_by_tenor": {
+        "5": {
+          "rate": 9.0,
+          "description": "5-year education plan @ 9%"
+        },
+        "10": {
+          "rate": 9.0,
+          "description": "10-year education plan @ 9%"
+        },
+        "15": {
+          "rate": 9.0,
+          "description": "15-year education plan @ 9%"
+        },
+        "20": {
+          "rate": 9.0,
+          "description": "20-year education plan @ 9%"
+        }
+      },
+      "min_monthly_installment": 500,
+      "monthly_installment_multiple": 500,
+      "max_monthly_installment": 120000,
+      "tenure_months": [60, 120, 180, 240],
+      "sample_maturity_values": {
+        "500_monthly_5year": {
+          "installment": 500,
+          "tenure": "5 years",
+          "total_deposit": 30000,
+          "maturity_value": 37925,
+          "interest_earned": 7925
+        },
+        "500_monthly_20year": {
+          "installment": 500,
+          "tenure": "20 years",
+          "total_deposit": 120000,
+          "maturity_value": 333600,
+          "interest_earned": 213600
+        },
+        "10000_monthly_20year": {
+          "installment": 10000,
+          "tenure": "20 years",
+          "total_deposit": 2400000,
+          "maturity_value": 6672000,
+          "interest_earned": 4272000
+        }
+      },
+      "early_encashment_rules": {
+        "before_12_months": "no_profit",
+        "before_60_months": "savings_account_rate",
+        "before_120_months": "60m_scheme_rate_plus_fraction_savings",
+        "before_180_months": "120m_scheme_rate_plus_fraction_savings",
+        "before_240_months": "180m_scheme_rate_plus_fraction_savings"
+      },
+      "investment_facility": {
+        "available": true,
+        "percentage": 90,
+        "interest": "bank_loan_rate"
+      },
+      "eligible_for_minors": true,
+      "primary_users": [
+        "Young parents",
+        "Educators",
+        "Grandparents",
+        "Guardians",
+        "Education-focused savers"
+      ],
+      "documents_required": [
+        "Completed Personal Savings Scheme Account Opening Form",
+        "Active linked Current/Savings account",
+        "Child identity documents",
+        "Parent/guardian authorization",
+        "School certificate (if applicable)"
+      ]
+    },
+    {
+      "id": "ISLAMI_SCHEME_007",
+      "name": "Prime Profit-First TD",
+      "category": "Deposit Scheme",
+      "type": "fixed_deposit_advance_profit",
+      "tagline": "Start with a Win, Earn Profit on Day One",
+      "overview": "Unique fixed deposit providing advance profit payment on opening day with principal returned at 12-month maturity",
+      "markdown_ref": "/app/knowledge/products/islami/save/deposit_schemes/prime_profit_first_td.md",
+      "json_ref": "ISLAMI_SCHEME_007",
+      "operating_principle": "Mudaraba",
+      "shariah_compliant": true,
+      "unique_feature": "advance_profit_on_day_1",
+      "features": [
+        "Advance profit paid on opening day",
+        "Principal fully protected 12 months",
+        "Attractive fixed profit rate",
+        "12-month fixed tenor",
+        "Minimum BDT 1 lakh required",
+        "No maximum limit",
+        "Auto-payback of principal at maturity",
+        "Investment facility up to 90%",
+        "Early encashment option with penalties",
+        "Islamic Mudaraba principle"
+      ],
+      "tenor_months": 12,
+      "profit_rate": {
+        "rate": 8.0,
+        "type": "estimated",
+        "payment_timing": "day_1",
+        "description": "Approximate rate, confirmed at opening"
+      },
+      "min_deposit": 100000,
+      "max_deposit": "unlimited",
+      "sample_calculations": {
+        "100000_deposit": {
+          "amount": 100000,
+          "assumed_rate": 8.0,
+          "day_1_profit": 8000,
+          "month_12_principal": 100000,
+          "benefit": "Profit received immediately, capital safe"
+        },
+        "1000000_deposit": {
+          "amount": 1000000,
+          "assumed_rate": 8.0,
+          "day_1_profit": 80000,
+          "month_12_principal": 1000000,
+          "benefit": "High profit + principal preservation"
+        },
+        "5000000_deposit": {
+          "amount": 5000000,
+          "assumed_rate": 8.0,
+          "day_1_profit": 400000,
+          "month_12_principal": 5000000,
+          "benefit": "Substantial immediate cash + wealth preserved"
+        }
+      },
+      "principal_protection": "full_return_at_maturity",
+      "profit_payment": "advance_on_day_1",
+      "profit_refundable": false,
+      "early_encashment_rules": {
+        "before_1_month": "no_additional_profit",
+        "after_1_month": "savings_account_rate"
+      },
+      "investment_facility": {
+        "available": true,
+        "percentage": 90,
+        "interest": "bank_loan_rate"
+      },
+      "eligible_for_minors": true,
+      "primary_users": [
+        "Investors needing cash flow",
+        "Business owners",
+        "Retirees",
+        "Property sellers",
+        "Inheritance recipients"
+      ],
+      "documents_required": [
+        "Completed Personal Fixed Deposit Account Opening Form",
+        "Active linked Current/Savings account",
+        "Identity documents (NID/Passport/Birth Certificate)",
+        "Nominee information",
+        "Guardian documents (if minor)"
+      ]
+    },
+    {
+      "id": "ISLAMI_SCHEME_008",
+      "name": "Prime Hasanah Term Deposit Plus",
+      "category": "Deposit Scheme",
+      "type": "short_term_fixed_deposit_premium",
+      "tagline": "Premium Returns, Premium Flexibility",
+      "overview": "Premium short-term fixed deposit offering exceptional interest rates (9.25% for 91 days, 9.50% for 181 days) with auto-renewal options",
+      "markdown_ref": "/app/knowledge/products/islami/save/deposit_schemes/prime_hasanah_term_deposit_plus.md",
+      "json_ref": "ISLAMI_SCHEME_008",
+      "operating_principle": "Mudaraba",
+      "shariah_compliant": true,
+      "features": [
+        "Premium short-term rates: 9.25%-9.50%",
+        "Two tenor options: 91 or 181 days",
+        "Lump-sum deposits minimum BDT 10,000",
+        "No maximum limit",
+        "Auto-renewal with/without interest options",
+        "Investment facility up to 90%",
+        "Early encashment with reduced rates",
+        "Islamic Mudaraba principle",
+        "Quarterly/bi-annual maturity windows",
+        "Flexible amount multiples"
+      ],
+      "tenors": [91, 181],
+      "tenor_days": {
+        "91": {
+          "months": "~3 months",
+          "annual_rate": 9.25,
+          "rate_for_period": 2.32
+        },
+        "181": {
+          "months": "~6 months",
+          "annual_rate": 9.50,
+          "rate_for_period": 4.71
+        }
+      },
+      "min_deposit": 10000,
+      "min_deposit_multiple": 10000,
+      "max_deposit": "unlimited",
+      "sample_interest_calculations": {
+        "91day_10000": {
+          "deposit": 10000,
+          "tenor": 91,
+          "rate": 9.25,
+          "interest": 232
+        },
+        "91day_1000000": {
+          "deposit": 1000000,
+          "tenor": 91,
+          "rate": 9.25,
+          "interest": 23158
+        },
+        "181day_10000": {
+          "deposit": 10000,
+          "tenor": 181,
+          "rate": 9.50,
+          "interest": 471
+        },
+        "181day_1000000": {
+          "deposit": 1000000,
+          "tenor": 181,
+          "rate": 9.50,
+          "interest": 47123
+        }
+      },
+      "auto_renewal_options": [
+        {
+          "option": "with_interest",
+          "description": "Principal + accumulated interest renewed as new deposit, compounding effect"
+        },
+        {
+          "option": "principal_only",
+          "description": "Interest credited to account, principal renewed for next cycle"
+        }
+      ],
+      "early_encashment_rules": {
+        "before_91_days": "prime_savings_rate",
+        "before_181_days": "91d_td_plus_rate_plus_fraction_savings"
+      },
+      "investment_facility": {
+        "available": true,
+        "percentage": 90,
+        "interest": "bank_loan_rate"
+      },
+      "eligible_for_minors": true,
+      "primary_users": [
+        "Short-term investors",
+        "Business owners",
+        "Traders and investors",
+        "Goal-based planners",
+        "Premium rate seekers"
+      ],
+      "documents_required": [
+        "Completed Personal Fixed Deposit Account Opening Form",
+        "Active linked Current/Savings account",
+        "Identity documents",
+        "Nominee information",
+        "Guardian documents (if minor)"
+      ]
+    },
+    {
+      "id": "ISLAMI_SCHEME_009",
+      "name": "Sadaqah Jariyah Account",
+      "category": "Deposit Scheme",
+      "type": "perpetual_charity_waqf",
+      "tagline": "Give Continuously, Earn Eternally",
+      "overview": "Perpetual waqf-based charitable account where customers deposit capital earning 9% annual profit, with all profits donated yearly to Shariah-approved charitable organizations while principal remains intact eternally",
+      "markdown_ref": "/app/knowledge/products/islami/save/deposit_schemes/sadaqah_jariyah_account.md",
+      "json_ref": "ISLAMI_SCHEME_009",
+      "operating_principle": "Waqf (Charitable Endowment)",
+      "shariah_compliant": true,
+      "charitable": true,
+      "perpetual": true,
+      "features": [
+        "Perpetual non-withdrawable account",
+        "Capital preserved forever",
+        "9% annual profit all donated to charity",
+        "Three deposit modes: Fixed/Installment/Flexo",
+        "Faith-based charitable giving",
+        "Waqf (Islamic endowment) principle",
+        "Annual charitable distribution",
+        "Multiple partner organizations",
+        "Transparent donation process",
+        "Shariah Supervisory oversight"
+      ],
+      "deposit_modes": [
+        {
+          "mode": "fixed",
+          "description": "One-time lump-sum deposit",
+          "min_amount": 5000,
+          "tenure": "perpetual"
+        },
+        {
+          "mode": "installment",
+          "description": "Monthly installment for 36 or 60 months then perpetual",
+          "min_monthly": 1000,
+          "tenure_months": [36, 60]
+        },
+        {
+          "mode": "flexo",
+          "description": "Variable deposits anytime, 12-120 months tenure then perpetual",
+          "min_amount": 1000,
+          "tenure_months": "1_to_120"
+        }
+      ],
+      "profit_rate": {
+        "rate": 9.0,
+        "perpetual": true,
+        "all_donated": true
+      },
+      "sample_scenarios": {
+        "fixed_1000000": {
+          "mode": "fixed",
+          "deposit": 1000000,
+          "annual_profit": 90000,
+          "charity_donation_yearly": 90000,
+          "perpetual_benefit": "Forever yearly donation"
+        },
+        "installment_36month_5000": {
+          "mode": "installment",
+          "monthly": 5000,
+          "months": 36,
+          "total_capital": 180000,
+          "annual_profit_perpetual": 16200,
+          "charity_donation_yearly": 16200
+        },
+        "flexo_5year": {
+          "mode": "flexo",
+          "total_deposits_5year": 225000,
+          "annual_profit_perpetual": 20250,
+          "charity_donation_yearly": 20250
+        }
+      },
+      "non_withdrawable": true,
+      "no_premature_encashment": true,
+      "death_handling": {
+        "account_continuation": true,
+        "principal_perpetual": true,
+        "profit_continues": true,
+        "charity_continues": "forever"
+      },
+      "charity_partners": [
+        "As-Sunnah Foundation (Islamic education)",
+        "Center for Zakat Management (poverty alleviation)",
+        "Bangladesh Thalassemia Foundation (healthcare)",
+        "Dhaka Ahsania Mission (social welfare)",
+        "MASTUL Foundation (community development)"
+      ],
+      "supervision": [
+        "Sadaqah Management Committee (Prime Bank Head Office)",
+        "Shariah Supervisory Committee oversight",
+        "Quarterly audits and reports"
+      ],
+      "eligible_age": 18,
+      "joint_account": true,
+      "multiple_accounts": true,
+      "eligible_users": [
+        "Charitable-minded individuals",
+        "Retirees with legacy goals",
+        "Business owners (CSR)",
+        "Families building heritage",
+        "Inheritance recipients",
+        "Haj pilgrims"
+      ],
+      "documents_required": [
+        "Completed Personal Savings Account Opening Form (SJA-specific)",
+        "Linked CASA account details (for installment/flexo)",
+        "Identity documents (NID/Passport/Birth Certificate)",
+        "Address proof (utility bill <2 months)",
+        "Nominee information"
+      ]
+    },
+    {
+      "id": "ISLAMI_SCHEME_010",
+      "name": "Prime Hasanah NFCD Account",
+      "category": "Deposit Scheme",
+      "type": "non_resident_foreign_currency_deposit",
+      "tagline": "Global Earnings, Islamic Banking",
+      "overview": "Non-resident foreign currency deposit account for expatriate Bangladeshis, foreign nationals, and international workers supporting multi-currency savings with 1-12 month flexible tenors",
+      "markdown_ref": "/app/knowledge/products/islami/save/deposit_schemes/prime_hasanah_nfcd_account.md",
+      "json_ref": "ISLAMI_SCHEME_010",
+      "operating_principle": "Mudaraba",
+      "shariah_compliant": true,
+      "international": true,
+      "features": [
+        "Multi-currency support: USD/GBP/EUR/JPY",
+        "Flexible tenors: 1-12 months",
+        "Designed for expatriates and foreign workers",
+        "High minimum deposits (USD 1K-25K tier dependent)",
+        "No maximum limit on deposits",
+        "Easy international wire transfers",
+        "Competitive profit rates",
+        "Multiple account option",
+        "Islamic Mudaraba principle",
+        "Global customer base support"
+      ],
+      "eligible_customers": [
+        "Bangladeshi government officials abroad",
+        "Bangladeshi professionals in international organizations",
+        "Foreign nationals residing abroad or in Bangladesh",
+        "Foreign companies and firms",
+        "International financial institutions",
+        "100% foreign-owned businesses in EPZ"
+      ],
+      "currencies": [
+        {
+          "code": "USD",
+          "name": "US Dollar",
+          "use": "International trade standard"
+        },
+        {
+          "code": "GBP",
+          "name": "British Pound Sterling",
+          "use": "Commonwealth economies"
+        },
+        {
+          "code": "EUR",
+          "name": "Euro",
+          "use": "European business"
+        },
+        {
+          "code": "JPY",
+          "name": "Japanese Yen",
+          "use": "Asian investments"
+        }
+      ],
+      "account_tiers": [
+        {
+          "tier": "Bangladeshi Expatriate",
+          "min_usd": 1000,
+          "min_gbp": 500,
+          "min_eur": "equivalent",
+          "min_jpy": "equivalent"
+        },
+        {
+          "tier": "Foreign National/Company",
+          "min_usd": 25000,
+          "min_gbp": "equivalent",
+          "min_eur": "equivalent",
+          "min_jpy": "equivalent"
+        }
+      ],
+      "tenors": [1, 3, 6, 12],
+      "tenor_months": "1 to 12",
+      "profit_rates": {
+        "market_linked": true,
+        "tiered_by_tenure": true,
+        "typical_range": "3% to 8%",
+        "confirmation_at_opening": true
+      },
+      "sample_scenarios": [
+        {
+          "profile": "Bangladeshi expatriate in London",
+          "currency": "GBP",
+          "deposit": 15000,
+          "tenor": 12,
+          "benefit": "Safe GBP management while abroad"
+        },
+        {
+          "profile": "American executive in Dhaka",
+          "currency": "USD",
+          "deposit": 25000,
+          "tenor": 6,
+          "benefit": "Salary-matched management + profit"
+        },
+        {
+          "profile": "UK trading company",
+          "currencies": ["USD", "GBP"],
+          "deposits": [50000, 25000],
+          "tenors": [12, 12],
+          "benefit": "Multi-currency portfolio management"
+        }
+      ],
+      "account_features": [
+        "Receive international wire transfers",
+        "Make international payments",
+        "Earn competitive returns",
+        "Multiple tenor flexibility",
+        "Auto-renewal options"
+      ],
+      "account_restrictions": [
+        "No checkbook facility",
+        "Limited debit card (international only)",
+        "No overdraft allowed"
+      ],
+      "documents_required": [
+        "Completed NFCD Account Opening Form",
+        "Passport and work permit copies",
+        "Employment/salary certificate",
+        "Identity and address proof",
+        "Nominee information",
+        "Bank introduction letter"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,976 @@
+{
+  "prime_first_account": {
+    "product_id": "prime_first_account",
+    "product_name": "Prime First Account",
+    "category": "savings_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "Little Dreams Take Flight",
+    
+    "eligibility": {
+      "min_age": 13,
+      "max_age": 18,
+      "min_income": null,
+      "min_deposit": 100,
+      "income_required": false,
+      "employment_types": ["student"],
+      "credit_score_required": false,
+      "requires_guardian": true,
+      "guardian_operating_mandate": true
+    },
+    
+    "attributes": {
+      "interest_rate": 5.0,
+      "interest_frequency": "half_yearly",
+      "interest_bearing": "daily",
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "atm_access": true,
+      "cheque_book": true,
+      "debit_card": true,
+      "internet_banking": true,
+      "minimum_balance": 0
+    },
+    
+    "features": [
+      "low_opening_balance",
+      "student_eligible",
+      "parental_control",
+      "free_debit_card",
+      "free_internet_banking",
+      "interest_earning",
+      "no_maintenance_fee",
+      "atm_access_24_7"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate_parent",
+      "nid_passport_birth_certificate_student",
+      "nid_passport_birth_certificate_nominee",
+      "address_proof",
+      "school_id_or_certificate",
+      "tuition_fee_payment_slip",
+      "parent_income_proof",
+      "passport_photo_student_2",
+      "passport_photo_parent_1",
+      "passport_photo_nominee_1",
+      "psr_etin_parent"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_first_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "Students under 18",
+      "Young learners",
+      "Children with parental oversight"
+    ],
+    
+    "regulatory_note": "FDIC insured up to maximum limit per Bangladesh Bank guidelines"
+  },
+
+  "prime_youth_account": {
+    "product_id": "prime_youth_account",
+    "product_name": "Prime Youth Account",
+    "category": "savings_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "Live Life with Financial Freedom",
+    
+    "eligibility": {
+      "min_age": 18,
+      "max_age": 25,
+      "min_income": null,
+      "min_deposit": 500,
+      "income_required": false,
+      "employment_types": ["student", "employed"],
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "guardian_operating_mandate": false
+    },
+    
+    "attributes": {
+      "interest_rate": 4.0,
+      "interest_frequency": "half_yearly",
+      "interest_bearing": "daily",
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "atm_access": true,
+      "cheque_book": true,
+      "debit_card": true,
+      "internet_banking": true,
+      "minimum_balance": 0,
+      "life_insurance": true,
+      "hospitalization_coverage": true
+    },
+    
+    "features": [
+      "student_eligible",
+      "free_debit_card",
+      "free_cheque_book",
+      "free_internet_banking",
+      "free_sms_alert",
+      "natural_death_coverage",
+      "accidental_death_coverage",
+      "hospitalization_coverage",
+      "interest_earning",
+      "no_maintenance_fee"
+    ],
+    
+    "insurance_coverage": {
+      "natural_death": 100000,
+      "accidental_death": 100000,
+      "hospitalization": 15000
+    },
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate_applicant",
+      "nid_passport_birth_certificate_nominee",
+      "address_proof",
+      "student_id_certificate",
+      "parent_income_proof",
+      "passport_photo_applicant_2",
+      "passport_photo_nominee_1",
+      "psr_etin"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_youth_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "Young adults 18-25",
+      "College and university students",
+      "Young professionals",
+      "Recent graduates"
+    ],
+    
+    "regulatory_note": "FDIC insured up to maximum limit per Bangladesh Bank guidelines. Insurance underwritten by partnering company."
+  },
+
+  "prime_savings_account": {
+    "product_id": "prime_savings_account",
+    "product_name": "Prime Savings Account",
+    "category": "savings_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "Saved My Money, Gained A Smile",
+    
+    "eligibility": {
+      "min_age": 0,
+      "max_age": null,
+      "min_income": null,
+      "min_deposit": 500,
+      "income_required": false,
+      "employment_types": ["any"],
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "guardian_operating_mandate": false
+    },
+    
+    "attributes": {
+      "interest_rate": 2.0,
+      "interest_frequency": "half_yearly",
+      "interest_bearing": "daily",
+      "interest_min_balance": 10000,
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "atm_access": true,
+      "cheque_book": true,
+      "debit_card": true,
+      "internet_banking": true,
+      "minimum_balance": 0
+    },
+    
+    "features": [
+      "all_ages_eligible",
+      "low_opening_balance",
+      "free_debit_card",
+      "free_cheque_book",
+      "free_internet_banking",
+      "interest_earning",
+      "no_maintenance_fee",
+      "flexible_withdrawal",
+      "guardian_option_for_minors"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate_applicant",
+      "nid_passport_birth_certificate_nominee",
+      "address_proof",
+      "income_proof",
+      "passport_photo_applicant_2",
+      "passport_photo_nominee_1",
+      "psr_etin",
+      "fatca_form"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_savings_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "All Bangladeshi citizens",
+      "Salaried employees",
+      "Business owners",
+      "Self-employed professionals",
+      "Minors (with guardian)",
+      "Retirees"
+    ],
+    
+    "regulatory_note": "FDIC insured up to maximum limit per Bangladesh Bank guidelines"
+  },
+
+  "prime_freelancer_account": {
+    "product_id": "prime_freelancer_account",
+    "product_name": "Prime Freelancer Account",
+    "category": "foreign_currency_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "Optimized My Income, Become My Own Boss",
+    
+    "eligibility": {
+      "min_age": 18,
+      "max_age": null,
+      "min_income": null,
+      "min_deposit": 0,
+      "income_required": true,
+      "income_type": "foreign_currency_freelance",
+      "employment_types": ["freelancer"],
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "residency_required": true,
+      "valid_employment_proof_required": true
+    },
+    
+    "attributes": {
+      "currency": "USD",
+      "secondary_currencies": ["GBP", "EUR"],
+      "interest_rate": 0.0,
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "international_debit_card": true,
+      "linked_bdt_account": true,
+      "erq_retention_limit": 35,
+      "bundled_account": true
+    },
+    
+    "features": [
+      "foreign_currency_account",
+      "zero_balance_opening",
+      "free_international_debit_card_lifetime",
+      "35_percent_retention",
+      "bundled_bdt_account",
+      "no_maintenance_fee",
+      "hassle_free_conversion",
+      "dedicated_service_desk",
+      "complementary_life_insurance",
+      "seamless_remittance"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate",
+      "address_proof",
+      "government_certificate_or_basis_or_bfds",
+      "freelance_profile_screenshot",
+      "work_order_last_3_items",
+      "email_communication_work_order",
+      "passport_photo_applicant_2",
+      "passport_photo_nominee_1",
+      "psr_etin"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_freelancer_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "Freelancers earning in foreign currency",
+      "Software developers",
+      "Content writers and designers",
+      "Virtual assistants",
+      "Service providers abroad",
+      "Consultants"
+    ],
+    
+    "regulatory_note": "ERQ Account (Exporters' Retention Quota) as per Bangladesh Bank guidelines. Subject to 35% retention limit."
+  },
+
+  "prime_current_account": {
+    "product_id": "prime_current_account",
+    "product_name": "Prime Current Account",
+    "category": "current_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "Limitless Possibilities Await",
+    
+    "eligibility": {
+      "min_age": 18,
+      "max_age": null,
+      "min_income": null,
+      "min_deposit": 1000,
+      "income_required": false,
+      "employment_types": ["any"],
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "residency_required": true
+    },
+    
+    "attributes": {
+      "interest_rate": 0.0,
+      "unlimited_transactions": true,
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "atm_access": true,
+      "cheque_book": true,
+      "debit_card": true,
+      "internet_banking": true,
+      "minimum_balance": 0
+    },
+    
+    "features": [
+      "unlimited_deposits",
+      "unlimited_withdrawals",
+      "no_transaction_limits",
+      "free_debit_card",
+      "free_internet_banking",
+      "free_cheque_book",
+      "business_focused",
+      "no_maintenance_fee",
+      "24_7_access"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate_applicant",
+      "nid_passport_birth_certificate_nominee",
+      "address_proof",
+      "income_employment_proof",
+      "passport_photo_applicant_2",
+      "passport_photo_nominee_1",
+      "psr_etin",
+      "fatca_form"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_current_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "Business owners",
+      "Traders and retailers",
+      "Professionals",
+      "Sole proprietors",
+      "Freelancers seeking local transactions",
+      "High-volume transaction users"
+    ],
+    
+    "regulatory_note": "FDIC insured (BDT portion) up to maximum limit per Bangladesh Bank guidelines"
+  },
+
+  "prime_rfcd_account": {
+    "product_id": "prime_rfcd_account",
+    "product_name": "Prime RFCD Account",
+    "full_name": "Resident Foreign Currency Deposit Account",
+    "category": "foreign_currency_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "Left the Worry, Embraced the Joy",
+    
+    "eligibility": {
+      "min_age": 18,
+      "max_age": null,
+      "min_income": null,
+      "min_deposit": 250,
+      "income_required": false,
+      "employment_types": ["any"],
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "residency_required": true,
+      "passport_required": true,
+      "travel_history_required": true
+    },
+    
+    "attributes": {
+      "currencies": ["USD", "GBP", "EUR"],
+      "interest_rate": 0.0,
+      "cash_deposit_limit_no_declaration": 10000,
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "minimum_balance": 0,
+      "international_credit_card": true,
+      "multi_currency": true,
+      "remittance_enabled": true
+    },
+    
+    "features": [
+      "multi_currency_deposit",
+      "usd_gbp_eur_support",
+      "no_maintenance_fee",
+      "no_minimum_balance",
+      "free_deposits",
+      "flexible_withdrawal",
+      "international_credit_card",
+      "remittance_worldwide",
+      "easy_currency_conversion",
+      "zero_declaration_upto_10k"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_or_passport",
+      "address_proof",
+      "passport_with_immigration_stamp",
+      "declaration_form",
+      "fmj_form_if_over_10k",
+      "passport_photo_2",
+      "nominee_photo_1",
+      "income_proof_optional"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/resident_foreign_currency_deposit_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "Expatriates and NRBs",
+      "Parents of students abroad",
+      "International business owners",
+      "Frequent travelers",
+      "Remittance recipients",
+      "Foreign earners"
+    ],
+    
+    "regulatory_note": "FDIC insured up to maximum limit per Bangladesh Bank guidelines. Complies with foreign currency deposit regulations."
+  },
+
+  "prime_personal_retail_account": {
+    "product_id": "prime_personal_retail_account",
+    "product_name": "Prime Personal Retail Account",
+    "category": "savings_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "Unlimited Banking Transactions for Personal or Business",
+    
+    "eligibility": {
+      "min_age": 18,
+      "max_age": null,
+      "min_income": null,
+      "min_deposit": 0,
+      "income_required": false,
+      "employment_types": ["micro_entrepreneur", "street_vendor", "service_provider", "social_media_seller", "self_employed"],
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "trade_license_required": false,
+      "alternative_documentation_required": true
+    },
+    
+    "attributes": {
+      "interest_rate": 0.0,
+      "unlimited_transactions": true,
+      "no_account_maintenance_fee": true,
+      "no_intercity_transaction_fee": true,
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "atm_access": true,
+      "cheque_book": true,
+      "debit_card": true,
+      "internet_banking": true,
+      "minimum_balance": 0
+    },
+    
+    "features": [
+      "zero_balance_opening",
+      "unlimited_transactions",
+      "no_maintenance_fee",
+      "no_intercity_fee",
+      "free_internet_banking",
+      "free_first_cheque_book",
+      "free_debit_card",
+      "no_trade_license_required",
+      "alternative_attestation_accepted"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate",
+      "address_proof",
+      "income_profession_proof_attestation_certificate",
+      "local_public_representative_attestation",
+      "professional_association_certificate",
+      "passport_photo_2",
+      "nominee_photo_1",
+      "psr_etin",
+      "fatca_form"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_personal_retail_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "Street vendors and market sellers",
+      "Service providers (plumbers, electricians, carpenters)",
+      "Social media entrepreneurs",
+      "Artisans and craft makers",
+      "Seasonal and floating entrepreneurs",
+      "Micro-business owners without formal licenses"
+    ],
+    
+    "regulatory_note": "FDIC insured up to maximum limit per Bangladesh Bank guidelines. Complies with financial inclusion initiatives."
+  },
+
+  "prime_teachers_account": {
+    "product_id": "prime_teachers_account",
+    "product_name": "Prime Teacher's Savings Account",
+    "category": "savings_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "A Savings Guide for the Teachers",
+    
+    "eligibility": {
+      "min_age": 18,
+      "max_age": null,
+      "min_income": null,
+      "min_deposit": 500,
+      "income_required": true,
+      "employment_types": ["teacher", "lecturer", "professor"],
+      "employment_status": "active",
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "residency_required": true
+    },
+    
+    "attributes": {
+      "interest_rate": 5.0,
+      "interest_frequency": "monthly",
+      "interest_bearing": "daily",
+      "tiered_interest": true,
+      "life_insurance": true,
+      "max_insurance_coverage": 300000,
+      "locker_discount": 50,
+      "loan_fee_waiver": 50,
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "atm_access": true,
+      "cheque_book": true,
+      "debit_card": true,
+      "internet_banking": true,
+      "minimum_balance": 0
+    },
+    
+    "tiered_interest_rates": {
+      "0_to_50000": 0.0,
+      "50001_to_500000": 4.0,
+      "500001_to_2000000": 4.5,
+      "2000001_plus": 5.0
+    },
+    
+    "insurance_coverage_tiers": {
+      "below_100000": 100000,
+      "100000_to_200000": 200000,
+      "200000_plus": 300000
+    },
+    
+    "features": [
+      "tiered_interest_upto_5_percent",
+      "monthly_interest_payment",
+      "free_first_cheque_book",
+      "free_internet_banking",
+      "free_debit_card_first_year",
+      "complimentary_life_insurance",
+      "50_percent_locker_discount",
+      "50_percent_loan_processing_fee_waiver",
+      "priority_service",
+      "dedicated_support"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate_applicant",
+      "nid_passport_birth_certificate_nominee",
+      "address_proof",
+      "salary_certificate",
+      "letter_of_intent",
+      "pay_slip",
+      "job_id",
+      "passport_photo_applicant_2",
+      "passport_photo_nominee_1",
+      "psr_etin"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_teachers_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "School teachers",
+      "College lecturers",
+      "University professors",
+      "Education administrators",
+      "Active educators"
+    ],
+    
+    "regulatory_note": "FDIC insured up to maximum limit per Bangladesh Bank guidelines. Life insurance underwritten by partnering insurance company."
+  },
+
+  "prime_50_plus_savings_account": {
+    "product_id": "prime_50_plus_savings_account",
+    "product_name": "Prime 50 & Plus Savings Account",
+    "category": "savings_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "Life Only Gets Better",
+    
+    "eligibility": {
+      "min_age": 50,
+      "max_age": null,
+      "min_income": null,
+      "min_deposit": 500,
+      "income_required": false,
+      "employment_types": ["any"],
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "residency_required": true,
+      "senior_citizen": true
+    },
+    
+    "attributes": {
+      "interest_rate": 4.5,
+      "interest_frequency": "monthly",
+      "interest_bearing": "daily",
+      "tiered_interest": true,
+      "health_benefits": true,
+      "locker_discount": 50,
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "atm_access": true,
+      "debit_card": true,
+      "internet_banking": true,
+      "minimum_balance": 0
+    },
+    
+    "tiered_interest_rates": {
+      "below_100000": 3.0,
+      "100001_to_1000000": 3.5,
+      "1000001_to_5000000": 4.0,
+      "5000001_plus": 4.5
+    },
+    
+    "features": [
+      "tiered_interest_upto_4_50_percent",
+      "monthly_interest_payment",
+      "free_debit_card",
+      "free_internet_banking",
+      "free_sms_alerts",
+      "medical_health_benefits",
+      "hospital_network_access",
+      "50_percent_locker_discount",
+      "priority_senior_service",
+      "dedicated_helpline"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate",
+      "address_proof",
+      "pension_statement_or_salary_slip",
+      "retirement_certificate",
+      "income_proof_any_type",
+      "passport_photo_2",
+      "nominee_photo_1",
+      "psr_etin"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_50_plus_savings_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "Senior citizens 50 and above",
+      "Retirees",
+      "Pensioners",
+      "Elderly individuals",
+      "Health-conscious seniors"
+    ],
+    
+    "regulatory_note": "FDIC insured up to maximum limit per Bangladesh Bank guidelines. Health benefits provided through hospital network partners."
+  },
+
+  "prime_porijon_savings_account": {
+    "product_id": "prime_porijon_savings_account",
+    "product_name": "Prime Porijon Savings Account",
+    "category": "savings_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "Supporting Families Across Borders",
+    
+    "eligibility": {
+      "min_age": 18,
+      "max_age": 65,
+      "min_income": null,
+      "min_deposit": 500,
+      "income_required": false,
+      "employment_types": ["any"],
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "nrb_relationship": true,
+      "beneficiary_requirement": true,
+      "sole_operator_requirement": true,
+      "residency_required": true
+    },
+    
+    "attributes": {
+      "interest_rate": 3.0,
+      "interest_frequency": "monthly",
+      "interest_bearing": "daily",
+      "interest_min_balance": 10000,
+      "life_insurance": true,
+      "insurance_on_remittance": true,
+      "max_remittance_insurance": 100000,
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "cheque_book": true,
+      "dual_currency_card": true,
+      "internet_banking": true,
+      "minimum_balance": 0
+    },
+    
+    "remittance_insurance_tiers": {
+      "upto_50000": 25000,
+      "50001_to_100000": 75000,
+      "above_100000": 100000
+    },
+    
+    "features": [
+      "3_percent_interest",
+      "monthly_interest_payment",
+      "complimentary_remittance_insurance",
+      "30_day_coverage_period",
+      "free_cheque_book",
+      "free_internet_banking",
+      "local_dual_currency_debit_card",
+      "unlimited_transactions",
+      "nrb_family_focused",
+      "seamless_remittance",
+      "insurance_on_wage_earner_remittance"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate",
+      "address_proof",
+      "income_profession_proof",
+      "nrb_work_permit_if_joint",
+      "nrb_visa_copy_if_joint",
+      "passport_photo_2",
+      "nominee_photo_1",
+      "psr_etin"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_porijon_savings_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "Family members of NRB remitters",
+      "Wives of overseas workers",
+      "Mothers receiving remittance support",
+      "Children of NRB parents",
+      "Siblings receiving support",
+      "NRB family beneficiaries"
+    ],
+    
+    "regulatory_note": "FDIC insured up to maximum limit per Bangladesh Bank guidelines. Remittance insurance complies with Bangladesh Bank wage earner remittance guidelines."
+  },
+
+  "prime_atlas_fc_account": {
+    "product_id": "prime_atlas_fc_account",
+    "product_name": "Prime Atlas FC Account",
+    "category": "foreign_currency_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "Sail the World, Save at Home",
+    
+    "eligibility": {
+      "min_age": 18,
+      "max_age": null,
+      "min_income": null,
+      "min_deposit": 0,
+      "income_required": true,
+      "income_type": "maritime",
+      "employment_type": "mariner_crew_member",
+      "vessel_requirement": "ocean_going",
+      "shipping_company": "foreign_or_local",
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "passport_required": true,
+      "discharge_book_required": true
+    },
+    
+    "attributes": {
+      "currencies": ["USD", "GBP", "EUR", "JPY"],
+      "interest_rate": 0.0,
+      "unlimited_transactions": true,
+      "international_debit_card": true,
+      "debit_card_currency_restriction": "USD_only",
+      "linked_bdt_account": true,
+      "investment_eligible": true,
+      "wage_earners_bond_eligible": true,
+      "nfcd_eligible": true,
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "minimum_balance": 0
+    },
+    
+    "features": [
+      "multi_currency_account",
+      "unlimited_transactions",
+      "international_debit_card",
+      "local_currency_withdrawals",
+      "linked_prime_one_bdt_account",
+      "global_remittance",
+      "wage_earners_bond_investment",
+      "nfcd_investment_eligible",
+      "mariner_specific_documentation",
+      "seamless_forex_conversion"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate",
+      "address_proof",
+      "valid_passport",
+      "mariner_discharge_book",
+      "employment_letter_from_agent",
+      "current_work_contract",
+      "passport_photo_2",
+      "nominee_photo_1",
+      "psr_etin"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_atlas_fc_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "Bangladeshi mariners",
+      "Ocean-going vessel crew members",
+      "Ship captains and officers",
+      "Deck crew and ratings",
+      "Engine crew",
+      "Seafarers with international employment"
+    ],
+    
+    "regulatory_note": "FDIC insured (BDT portion) up to maximum limit per Bangladesh Bank guidelines. Complies with NRB and foreign currency account regulations."
+  },
+
+  "prime_one_savings_account": {
+    "product_id": "prime_one_savings_account",
+    "product_name": "Prime One Savings Account",
+    "category": "savings_account",
+    "banking_type": "conventional",
+    "vertical": "save",
+    "tagline": "One Choice, Total Freedom",
+    
+    "eligibility": {
+      "min_age": 0,
+      "max_age": null,
+      "min_income": null,
+      "min_deposit": 500,
+      "income_required": false,
+      "employment_types": ["any"],
+      "credit_score_required": false,
+      "requires_guardian": false,
+      "minor_eligible": true,
+      "joint_account": true,
+      "residency_required": true
+    },
+    
+    "attributes": {
+      "interest_rate": 4.0,
+      "interest_frequency": "monthly",
+      "interest_bearing": "daily",
+      "interest_min_balance": 100000,
+      "tiered_interest": true,
+      "life_insurance": true,
+      "max_insurance_coverage": 500000,
+      "multi_currency_card": true,
+      "monthly_fee": 0,
+      "annual_fee": 0,
+      "maintenance_fee": 0,
+      "intercity_commission": 0,
+      "online_commission": 0,
+      "atm_access": true,
+      "cheque_book": true,
+      "debit_card": true,
+      "internet_banking": true,
+      "minimum_balance": 0
+    },
+    
+    "tiered_interest_rates": {
+      "0_to_100000": 0.0,
+      "100001_to_1000000": 2.0,
+      "1000001_to_2500000": 3.0,
+      "2500000_plus": 4.0
+    },
+    
+    "insurance_coverage_tiers": {
+      "100000_to_200000": 100000,
+      "200001_to_300000": 200000,
+      "300001_to_400000": 300000,
+      "400001_to_500000": 400000,
+      "500000_plus": 500000
+    },
+    
+    "features": [
+      "tiered_interest_upto_4_percent",
+      "monthly_interest_payment",
+      "no_intercity_commission",
+      "no_online_commission",
+      "complimentary_life_insurance",
+      "up_to_5_lakh_coverage",
+      "multi_currency_debit_card",
+      "free_first_year_debit_card",
+      "free_cheque_book",
+      "free_internet_banking",
+      "24_7_atm_access",
+      "minor_account_option",
+      "joint_account_option"
+    ],
+    
+    "documents_required": [
+      "account_opening_form",
+      "nid_passport_birth_certificate",
+      "address_proof",
+      "income_profession_proof",
+      "parent_documents_if_minor",
+      "parent_operating_mandate_if_minor",
+      "passport_photo_2",
+      "nominee_photo_1",
+      "psr_etin",
+      "fatca_form"
+    ],
+    
+    "markdown_ref": "knowledge/products/conventional/save/deposit_accounts/prime_one_savings_account.md",
+    "json_ref": "knowledge/structured/conventional/deposit_accounts.json",
+    
+    "target_audience": [
+      "All Bangladeshi citizens",
+      "Salaried professionals",
+      "Business owners",
+      "Self-employed professionals",
+      "Students and young adults",
+      "Families and households",
+      "Minors with parental support",
+      "High-balance savers",
+      "Wage earner investors"
+    ],
+    
+    "regulatory_note": "FDIC insured up to maximum limit per Bangladesh Bank guidelines. Life insurance underwritten by partnering insurance company. Interest rates subject to change with notice."
+  }
+}
