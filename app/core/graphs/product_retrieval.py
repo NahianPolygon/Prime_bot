@@ -1,135 +1,114 @@
-from langgraph.graph import StateGraph, END
-from typing import Any
+from langgraph.graph import StateGraph, START, END
+from app.core.config import llm
 from app.models.conversation_state import ConversationState
-from app.core.graph_visualizer import save_graph_visualization
+from app.models.graphs import ProductSelection
 from app.services.knowledge_service import load_products
+from app.prompts.product_retrieval import RETRIEVE_PRODUCTS_PROMPT, RANK_PRODUCTS_PROMPT, GENERATE_RETRIEVAL_MESSAGE
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ProductRetrievalGraph:
     def __init__(self):
-        self._graph = None
+        self.llm = llm
 
-    def build_query_node(self, state: ConversationState) -> dict:
-        banking_type = state.banking_type or "conventional"
-        category = state.product_category or "deposit"
-        
-        return {
-            "banking_type": banking_type,
-            "product_category": category,
-            "response": f"Searching for {banking_type} {category} products..."
-        }
+    def retrieve_products_node(self, state: ConversationState) -> dict:
+        try:
+            banking_type = state.banking_type or "conventional"
+            category = state.product_category or "deposit"
+            
+            products = load_products(banking_type, category)
+            product_names = []
+            
+            if isinstance(products, list):
+                product_names = [
+                    p.get("product_name") or p.get("name", "") 
+                    for p in products if p.get("product_name") or p.get("name")
+                ]
+            elif isinstance(products, dict):
+                product_names = list(products.keys())
+            
+            profile = state.user_profile.model_dump(exclude_none=True)
+            
+            prompt = self.RETRIEVE_PRODUCTS_PROMPT.format(
+                banking_type=banking_type,
+                product_category=category,
+                profile=profile,
+                available_products=", ".join(product_names[:10]) or "None"
+            )
 
-    def fetch_products_node(self, state: ConversationState) -> dict:
-        banking_type = state.banking_type or "conventional"
-        category = state.product_category or "deposit"
-        
-        # Load products from knowledge base
-        products = load_products(banking_type, category)
-        
-        product_names = []
-        if isinstance(products, list):
-            product_names = [p.get('product_name') or p.get('name', '') for p in products if p.get('product_name') or p.get('name')]
-        elif isinstance(products, dict):
-            product_names = list(products.keys())
-        
-        return {
-            "eligible_products": product_names[:10],
-            "response": f"Found {len(product_names)} {banking_type} {category} products."
-        }
+            structured_llm = self.llm.with_structured_output(ProductSelection)
+            result = structured_llm.invoke(prompt)
+
+            return {
+                "eligible_products": result.selected_products,
+                "response": result.ranking_reason
+            }
+        except Exception as e:
+            return {
+                "eligible_products": [],
+                "response": "I'm retrieving available products for you."
+            }
 
     def rank_products_node(self, state: ConversationState) -> dict:
-        products = state.eligible_products if isinstance(state.eligible_products, list) else []
+        if not state.eligible_products:
+            return {}
         
-        # Rank based on user profile
-        ranked = products
-        if state.user_profile and state.user_profile.employment_type:
-            employment_type = state.user_profile.employment_type.lower()
+        try:
+            products = state.eligible_products if isinstance(state.eligible_products, list) else []
+            profile = state.user_profile
             
-            if "freelancer" in employment_type or "self-employed" in employment_type:
-                freelancer_products = [p for p in products if "freelancer" in p.lower()]
-                other_products = [p for p in products if "freelancer" not in p.lower()]
-                ranked = freelancer_products + other_products
-        
-        return {
-            "eligible_products": ranked[:10],
-            "response": f"Ranked {len(ranked)} products."
-        }
+            prompt = self.RANK_PRODUCTS_PROMPT.format(
+                products=", ".join(products),
+                age=profile.age or "Unknown",
+                employment=profile.employment_type or "Unknown",
+                income=profile.income_monthly or "Unknown"
+            )
 
-    def format_response_node(self, state: ConversationState) -> dict:
-        message = state.conversation_history[-1]["content"].lower() if state.conversation_history else ""
-        banking_type = state.banking_type or "conventional"
-        category = state.product_category or "deposit"
-        products = state.eligible_products if isinstance(state.eligible_products, list) else []
-        
-        if any(word in message for word in ["islamic", "shariah", "halal", "islami"]):
-            if not products:
-                response = "I understand you're interested in Shariah-compliant banking products. What type of product would you like - savings accounts, deposit schemes, or credit products?"
-            else:
-                top_products = products[:3]
-                products_text = "\n".join([f"• {p}" for p in top_products])
-                response = f"Great! Here are our Shariah-compliant {category} products:\n{products_text}\n\nWould you like more details?"
-        
-        elif any(word in message for word in ["deposit", "save", "savings", "account", "dps", "scheme"]):
-            if not products:
-                response = f"For savings and deposit products, could you tell me more? How much would you like to deposit initially?"
-            else:
-                top_products = products[:3]
-                products_text = "\n".join([f"• {p}" for p in top_products])
-                response = f"Based on your interest in savings, here are our top {banking_type} options:\n{products_text}\n\nWould you like more details?"
-        
-        elif any(word in message for word in ["credit", "card", "loan"]):
-            if not products:
-                response = f"We have various credit products. What's your annual income and what features matter most to you?"
-            else:
-                top_products = products[:3]
-                products_text = "\n".join([f"• {p}" for p in top_products])
-                response = f"Here are our {banking_type} credit cards:\n{products_text}\n\nWould you like to know about features or eligibility?"
-        
-        else:
-            if not products:
-                response = f"I'd love to help! Could you tell me more about what type of product you're looking for?"
-            else:
-                top_products = products[:3]
-                products_text = "\n".join([f"• {p}" for p in top_products])
-                response = f"Based on your interest, here are my recommendations:\n{products_text}\n\nWould you like more details?"
-        
-        return {
-            "response": response,
-            "eligible_products": products
-        }
+            structured_llm = self.llm.with_structured_output(ProductSelection)
+            result = structured_llm.invoke(prompt)
 
-    def build_graph(self) -> Any:
+            return {"eligible_products": result.selected_products}
+        except Exception as e:
+            return {"eligible_products": state.eligible_products}
+
+    def generate_recommendation_message_node(self, state: ConversationState) -> dict:
+        try:
+            products = state.eligible_products or []
+            profile_category = state.product_category or "banking"
+            
+            prompt = self.GENERATE_RETRIEVAL_MESSAGE.format(
+                products=", ".join(products) or "None currently",
+                profile_category=profile_category
+            )
+
+            response = self.llm.invoke(prompt)
+            return {"response": response.content}
+        except Exception as e:
+            products = state.eligible_products or []
+            if products:
+                return {"response": f"Here are some products you might be interested in: {', '.join(products[:3])}"}
+            return {"response": "Let me help you find the right product for your needs."}
+
+    def build_graph(self):
         graph = StateGraph(ConversationState)
         
-        graph.add_node("build_query", self.build_query_node)
-        graph.add_node("fetch_products", self.fetch_products_node)
+        graph.add_node("retrieve_products", self.retrieve_products_node)
         graph.add_node("rank_products", self.rank_products_node)
-        graph.add_node("format_response", self.format_response_node)
+        graph.add_node("generate_message", self.generate_recommendation_message_node)
         
-        graph.set_entry_point("build_query")
-        graph.add_edge("build_query", "fetch_products")
-        graph.add_edge("fetch_products", "rank_products")
-        graph.add_edge("rank_products", "format_response")
-        graph.add_edge("format_response", END)
+        graph.add_edge(START, "retrieve_products")
+        graph.add_edge("retrieve_products", "rank_products")
+        graph.add_edge("rank_products", "generate_message")
+        graph.add_edge("generate_message", END)
         
-        self._graph = graph.compile()
-        save_graph_visualization(graph, "graph_2_product_retrieval")
-        return self._graph
-    
-    def invoke(self, state: ConversationState) -> ConversationState:
+        return graph.compile()
+
+    def visualize(self):
         graph = self.build_graph()
-        if isinstance(state, dict):
-            state_obj = ConversationState(**state)
-            state_dict = state
-        else:
-            state_obj = state
-            state_dict = state.model_dump()
-        
-        result = graph.invoke(state_dict)
-        
-        updated_fields = {
-            "eligible_products": result.get("eligible_products", state_obj.eligible_products),
-            "response": result.get("response", state_obj.response)
-        }
-        
-        return ConversationState(**{**state_obj.model_dump(), **updated_fields})
+        return graph.get_graph().to_dict()
+
+    def invoke(self, state):
+        graph = self.build_graph()
+        return graph.invoke(state)

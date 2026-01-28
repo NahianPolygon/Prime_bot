@@ -1,20 +1,6 @@
 from pathlib import Path
 from typing import Optional
-from pydantic import BaseModel
-
-
-class DocumentMetadata(BaseModel):
-    title: str
-    path: str
-    category: str
-    domain: str
-    filename: str
-
-
-class DocumentContent(BaseModel):
-    metadata: DocumentMetadata
-    content: str
-    word_count: int
+from app.models.documents import DocumentMetadata, DocumentContent
 
 
 class MarkdownLoader:

@@ -1,84 +1,112 @@
-from langgraph.graph import StateGraph, END
-from typing import Any
+from langgraph.graph import StateGraph, START, END
+from app.core.config import llm
 from app.models.conversation_state import ConversationState
-from app.core.graph_visualizer import save_graph_visualization
+from app.models.graphs import ExplanationResult
+from app.prompts.rag_explanation import RETRIEVE_DOCUMENTS_PROMPT, GROUND_EXPLANATION_PROMPT, FORMAT_EXPLANATION_MESSAGE
+from app.services.knowledge_service import load_products
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RAGExplanationGraph:
-    def __init__(self, openai_client=None, embedding_model=None):
-        self._graph = None
-        self.client = openai_client
-        self.embedding_model = embedding_model
+    def __init__(self):
+        self.llm = llm
 
     def retrieve_documents_node(self, state: ConversationState) -> dict:
-        query = state.response or "banking products information"
-        retrieved_docs = [
-            {
-                "title": "Deposit Products Guide",
-                "content": "Deposit products include savings accounts, fixed deposits, and monthly savings schemes."
-            },
-            {
-                "title": "Credit Products Guide",
-                "content": "Credit products include credit cards, personal loans, and overdrafts."
-            }
-        ]
+        banking_type = state.banking_type or "conventional"
+        category = state.product_category or "deposit"
         
+        # Map product categories to knowledge service categories
+        category_map = {
+            "credit": "credit",
+            "deposit": "deposit",
+            "schemes": "schemes"
+        }
+        kb_category = category_map.get(category, "deposit")
+        
+        # Load products from knowledge base
+        all_products = load_products(banking_type, kb_category)
+
+        context = []
+        for prod in all_products[:2]:
+            context.append({
+                "name": prod.get("product_name") or prod.get("name", ""),
+                "description": prod.get("description") or prod.get("tagline", ""),
+                "features": prod.get("features", []),
+                "charges": prod.get("charges", {}) if isinstance(prod.get("charges"), dict) else {}
+            })
+
         return {
-            "response": f"Retrieved {len(retrieved_docs)} relevant documents."
+            "retrieved_context": context,
+            "response": f"Retrieved context for {len(context)} products"
         }
 
-    def grounded_generation_node(self, state: ConversationState) -> dict:
-        context = "Based on banking product documentation: "
-        
-        if state.banking_type == "deposit":
-            context += "Deposit products help you save money safely with interest benefits."
-        elif state.banking_type == "credit":
-            context += "Credit products provide borrowing solutions with flexible repayment."
-        
-        if state.eligible_products:
-            context += f" Recommended products: {', '.join(state.eligible_products[:2])}"
-        
-        return {
-            "response": context
-        }
+    def ground_explanation_node(self, state: ConversationState) -> dict:
+        try:
+            product = state.response or "banking product"
+            context = getattr(state, "retrieved_context", [])
+            profile = state.user_profile.model_dump(exclude_none=True)
+            
+            prompt = self.GROUND_EXPLANATION_PROMPT.format(
+                product=product,
+                context=str(context),
+                profile=profile
+            )
+
+            structured_llm = self.llm.with_structured_output(ExplanationResult)
+            result = structured_llm.invoke(prompt)
+
+            return {
+                "response": result.explanation,
+                "explanation_benefits": result.key_benefits,
+                "explanation_terms": result.important_terms
+            }
+        except Exception as e:
+            return {
+                "response": f"Let me explain this product to you.",
+                "explanation_benefits": [],
+                "explanation_terms": {}
+            }
 
     def format_explanation_node(self, state: ConversationState) -> dict:
-        explanation = f"Here's what you need to know:\n\n{state.response}\n\n"
-        explanation += "This recommendation is based on your profile and banking needs."
-        
-        return {
-            "response": explanation
-        }
+        try:
+            explanation = getattr(state, "response", "")
+            benefits = getattr(state, "explanation_benefits", [])
+            terms = getattr(state, "explanation_terms", {})
+            
+            prompt = self.FORMAT_EXPLANATION_MESSAGE.format(
+                explanation=explanation or "Explanation pending",
+                benefits=", ".join(benefits) if benefits else "None identified",
+                terms=str(terms) if terms else "No specific terms"
+            )
 
-    def build_graph(self) -> Any:
+            response = self.llm.invoke(prompt)
+            return {"response": response.content}
+        except Exception as e:
+            explanation = getattr(state, "response", "")
+            if explanation:
+                return {"response": explanation}
+            return {"response": "I can help explain this banking product to you."}
+
+    def build_graph(self):
         graph = StateGraph(ConversationState)
         
         graph.add_node("retrieve_documents", self.retrieve_documents_node)
-        graph.add_node("grounded_generation", self.grounded_generation_node)
+        graph.add_node("ground_explanation", self.ground_explanation_node)
         graph.add_node("format_explanation", self.format_explanation_node)
         
-        graph.set_entry_point("retrieve_documents")
-        graph.add_edge("retrieve_documents", "grounded_generation")
-        graph.add_edge("grounded_generation", "format_explanation")
+        graph.add_edge(START, "retrieve_documents")
+        graph.add_edge("retrieve_documents", "ground_explanation")
+        graph.add_edge("ground_explanation", "format_explanation")
         graph.add_edge("format_explanation", END)
         
-        self._graph = graph.compile()
-        save_graph_visualization(graph, "graph_5_rag_explanation")
-        return self._graph
-    
-    def invoke(self, state: ConversationState) -> ConversationState:
+        return graph.compile()
+
+    def visualize(self):
         graph = self.build_graph()
-        if isinstance(state, dict):
-            state_obj = ConversationState(**state)
-            state_dict = state
-        else:
-            state_obj = state
-            state_dict = state.model_dump()
-        
-        result = graph.invoke(state_dict)
-        
-        updated_fields = {
-            "response": result.get("response", state_obj.response)
-        }
-        
-        return ConversationState(**{**state_obj.model_dump(), **updated_fields})
+        return graph.get_graph().to_dict()
+
+    def invoke(self, state):
+        graph = self.build_graph()
+        return graph.invoke(state)

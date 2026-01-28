@@ -5,7 +5,6 @@ redis_client = None
 
 
 async def init_redis():
-    """Initialize Redis client"""
     global redis_client
     redis_client = await redis.from_url(
         settings.REDIS_URL,
@@ -16,12 +15,12 @@ async def init_redis():
 
 
 async def close_redis():
-    """Close Redis connection"""
     global redis_client
     if redis_client:
         await redis_client.close()
+        redis_client = None
 
 
 def get_redis():
-    """Get the Redis client"""
     return redis_client
+

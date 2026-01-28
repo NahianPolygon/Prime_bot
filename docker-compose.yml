@@ -25,9 +25,7 @@ services:
       - "8000:8000"
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - ENVIRONMENT=production
     depends_on:
       redis:
@@ -41,6 +39,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./documentation:/app/documentation
+      - ./index.html:/app/index.html
     networks:
       - prime_bot_network
 
@@ -52,49 +51,12 @@ services:
     working_dir: /app
     volumes:
       - ./:/app
-    command: python -m http.server 8080
+    command: bash -c "cd /app && python -m http.server 8080"
     networks:
       - prime_bot_network
-    #restart: unless-stopped
-
-  langfuse:
-    image: ghcr.io/langfuse/langfuse:2
-    container_name: prime_bot_langfuse
-    ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/langfuse
-      NEXTAUTH_SECRET: your-secret-key-change-me
-      NEXTAUTH_URL: http://localhost:3000
-      SALT: your-salt-change-me
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - prime_bot_network
-    #restart: unless-stopped
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: prime_bot_postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: langfuse
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - prime_bot_network
-    #restart: unless-stopped
 
 volumes:
   redis_data:
-  postgres_data:
 
 networks:
   prime_bot_network:

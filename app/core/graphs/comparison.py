@@ -1,138 +1,132 @@
-from langgraph.graph import StateGraph, END
-from typing import Any
-import json
+from langgraph.graph import StateGraph, START, END
+from app.core.config import llm
 from app.models.conversation_state import ConversationState
-from app.core.graph_visualizer import save_graph_visualization
+from app.models.graphs import ComparisonResult
+from app.prompts.comparison import COMPARE_PRODUCTS_PROMPT, GENERATE_COMPARISON_MESSAGE
+from app.services.knowledge_service import load_products
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ComparisonGraph:
     def __init__(self):
-        self._graph = None
+        self.llm = llm
 
-    def select_products_node(self, state: ConversationState) -> dict:
+    def prepare_comparison_node(self, state: ConversationState) -> dict:
+        logger.info(f"⚖️  [COMPARISON_PREP] Preparing comparison for {len(state.eligible_products)} products")
         products = state.eligible_products or []
         
-        if not products:
+        if len(products) < 2:
+            logger.info(f"⚠️  [COMPARISON_PREP] Not enough products to compare (need 2+, have {len(products)})")
             return {
-                "response": "No products to compare. Please specify products first.",
+                "response": "Need at least 2 products to compare. Let me retrieve more options.",
                 "comparison_mode": False
             }
-        
+
+        logger.info(f"✅ [COMPARISON_PREP] Ready to compare {len(products[:3])} products")
         return {
-            "response": f"Comparing {len(products[:3])} products...",
+            "response": f"Comparing {len(products[:3])} products for you...",
             "comparison_mode": True
         }
 
-    def normalize_attributes_node(self, state: ConversationState) -> dict:
-        try:
-            with open("app/data/banking_products.json", "r") as f:
-                all_products = json.load(f)
-        except:
-            all_products = []
+    def fetch_product_details_node(self, state: ConversationState) -> dict:
+        products = state.eligible_products or []
+        banking_type = state.banking_type or "conventional"
+        category = state.product_category or "deposit"
         
-        normalized = {}
-        for product_name in state.eligible_products[:3]:
-            for product in all_products:
-                if product.get("name") == product_name:
-                    normalized[product_name] = {
-                        "min_balance": product.get("min_balance", 0),
-                        "interest_rate": product.get("interest_rate", 0),
-                        "charges": product.get("charges", 0),
-                        "shariah_compliant": product.get("shariah_compliant", False)
+        # Map product categories to knowledge service categories
+        category_map = {
+            "credit": "credit",
+            "deposit": "deposit",
+            "schemes": "schemes"
+        }
+        kb_category = category_map.get(category, "deposit")
+        
+        # Load products from knowledge base
+        all_products = load_products(banking_type, kb_category)
+
+        product_details = {}
+        for product_name in products[:3]:
+            for product_data in all_products:
+                if product_data.get("name") == product_name or product_data.get("product_name") == product_name:
+                    product_details[product_name] = {
+                        "min_balance": product_data.get("min_balance", "N/A"),
+                        "interest_rate": product_data.get("interest_rate", "N/A"),
+                        "charges": product_data.get("charges", "N/A"),
+                        "shariah_compliant": product_data.get("shariah_compliant", False),
+                        "features": product_data.get("features", [])
                     }
                     break
-        
-        return {
-            "response": f"Normalized attributes for {len(normalized)} products."
-        }
 
-    def compare_features_node(self, state: ConversationState) -> dict:
-        comparison = "Product Comparison:\n"
-        comparison += "-" * 50 + "\n"
-        comparison += f"{'Product':<20} {'Min Balance':<15} {'Interest':<10}\n"
-        comparison += "-" * 50 + "\n"
-        
-        for i, product in enumerate(state.eligible_products[:3], 1):
-            comparison += f"{product:<20} {'$1000':<15} {'3.5%':<10}\n"
-        
-        return {
-            "response": comparison
-        }
+        return {"product_details": product_details}
 
-    def apply_religious_constraints_node(self, state: ConversationState) -> dict:
-        if state.user_profile.religion == "Muslim":
-            filtered = []
-            try:
-                with open("app/data/banking_products.json", "r") as f:
-                    all_products = json.load(f)
-                    for product in all_products:
-                        if product.get("name") in state.eligible_products:
-                            if product.get("shariah_compliant", False):
-                                filtered.append(product.get("name"))
-            except:
-                filtered = state.eligible_products
+    def compare_products_node(self, state: ConversationState) -> dict:
+        try:
+            products = state.eligible_products or []
+            profile = state.user_profile.model_dump(exclude_none=True)
             
+            prompt = self.COMPARE_PRODUCTS_PROMPT.format(
+                products=", ".join(products[:3]),
+                profile=profile,
+                banking_type=state.banking_type or "conventional"
+            )
+
+            structured_llm = self.llm.with_structured_output(ComparisonResult)
+            result = structured_llm.invoke(prompt)
+
             return {
-                "eligible_products": filtered,
-                "response": f"Filtered to Shariah-compliant products: {', '.join(filtered)}"
+                "response": result.comparison_text,
+                "comparison_recommendation": result.recommendation,
+                "comparison_key_differences": result.key_differences
             }
-        
-        return {
-            "response": "No religious constraints applied."
-        }
+        except Exception as e:
+            return {
+                "response": "I'm comparing these products for you.",
+                "comparison_recommendation": "",
+                "comparison_key_differences": []
+            }
 
-    def generate_comparison_node(self, state: ConversationState) -> dict:
-        summary = f"Based on your profile and requirements, I recommend:\n"
-        if state.eligible_products:
-            summary += f"1. {state.eligible_products[0]} (Top match)\n"
-            if len(state.eligible_products) > 1:
-                summary += f"2. {state.eligible_products[1]} (Alternative)\n"
-        
-        return {
-            "response": summary,
-            "comparison_mode": False
-        }
+    def generate_comparison_message_node(self, state: ConversationState) -> dict:
+        try:
+            comparison = getattr(state, "response", "")
+            recommendation = getattr(state, "comparison_recommendation", "")
+            differences = getattr(state, "comparison_key_differences", [])
+            
+            prompt = self.GENERATE_COMPARISON_MESSAGE.format(
+                comparison=comparison or "Comparison in progress",
+                recommendation=recommendation or "Analysis pending",
+                differences=", ".join(differences) if differences else "None identified"
+            )
 
-    def build_graph(self) -> Any:
+            response = self.llm.invoke(prompt)
+            return {"response": response.content}
+        except Exception as e:
+            products = state.eligible_products or []
+            if products:
+                return {"response": f"Compared products: {', '.join(products[:3])}. Let me know if you need more details."}
+            return {"response": "I can help you compare these products."}
+
+    def build_graph(self):
         graph = StateGraph(ConversationState)
         
-        graph.add_node("select_products", self.select_products_node)
-        graph.add_node("normalize_attributes", self.normalize_attributes_node)
-        graph.add_node("compare_features", self.compare_features_node)
-        graph.add_node("apply_religious_constraints", self.apply_religious_constraints_node)
-        graph.add_node("generate_comparison", self.generate_comparison_node)
+        graph.add_node("prepare_comparison", self.prepare_comparison_node)
+        graph.add_node("fetch_details", self.fetch_product_details_node)
+        graph.add_node("compare_products", self.compare_products_node)
+        graph.add_node("generate_message", self.generate_comparison_message_node)
         
-        graph.set_entry_point("select_products")
+        graph.add_edge(START, "prepare_comparison")
+        graph.add_edge("prepare_comparison", "fetch_details")
+        graph.add_edge("fetch_details", "compare_products")
+        graph.add_edge("compare_products", "generate_message")
+        graph.add_edge("generate_message", END)
         
-        graph.add_conditional_edges(
-            "select_products",
-            lambda state: "normalize_attributes" if state.comparison_mode else END
-        )
-        
-        graph.add_edge("normalize_attributes", "compare_features")
-        graph.add_edge("compare_features", "apply_religious_constraints")
-        graph.add_edge("apply_religious_constraints", "generate_comparison")
-        graph.add_edge("generate_comparison", END)
-        
-        self._graph = graph.compile()
-        save_graph_visualization(graph, "graph_4_comparison")
-        return self._graph
-    
-    def invoke(self, state: ConversationState) -> ConversationState:
+        return graph.compile()
+
+    def visualize(self):
         graph = self.build_graph()
-        if isinstance(state, dict):
-            state_obj = ConversationState(**state)
-            state_dict = state
-        else:
-            state_obj = state
-            state_dict = state.model_dump()
-        
-        result = graph.invoke(state_dict)
-        
-        updated_fields = {
-            "eligible_products": result.get("eligible_products", state_obj.eligible_products),
-            "response": result.get("response", state_obj.response),
-            "comparison_mode": result.get("comparison_mode", state_obj.comparison_mode)
-        }
-        
-        return ConversationState(**{**state_obj.model_dump(), **updated_fields})
+        return graph.get_graph().to_dict()
+
+    def invoke(self, state):
+        graph = self.build_graph()
+        return graph.invoke(state)

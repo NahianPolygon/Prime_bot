@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import List, Dict, Optional
 
-KNOWLEDGE_BASE = Path("/app/app/knowledge")
+KNOWLEDGE_BASE = Path("/app/knowledge")
 
 
 def load_products(banking_type: str = "conventional", category: str = None) -> List[Dict]:

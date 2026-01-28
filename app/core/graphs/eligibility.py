@@ -1,116 +1,120 @@
-from langgraph.graph import StateGraph, END
-from typing import Any
+from langgraph.graph import StateGraph, START, END
+from app.core.config import llm
 from app.models.conversation_state import ConversationState
-from app.core.graph_visualizer import save_graph_visualization
+from app.models.graphs import EligibilityAssessment
+from app.prompts.eligibility import ASSESS_ELIGIBILITY_PROMPT, GENERATE_RESPONSE_PROMPT
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class EligibilityGraph:
     def __init__(self):
-        self._graph = None
+        self.llm = llm
 
-    def validate_inputs_node(self, state: ConversationState) -> dict:
-        required_fields = ["age", "income_monthly", "employment_type"]
-        missing = [f for f in required_fields if not getattr(state.user_profile, f, None)]
-        
-        if missing:
-            return {
-                "missing_slots": missing,
-                "response": f"I need {', '.join(missing)} to determine eligibility.",
-                "eligible_products": []
-            }
-        
-        return {
-            "response": "Checking eligibility...",
-            "eligible_products": []
-        }
-
-    def apply_rules_node(self, state: ConversationState) -> dict:
-        profile = state.user_profile
-        eligible = []
-        
-        if profile.employment_type == "salaried" and 18 <= profile.age <= 65 and profile.income_monthly >= 20000:
-            eligible.extend(["savings_account", "dps", "monthly_sip"])
-        
-        if profile.age >= 21 and profile.income_monthly >= 30000:
-            eligible.extend(["credit_card", "personal_loan"])
-        
-        if profile.income_monthly >= 50000:
-            eligible.extend(["investment_account", "wealth_management"])
-        
-        if profile.deposit and profile.deposit >= 100000:
-            eligible.append("fixed_deposit_premium")
-        
-        return {
-            "eligible_products": list(set(eligible)),
-            "response": f"Found {len(set(eligible))} eligible products for you."
-        }
-
-    def filter_products_node(self, state: ConversationState) -> dict:
+    def assess_eligibility_node(self, state: ConversationState) -> dict:
+        logger.info(f"📊 [ELIGIBILITY_ASSESS] Assessing eligibility for user...")
         try:
-            with open("app/data/banking_products.json", "r") as f:
-                products = json.load(f)
-        except:
-            products = []
-        
-        filtered = []
-        for product in products:
-            if product.get("type") in state.eligible_products:
-                if state.user_profile.religion and product.get("shariah_compliant") is False:
-                    continue
-                filtered.append(product)
-        
-        return {
-            "eligible_products": [p.get("name") for p in filtered],
-            "response": f"Filtered to {len(filtered)} products based on your profile."
-        }
+            profile = state.user_profile
+            
+            prompt = ASSESS_ELIGIBILITY_PROMPT.format(
+                age=profile.age or "Unknown",
+                employment=profile.employment_type or "Unknown",
+                income=profile.income_monthly or "Unknown",
+                credit_score=profile.credit_score or "Not checked",
+                banking_type=state.banking_type or "conventional",
+                product_category=state.product_category or "deposit"
+            )
+            logger.info(f"📝 [ELIGIBILITY_ASSESS] Calling LLM for eligibility assessment...")
 
-    def store_eligible_products_node(self, state: ConversationState) -> dict:
-        return {
-            "eligible_products": state.eligible_products,
-            "response": f"Eligible products: {', '.join(state.eligible_products[:5])}"
-        }
+            structured_llm = self.llm.with_structured_output(EligibilityAssessment)
+            result = structured_llm.invoke(prompt)
+            logger.info(f"✅ [ELIGIBILITY_ASSESS] Eligible products: {result.eligible_products}")
 
-    def build_graph(self) -> Any:
+            return {
+                "eligible_products": result.eligible_products,
+                "response": result.reasoning
+            }
+        except Exception as e:
+            return {
+                "eligible_products": [],
+                "response": "I'm assessing your eligibility. Please provide more details about yourself."
+            }
+
+    def filter_by_category_node(self, state: ConversationState) -> dict:
+        if not state.eligible_products:
+            return {"eligible_products": []}
+        
+        products = state.eligible_products
+        category = state.product_category or "all"
+        
+        category_mapping = {
+            "deposit": ["savings_account", "dps", "fdr", "deposit"],
+            "credit": ["credit_card", "personal_loan", "auto_loan"],
+            "investment": ["mutual_fund", "investment_account", "wealth"]
+        }
+        
+        if category in category_mapping:
+            filtered = [p for p in products if any(
+                cat_keyword in p.lower() 
+                for cat_keyword in category_mapping[category]
+            )]
+            return {"eligible_products": filtered or products}
+        
+        return {"eligible_products": products}
+
+    def apply_banking_type_node(self, state: ConversationState) -> dict:
+        if state.banking_type == "islami":
+            products = state.eligible_products or []
+            filtered = [p for p in products if "islamic" in p.lower() or "islami" in p.lower()]
+            return {"eligible_products": filtered or products}
+        
+        return {}
+
+    def generate_eligibility_message_node(self, state: ConversationState) -> dict:
+        try:
+            profile = state.user_profile
+            eligible = state.eligible_products or []
+            
+            recommendations = eligible[:2] if eligible else []
+            
+            prompt = self.GENERATE_RESPONSE_PROMPT.format(
+                eligible_products=", ".join(eligible) or "None at this time",
+                age=profile.age or "Unknown",
+                employment=profile.employment_type or "Unknown",
+                income=profile.income_monthly or "Unknown",
+                recommendations=", ".join(recommendations)
+            )
+
+            response = self.llm.invoke(prompt)
+            return {"response": response.content}
+        except Exception as e:
+            eligible = state.eligible_products or []
+            if eligible:
+                return {"response": f"Based on your profile, you may be eligible for: {', '.join(eligible[:3])}"}
+            return {"response": "I need more information to assess your eligibility."}
+
+    def build_graph(self):
         graph = StateGraph(ConversationState)
         
-        graph.add_node("validate_inputs", self.validate_inputs_node)
-        graph.add_node("apply_rules", self.apply_rules_node)
-        graph.add_node("filter_products", self.filter_products_node)
-        graph.add_node("store_eligible_products", self.store_eligible_products_node)
+        graph.add_node("assess_eligibility", self.assess_eligibility_node)
+        graph.add_node("filter_category", self.filter_by_category_node)
+        graph.add_node("apply_banking_type", self.apply_banking_type_node)
+        graph.add_node("generate_message", self.generate_eligibility_message_node)
         
-        graph.set_entry_point("validate_inputs")
+        graph.add_edge(START, "assess_eligibility")
+        graph.add_edge("assess_eligibility", "filter_category")
+        graph.add_edge("filter_category", "apply_banking_type")
+        graph.add_edge("apply_banking_type", "generate_message")
+        graph.add_edge("generate_message", END)
         
-        graph.add_conditional_edges(
-            "validate_inputs",
-            lambda state: "apply_rules" if not state.missing_slots else END
-        )
-        
-        graph.add_edge("apply_rules", "filter_products")
-        graph.add_edge("filter_products", "store_eligible_products")
-        graph.add_edge("store_eligible_products", END)
-        
-        self._graph = graph.compile()
-        save_graph_visualization(graph, "graph_2_eligibility")
-        return self._graph
-        self._graph = graph.compile()
-        return self._graph
-    
-    def invoke(self, state: ConversationState) -> ConversationState:
+        return graph.compile()
+
+    def visualize(self):
         graph = self.build_graph()
-        if isinstance(state, dict):
-            state_obj = ConversationState(**state)
-            state_dict = state
-        else:
-            state_obj = state
-            state_dict = state.model_dump()
-        
-        result = graph.invoke(state_dict)
-        
-        updated_fields = {
-            "eligible_products": result.get("eligible_products", state_obj.eligible_products),
-            "missing_slots": result.get("missing_slots", state_obj.missing_slots),
-            "response": result.get("response", state_obj.response)
-        }
-        
-        return ConversationState(**{**state_obj.model_dump(), **updated_fields})
+        return graph.get_graph().to_dict()
+
+    def invoke(self, state):
+        graph = self.build_graph()
+        return graph.invoke(state)

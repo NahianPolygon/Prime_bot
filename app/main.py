@@ -1,6 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 from app.api.chat import router as chat_router
 from app.core.config import settings
 from app.core.redis import init_redis, close_redis, get_redis
@@ -32,10 +39,12 @@ app.include_router(chat_router, prefix="/api", tags=["chat"])
 
 @app.get("/health")
 async def health():
+    redis = get_redis()
+    if redis is None:
+        return {"status": "unhealthy", "error": "Redis not initialized"}
+    
     try:
-        redis_client = get_redis()
-        if redis_client:
-            await redis_client.ping()
+        await redis.ping()
         return {"status": "healthy"}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}

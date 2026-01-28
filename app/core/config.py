@@ -1,14 +1,12 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 
 class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
-    LANGFUSE_PUBLIC_KEY: str = ""
-    LANGFUSE_SECRET_KEY: str = ""
-    LANGFUSE_HOST: str = "https://cloud.langfuse.com"
+    GOOGLE_API_KEY: str = ""
+    GOOGLE_MODEL: str = "gemini-2.5-flash-lite"
     ENVIRONMENT: str = "development"
 
     class Config:
@@ -21,3 +19,14 @@ def get_settings():
 
 
 settings = get_settings()
+
+
+def get_llm():
+    return ChatGoogleGenerativeAI(
+        model=settings.GOOGLE_MODEL,
+        google_api_key=settings.GOOGLE_API_KEY,
+        temperature=0.3
+    )
+
+
+llm = get_llm()

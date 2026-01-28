@@ -31,7 +31,7 @@ class ConversationState(BaseModel):
     user_profile: UserProfile = Field(default_factory=UserProfile)
     
     missing_slots: List[str] = Field(default_factory=list)
-    eligible_products: List[dict] = Field(default_factory=list)
+    eligible_products: List[str] = Field(default_factory=list)
     comparison_mode: bool = False
     
     conversation_history: List[dict] = Field(default_factory=list)
