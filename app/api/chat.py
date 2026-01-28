@@ -127,7 +127,11 @@ async def _save_state(redis, session_id: str, state: ConversationState) -> None:
                 "product_name": state.product_name,
                 "user_profile": state.user_profile.model_dump(),
                 "conversation_history": state.conversation_history,
-                "response": state.response
+                "response": state.response,
+                "missing_slots": state.missing_slots,
+                "eligible_products": state.eligible_products,
+                "comparison_mode": state.comparison_mode,
+                "last_agent": state.last_agent
             }
             await redis.set(
                 f"state:{session_id}",
