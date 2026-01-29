@@ -22,7 +22,11 @@
         "Auto-renewal option available",
         "Qard/FO facility access"
       ],
-      "tenors": [1, 3, 5],
+      "tenors": [
+        1,
+        3,
+        5
+      ],
       "profit_rate_by_tenor": {
         "1": {
           "rate": 9.0,
@@ -64,7 +68,41 @@
         "NID/Passport/Birth Certificate",
         "Guardian documents (if minor)",
         "Nominee information"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "retired",
+          "pensioner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "retirement_income",
+          "monthly_cash_flow",
+          "income_stream"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "lump_sum_monthly_income",
+          "monthly_income",
+          "shariah_compliant"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly income",
+          "income",
+          "pension"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_SCHEME_002",
@@ -88,12 +126,28 @@
         "Qard/FO facility available",
         "Islamic Mudaraba principle"
       ],
-      "tenors": [3, 4, 5],
+      "tenors": [
+        3,
+        4,
+        5
+      ],
       "interest_rate": 6.0,
       "interest_type": "fixed",
       "interest_payment_frequency": "at_maturity",
       "goal_based": true,
-      "goal_amounts_supported": [50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000],
+      "goal_amounts_supported": [
+        50000,
+        100000,
+        200000,
+        300000,
+        400000,
+        500000,
+        600000,
+        700000,
+        800000,
+        900000,
+        1000000
+      ],
       "monthly_installment_calculation": "based_on_goal_and_tenor",
       "min_age": 18,
       "multiple_schemes_allowed": true,
@@ -117,7 +171,41 @@
         "Minor account formalities (if applicable)",
         "Active linked CASA account",
         "Separate scheme opening form for each goal"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "wealth_building",
+          "savings_discipline",
+          "systematic_saving"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "goal_based_recurring_deposit",
+          "recurring",
+          "shariah_compliant"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly",
+          "installment",
+          "accumulation"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_SCHEME_003",
@@ -142,7 +230,18 @@
         "Individual account only (no joint)",
         "Aligned with Hajj timeline"
       ],
-      "tenors": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      "tenors": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
       "daily_profit_calculation": true,
       "individual_account_only": true,
       "inter_branch_transferable": true,
@@ -220,7 +319,36 @@
         "Minor account formalities (if applicable)",
         "Active linked CASA account",
         "Personal Saving Scheme opening form"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "retired",
+          "pensioner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "purpose_specific_hajj_savings",
+          "shariah_compliant"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_SCHEME_004",
@@ -279,7 +407,36 @@
         "Minor account formalities (if applicable)",
         "Active linked CASA account",
         "Completed Term Deposit opening form"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "flexible_tenor_fixed_deposit",
+          "shariah_compliant"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_SCHEME_005",
@@ -302,7 +459,12 @@
         "Investment facility up to 90%",
         "Islamic Mudaraba principle"
       ],
-      "tenors": [3, 5, 7, 10],
+      "tenors": [
+        3,
+        5,
+        7,
+        10
+      ],
       "interest_rate": 9.0,
       "interest_type": "fixed",
       "interest_payment_frequency": "at_maturity",
@@ -365,7 +527,40 @@
         "NID/Passport/Birth Certificate",
         "Guardian documents (if minor)",
         "Nominee information"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "wealth_building",
+          "savings_discipline",
+          "systematic_saving"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "recurring_deposit_premium",
+          "recurring",
+          "shariah_compliant"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly",
+          "installment",
+          "accumulation"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_SCHEME_006",
@@ -390,7 +585,12 @@
         "Systematic discipline for education savings",
         "Can be opened for minors"
       ],
-      "tenors": [5, 10, 15, 20],
+      "tenors": [
+        5,
+        10,
+        15,
+        20
+      ],
       "profit_rate_by_tenor": {
         "5": {
           "rate": 9.0,
@@ -412,7 +612,12 @@
       "min_monthly_installment": 500,
       "monthly_installment_multiple": 500,
       "max_monthly_installment": 120000,
-      "tenure_months": [60, 120, 180, 240],
+      "tenure_months": [
+        60,
+        120,
+        180,
+        240
+      ],
       "sample_maturity_values": {
         "500_monthly_5year": {
           "installment": 500,
@@ -462,7 +667,40 @@
         "Child identity documents",
         "Parent/guardian authorization",
         "School certificate (if applicable)"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "monthly_installment_education",
+          "monthly_income",
+          "shariah_compliant"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly income",
+          "income",
+          "pension"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_SCHEME_007",
@@ -546,7 +784,36 @@
         "Identity documents (NID/Passport/Birth Certificate)",
         "Nominee information",
         "Guardian documents (if minor)"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "fixed_deposit_advance_profit",
+          "shariah_compliant"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_SCHEME_008",
@@ -571,7 +838,10 @@
         "Quarterly/bi-annual maturity windows",
         "Flexible amount multiples"
       ],
-      "tenors": [91, 181],
+      "tenors": [
+        91,
+        181
+      ],
       "tenor_days": {
         "91": {
           "months": "~3 months",
@@ -580,7 +850,7 @@
         },
         "181": {
           "months": "~6 months",
-          "annual_rate": 9.50,
+          "annual_rate": 9.5,
           "rate_for_period": 4.71
         }
       },
@@ -603,13 +873,13 @@
         "181day_10000": {
           "deposit": 10000,
           "tenor": 181,
-          "rate": 9.50,
+          "rate": 9.5,
           "interest": 471
         },
         "181day_1000000": {
           "deposit": 1000000,
           "tenor": 181,
-          "rate": 9.50,
+          "rate": 9.5,
           "interest": 47123
         }
       },
@@ -646,7 +916,36 @@
         "Identity documents",
         "Nominee information",
         "Guardian documents (if minor)"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "short_term_fixed_deposit_premium",
+          "shariah_compliant"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_SCHEME_009",
@@ -684,7 +983,10 @@
           "mode": "installment",
           "description": "Monthly installment for 36 or 60 months then perpetual",
           "min_monthly": 1000,
-          "tenure_months": [36, 60]
+          "tenure_months": [
+            36,
+            60
+          ]
         },
         {
           "mode": "flexo",
@@ -758,7 +1060,36 @@
         "Identity documents (NID/Passport/Birth Certificate)",
         "Address proof (utility bill <2 months)",
         "Nominee information"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "perpetual_charity_waqf",
+          "shariah_compliant"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_SCHEME_010",
@@ -830,7 +1161,12 @@
           "min_jpy": "equivalent"
         }
       ],
-      "tenors": [1, 3, 6, 12],
+      "tenors": [
+        1,
+        3,
+        6,
+        12
+      ],
       "tenor_months": "1 to 12",
       "profit_rates": {
         "market_linked": true,
@@ -855,9 +1191,18 @@
         },
         {
           "profile": "UK trading company",
-          "currencies": ["USD", "GBP"],
-          "deposits": [50000, 25000],
-          "tenors": [12, 12],
+          "currencies": [
+            "USD",
+            "GBP"
+          ],
+          "deposits": [
+            50000,
+            25000
+          ],
+          "tenors": [
+            12,
+            12
+          ],
           "benefit": "Multi-currency portfolio management"
         }
       ],
@@ -880,7 +1225,36 @@
         "Identity and address proof",
         "Nominee information",
         "Bank introduction letter"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "non_resident_foreign_currency_deposit",
+          "shariah_compliant"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme"
+        ],
+        "banking_type": "conventional"
+      }
     }
   ]
 }

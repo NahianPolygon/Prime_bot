@@ -15,8 +15,21 @@ from app.core.redis import init_redis, close_redis, get_redis
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    
     await init_redis()
+        
+    try:
+        from app.services.rag_retriever import RAGRetriever
+        logger = logging.getLogger(__name__)
+        logger.info("🚀 [STARTUP] Initializing RAG system...")
+        rag = RAGRetriever()
+        logger.info("✅ [STARTUP] RAG system initialized successfully")
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.warning(f"⚠️  [STARTUP] RAG initialization failed: {e}")
+    
     yield
+    
     await close_redis()
 
 

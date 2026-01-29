@@ -1,3 +1,17 @@
+---
+product_id: CARD_006
+product_name: JCB Platinum Credit Card
+banking_type: conventional
+category: credit_card
+card_network: JCB
+tier: platinum
+employment_suitable: ['salaried', 'business_owner']
+age_min: None
+age_max: None
+income_min: None
+keywords: []
+use_cases: ['premium_lifestyle', 'dining', 'shopping', 'travel']
+---
 # JCB Platinum Credit Card
 
 **Tagline:** Explore the World of Privileges & Enliven Your Lifestyle

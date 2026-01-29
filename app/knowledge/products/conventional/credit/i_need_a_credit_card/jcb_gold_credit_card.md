@@ -1,3 +1,17 @@
+---
+product_id: CARD_005
+product_name: JCB Gold Credit Card
+banking_type: conventional
+category: credit_card
+card_network: JCB
+tier: gold
+employment_suitable: ['salaried', 'business_owner']
+age_min: None
+age_max: None
+income_min: None
+keywords: []
+use_cases: ['shopping', 'travel', 'lifestyle', 'entry_level_premium']
+---
 # JCB Gold Credit Card
 
 **Tagline:** Power Your Dreams & Enliven Your Lifestyle

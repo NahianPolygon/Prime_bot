@@ -1,3 +1,17 @@
+---
+product_id: ISLAMI_CARD_001
+product_name: Visa Hasanah Gold Credit Card
+banking_type: islami
+category: credit_card
+card_network: 
+tier: gold
+employment_suitable: ['salaried', 'business_owner']
+age_min: None
+age_max: None
+income_min: None
+keywords: []
+use_cases: ['shopping', 'travel', 'rewards_earning', 'lifestyle', 'dining']
+---
 # Visa Hasanah Gold Credit Card
 
 **Tagline:** Power Your Dreams & Enliven Your Lifestyle

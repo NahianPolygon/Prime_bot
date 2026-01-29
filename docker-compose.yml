@@ -16,6 +16,19 @@ services:
     networks:
       - prime_bot_network
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: prime_bot_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - prime_bot_network
+    environment:
+      - QDRANT_API_KEY=
+
   app:
     build:
       context: .
@@ -27,6 +40,8 @@ services:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
       - ENVIRONMENT=production
     depends_on:
       redis:
@@ -58,6 +73,7 @@ services:
 
 volumes:
   redis_data:
+  qdrant_data:
 
 networks:
   prime_bot_network:

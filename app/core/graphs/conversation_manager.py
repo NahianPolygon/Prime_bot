@@ -8,9 +8,12 @@ from app.core.graphs.eligibility import EligibilityGraph
 from app.core.graphs.product_retrieval import ProductRetrievalGraph
 from app.core.graphs.comparison import ComparisonGraph
 from app.core.graphs.rag_explanation import RAGExplanationGraph
-from app.prompts.conversation_manager import INTENT_PROMPT, SLOT_VALIDATION_PROMPT, GREETING_PROMPT, GREETING_DETECTION_PROMPT
+from app.prompts.conversation_manager import INTENT_PROMPT, SLOT_VALIDATION_PROMPT, GREETING_PROMPT
 from app.prompts.slot_collection import EXTRACT_SLOT_PROMPT
 from app.models.graphs import SlotExtractionResult
+from app.services.product_matcher import ProductMatcher
+from app.services.knowledge_cache import KnowledgeBaseCache
+from app.services.inquiry_classifier import InquiryClassifier
 import json
 import logging
 
@@ -26,34 +29,9 @@ class ConversationManagerGraph:
         self.product_retrieval_graph = ProductRetrievalGraph()
         self.comparison_graph = ComparisonGraph()
         self.rag_explanation_graph = RAGExplanationGraph()
+        self.product_matcher = ProductMatcher(llm)
+        self.kb_cache = KnowledgeBaseCache.get_instance()
 
-    def initial_greeting_node(self, state: ConversationState) -> dict:
-        message = state.conversation_history[-1]["content"] if state.conversation_history else ""
-        
-        detection_prompt = GREETING_DETECTION_PROMPT.format(user_message=message)
-        detection_response = self.llm.invoke(detection_prompt)
-        response_type = detection_response.content.upper().strip()
-        
-        is_greeting = "GREETING" in response_type
-        is_slot = "SLOT" in response_type
-        
-        logger.info(f"👋 [GREETING_DETECTION] Message type: {response_type}")
-        
-        if is_greeting:
-            greeting_prompt = GREETING_PROMPT.format(user_message=message)
-            greeting_response = self.llm.invoke(greeting_prompt)
-            logger.info(f"✅ [GREETING] Greeting sent")
-            return {
-                "response": greeting_response.content,
-                "last_agent": "greeting"
-            }
-        
-        if is_slot:
-            logger.info(f"📝 [GREETING] Slot value detected, skipping greeting")
-            return {"last_agent": "greeting_skipped"}
-        
-        logger.info(f"📋 [GREETING] Direct request detected, skipping greeting")
-        return {"last_agent": "greeting_skipped"}
 
     def extract_slot_if_needed_node(self, state: ConversationState) -> dict:
         """Extract slot value if we're responding to a slot collection prompt"""
@@ -271,27 +249,109 @@ class ConversationManagerGraph:
             "last_agent": "route_to_subgraph"
         }
 
+    def classify_inquiry_type_node(self, state: ConversationState) -> dict:
+        logger.info(f"⚡ [CLASSIFY_INQUIRY] Pattern-based classification (fast)")
+        
+        message = state.conversation_history[-1]["content"] if state.conversation_history else ""
+        
+        classification = InquiryClassifier.classify(message)
+        logger.info(f"✅ [CLASSIFY_INQUIRY] Type: {classification.inquiry_type}, Confidence: {classification.confidence}")
+        
+        if classification.inquiry_type == "GREETING":
+            greeting_prompt = GREETING_PROMPT.format(user_message=message)
+            greeting_response = self.llm.invoke(greeting_prompt)
+            return {
+                "response": greeting_response.content,
+                "inquiry_type": "GREETING",
+                "inquiry_confidence": classification.confidence,
+                "last_agent": "classify_inquiry"
+            }
+        
+        return {
+            "inquiry_type": classification.inquiry_type,
+            "inquiry_confidence": classification.confidence,
+            "extracted_context": classification.extracted_context.model_dump(),
+            "last_agent": "classify_inquiry"
+        }
+
+    def product_matcher_node(self, state: ConversationState) -> dict:
+        logger.info(f"🎯 [PRODUCT_MATCHER] Starting product matching for credit cards...")
+        
+        try:
+            context_dict = state.extracted_context or {}
+            from app.services.product_matcher import ExtractedContext
+            context = ExtractedContext(**context_dict)
+            
+            logger.info(f"📝 [PRODUCT_MATCHER] Extracted context: banking_type={context.banking_type}, employment={context.employment}, keywords={context.keywords}")
+            
+            products = self.kb_cache.get_credit_cards(context.banking_type)
+            logger.info(f"📦 [PRODUCT_MATCHER] Loaded {len(products)} products from knowledge base")
+            
+            matched_products = self.product_matcher.filter_credit_cards(products, context)
+            logger.info(f"✅ [PRODUCT_MATCHER] Matched {len(matched_products)} products after filtering")
+            
+            user_query = state.conversation_history[-1]["content"] if state.conversation_history else ""
+            response = self.product_matcher.format_products_response(matched_products, user_query)
+            
+            return {
+                "response": response,
+                "matched_products": matched_products,
+                "last_agent": "product_matcher"
+            }
+        except Exception as e:
+            logger.error(f"❌ [PRODUCT_MATCHER] Error: {str(e)}")
+            return {
+                "response": "I couldn't retrieve product information. Please try again.",
+                "matched_products": [],
+                "last_agent": "product_matcher_error"
+            }
+
     def build_graph(self):
         graph = StateGraph(ConversationState)
         
-        graph.add_node("greeting", self.initial_greeting_node)
+        graph.add_node("classify_inquiry", self.classify_inquiry_type_node)
+        graph.add_node("product_matcher", self.product_matcher_node)
         graph.add_node("extract_slot", self.extract_slot_if_needed_node)
         graph.add_node("classify_intent", self.classify_intent_node)
         graph.add_node("validate_slots", self.validate_slots_node)
         graph.add_node("route_to_subgraph", self.route_to_subgraph_node)
         
-        graph.add_edge(START, "greeting")
+        graph.add_edge(START, "classify_inquiry")
         
-        def route_after_greeting(state: ConversationState) -> str:
-            if state.last_agent == "greeting":
+        def route_after_inquiry(state: ConversationState) -> str:
+            inquiry_type = state.inquiry_type
+            confidence = state.inquiry_confidence
+            
+            # If it's a greeting, end immediately
+            if inquiry_type == "GREETING":
+                logger.info(f"🎯 [ROUTE] Greeting detected → END")
                 return END
+            
+            if confidence >= 0.7 and inquiry_type == "PRODUCT_INFO_QUERY":
+                logger.info(f"🎯 [ROUTE] FAQ Query detected (confidence: {confidence}) → Product Matcher")
+                return "product_matcher"
+            
+            if confidence >= 0.7 and inquiry_type == "MIXED_QUERY":
+                logger.info(f"🎯 [ROUTE] Mixed Query detected (confidence: {confidence}) → Product Matcher")
+                return "product_matcher"
+            
+            logger.info(f"🎯 [ROUTE] Eligibility Query (confidence: {confidence}) → Slot Extraction")
             return "extract_slot"
         
-        graph.add_conditional_edges("greeting", route_after_greeting, {END: END, "extract_slot": "extract_slot"})
+        graph.add_conditional_edges("classify_inquiry", route_after_inquiry, {
+            END: END,
+            "product_matcher": "product_matcher",
+            "extract_slot": "extract_slot"
+        })
+        
+        graph.add_edge("product_matcher", END)
         graph.add_edge("extract_slot", "classify_intent")
         graph.add_edge("classify_intent", "validate_slots")
         graph.add_edge("validate_slots", "route_to_subgraph")
         graph.add_edge("route_to_subgraph", END)
+        
+        self._graph = graph.compile()
+        return self._graph
         
         self._graph = graph.compile()
         return self._graph

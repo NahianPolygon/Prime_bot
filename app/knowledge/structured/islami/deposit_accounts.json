@@ -47,7 +47,43 @@
         "Supporting documents for fund source",
         "Passport size photos (2 for student, 1 for parent, 1 for nominee)",
         "PSR/E-TIN Certificate (where applicable)"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "student",
+          "young_professional"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 0,
+          "max": 18
+        },
+        "use_cases": [
+          "student_savings",
+          "parental_gifting",
+          "learning_banking"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "student_account",
+          "youth",
+          "low_balance"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional",
+          "student",
+          "children",
+          "young",
+          "first account"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_002",
@@ -93,7 +129,41 @@
         "Supporting documents for fund source (if applicable)",
         "Passport size photos (2 for applicant, 1 for nominee)",
         "PSR/E-TIN Certificate (where applicable)"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "student",
+          "young_professional"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 25
+        },
+        "use_cases": [
+          "youth_savings",
+          "student_account_graduate",
+          "early_career_savings"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "youth_account",
+          "young_professional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional",
+          "youth",
+          "18-25",
+          "young professional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_003",
@@ -138,7 +208,35 @@
         "Passport size photos (2 for applicant, 1 for nominee)",
         "PSR/E-TIN Certificate (where applicable)",
         "FATCA form"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "student"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_004",
@@ -187,7 +285,35 @@
         "Address Proof (utility bill)",
         "Income/Profession Proof (Freelancer credentials, portfolio, work orders)",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "freelancer",
+          "self_employed"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_005",
@@ -230,7 +356,35 @@
         "Passport size photos (2 for applicant, 1 for nominee)",
         "PSR/E-TIN Certificate (where applicable)",
         "FATCA form"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "student"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_006",
@@ -300,7 +454,35 @@
         "Passport size photos (2 for applicant, 1 for nominee)",
         "PSR/E-TIN Certificate (where applicable)",
         "FATCA form"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "student"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_007",
@@ -348,7 +530,35 @@
         "Passport size photos (2 for applicant, 1 for nominee)",
         "PSR/E-TIN Certificate (where applicable)",
         "FATCA form"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "student"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_008",
@@ -408,7 +618,35 @@
         "Income/Profession Proof (Salary Certificate, LOI, Pay Slip, Job ID)",
         "Passport size photos (2 for applicant, 1 for nominee)",
         "PSR/E-TIN Certificate (where applicable)"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "student"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_009",
@@ -458,7 +696,35 @@
         "Income/Profession Proof (Salary cert, trade license, etc.)",
         "Passport size photos (2 for applicant, 1 for nominee)",
         "PSR/E-TIN Certificate (where applicable)"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "student"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_010",
@@ -515,7 +781,35 @@
         "Legal resident/work permit of NRB (if joint application)",
         "Passport size photos (2 for applicant, 1 for nominee)",
         "PSR/E-TIN Certificate (where applicable)"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "student"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_011",
@@ -570,7 +864,35 @@
         "Written declaration of return date from abroad",
         "Bangladeshi passport with immigration arrival stamp",
         "FMJ form if deposit > USD 10,000"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "student"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_012",
@@ -620,7 +942,35 @@
         "PSR/E-TIN Certificate (where applicable)",
         "Identity Proof for Nominee (NID/Passport/Birth Certificate)",
         "Nominee photo (1 attested by account holder)"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "student"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "ISLAMI_ACCT_013",
@@ -689,7 +1039,35 @@
         "Income/Profession Proof (Salary cert, trade license, etc.)",
         "Passport size photos (2 for applicant, 1 for nominee)",
         "PSR/E-TIN Certificate (where applicable)"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "student"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "general_savings",
+          "daily_banking"
+        ],
+        "filtering_tags": [
+          "conventional"
+        ],
+        "quick_match_keywords": [
+          "savings account",
+          "account",
+          "conventional"
+        ],
+        "banking_type": "conventional"
+      }
     }
   ]
 }

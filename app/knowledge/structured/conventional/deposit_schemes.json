@@ -19,13 +19,23 @@
         "Automatic monthly deduction from linked account",
         "Simple wealth accumulation strategy"
       ],
-      "tenors": [5, 7, 10, 15],
+      "tenors": [
+        5,
+        7,
+        10,
+        15
+      ],
       "interest_rate": 9.0,
       "interest_type": "fixed",
       "min_monthly_installment": 500,
       "max_monthly_installment": 120000,
       "min_initial_deposit": 0,
-      "initial_deposit_options": [0, 100000, 500000, 1000000],
+      "initial_deposit_options": [
+        0,
+        100000,
+        500000,
+        1000000
+      ],
       "loan_facility": {
         "available": true,
         "max_percentage": 90,
@@ -49,7 +59,39 @@
         "Photograph (attested)",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "wealth_building",
+          "savings_discipline",
+          "systematic_saving"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "recurring_deposit_scheme",
+          "recurring"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly",
+          "installment",
+          "accumulation"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "SCHEME_002",
@@ -70,14 +112,24 @@
         "Pre-defined monthly amounts",
         "Millionaire status achievement"
       ],
-      "tenors": [5, 7, 10, 12],
+      "tenors": [
+        5,
+        7,
+        10,
+        12
+      ],
       "interest_rate_by_tenor": {
         "5": 6.0,
         "7": 6.0,
         "10": 7.0,
         "12": 7.0
       },
-      "fixed_monthly_amounts": [4550, 6825, 9100, 14500],
+      "fixed_monthly_amounts": [
+        4550,
+        6825,
+        9100,
+        14500
+      ],
       "target_maturity_value": 1000000,
       "loan_facility": {
         "available": true,
@@ -98,7 +150,39 @@
         "Photograph (attested)",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "fixed_monthly_installment_scheme",
+          "monthly_income"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly income",
+          "income",
+          "pension"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "SCHEME_003",
@@ -119,7 +203,12 @@
         "Systematic small amount saving",
         "Bonus guarantee at maturity"
       ],
-      "tenors": [3, 5, 10, 15],
+      "tenors": [
+        3,
+        5,
+        10,
+        15
+      ],
       "interest_rate_by_tenor": {
         "3": 6.0,
         "5": 6.0,
@@ -147,7 +236,40 @@
         "Photograph (attested)",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "wealth_building",
+          "savings_discipline",
+          "systematic_saving"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "recurring_deposit_with_terminal_benefit",
+          "recurring"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly",
+          "installment",
+          "accumulation"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "SCHEME_004",
@@ -195,7 +317,35 @@
         "Photograph (attested)",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "lump_sum_fixed_interest"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "SCHEME_005",
@@ -216,7 +366,11 @@
         "Overdraft facility for emergencies",
         "Retiree-perfect income stream"
       ],
-      "tenors": [1, 3, 5],
+      "tenors": [
+        1,
+        3,
+        5
+      ],
       "min_lump_sum": 100000,
       "min_lump_sum_multiple": 100000,
       "monthly_income_by_tenor": {
@@ -255,7 +409,40 @@
         "Photograph (attested)",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "retired",
+          "pensioner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "retirement_income",
+          "monthly_cash_flow",
+          "income_stream"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "lump_sum_monthly_income",
+          "monthly_income"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly income",
+          "income",
+          "pension"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "SCHEME_006",
@@ -276,10 +463,21 @@
         "Customizable to personal goals",
         "Flexible goal-based planning"
       ],
-      "tenors": [3, 4, 5],
+      "tenors": [
+        3,
+        4,
+        5
+      ],
       "interest_rate": 6.0,
       "interest_type": "fixed",
-      "goal_amounts": [50000, 100000, 200000, 300000, 500000, 1000000],
+      "goal_amounts": [
+        50000,
+        100000,
+        200000,
+        300000,
+        500000,
+        1000000
+      ],
       "monthly_installment_calculation": "based_on_goal_and_tenor",
       "loan_facility": {
         "available": true,
@@ -299,7 +497,40 @@
         "Photograph (attested)",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "wealth_building",
+          "savings_discipline",
+          "systematic_saving"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "goal_based_recurring_deposit",
+          "recurring"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly",
+          "installment",
+          "accumulation"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "SCHEME_007",
@@ -354,7 +585,35 @@
         "Photograph (attested)",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "fixed_deposit_flexible_tenor"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "SCHEME_008",
@@ -375,7 +634,12 @@
         "Early encashment rules tiered by duration",
         "Premium returns for regular savers"
       ],
-      "tenors": [3, 5, 7, 10],
+      "tenors": [
+        3,
+        5,
+        7,
+        10
+      ],
       "interest_rate": 9.0,
       "interest_type": "fixed",
       "min_monthly_installment": 500,
@@ -398,7 +662,40 @@
         "Photograph (attested)",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "wealth_building",
+          "savings_discipline",
+          "systematic_saving"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "recurring_deposit_premium",
+          "recurring"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly",
+          "installment",
+          "accumulation"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "SCHEME_009",
@@ -419,7 +716,12 @@
         "Loan facility: 90% of deposits",
         "Perfect for education planning"
       ],
-      "tenors": [5, 10, 15, 20],
+      "tenors": [
+        5,
+        10,
+        15,
+        20
+      ],
       "interest_rate": 9.0,
       "interest_type": "fixed",
       "min_monthly_installment": 500,
@@ -444,7 +746,40 @@
         "Child's birth certificate or ID",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "wealth_building",
+          "savings_discipline",
+          "systematic_saving"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "education_focused_recurring_deposit",
+          "recurring"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme",
+          "monthly",
+          "installment",
+          "accumulation"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "SCHEME_010",
@@ -491,7 +826,35 @@
         "Photograph (attested)",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "retired",
+          "pensioner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "fixed_deposit_advance_interest"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme"
+        ],
+        "banking_type": "conventional"
+      }
     },
     {
       "id": "SCHEME_011",
@@ -512,7 +875,10 @@
         "Loan/overdraft facility: 90%",
         "Exceptional short-term returns"
       ],
-      "tenor_options": [91, 181],
+      "tenor_options": [
+        91,
+        181
+      ],
       "interest_rates_by_tenor": {
         "91": 9.75,
         "181": 10.0
@@ -544,7 +910,35 @@
         "Photograph (attested)",
         "Nominee information",
         "Linked CASA account documentation"
-      ]
+      ],
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": null,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": null
+        },
+        "use_cases": [
+          "savings",
+          "investment"
+        ],
+        "filtering_tags": [
+          "conventional",
+          "short_term_premium_fd"
+        ],
+        "quick_match_keywords": [
+          "deposit scheme",
+          "savings scheme"
+        ],
+        "banking_type": "conventional"
+      }
     }
   ]
 }

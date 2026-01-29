@@ -120,6 +120,10 @@ async def _save_state(redis, session_id: str, state: ConversationState) -> None:
         try:
             state_data = {
                 "session_id": state.session_id,
+                "inquiry_type": state.inquiry_type,
+                "inquiry_confidence": state.inquiry_confidence,
+                "extracted_context": state.extracted_context,
+                "matched_products": state.matched_products,
                 "intent": state.intent,
                 "banking_type": state.banking_type,
                 "product_category": state.product_category,

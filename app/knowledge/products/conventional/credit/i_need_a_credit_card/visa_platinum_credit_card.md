@@ -1,3 +1,17 @@
+---
+product_id: CARD_002
+product_name: Visa Platinum Credit Card
+banking_type: conventional
+category: credit_card
+card_network: Visa
+tier: platinum
+employment_suitable: ['salaried', 'business_owner']
+age_min: None
+age_max: None
+income_min: None
+keywords: []
+use_cases: ['travel', 'dining', 'premium_lifestyle', 'lounge_access', 'business_spending']
+---
 # Visa Platinum Credit Card
 
 **Tagline:** Explore the World of Privileges & Enliven Your Lifestyle

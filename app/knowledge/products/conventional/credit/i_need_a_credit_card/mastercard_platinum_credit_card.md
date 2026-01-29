@@ -1,3 +1,17 @@
+---
+product_id: CARD_004
+product_name: Mastercard Platinum Credit Card
+banking_type: conventional
+category: credit_card
+card_network: Mastercard
+tier: platinum
+employment_suitable: ['salaried', 'business_owner']
+age_min: None
+age_max: None
+income_min: None
+keywords: []
+use_cases: ['international_travel', 'frequent_flyer', 'business_travel']
+---
 # Mastercard Platinum Credit Card
 
 **Tagline:** Explore the World of Privileges & Enliven Your Lifestyle

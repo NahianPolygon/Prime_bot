@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, START, END
 from app.core.config import llm
 from app.models.conversation_state import ConversationState
 from app.models.graphs import ProductSelection
-from app.services.knowledge_service import load_products
+from app.services.knowledge_cache import KnowledgeBaseCache
 from app.prompts.product_retrieval import RETRIEVE_PRODUCTS_PROMPT, RANK_PRODUCTS_PROMPT, GENERATE_RETRIEVAL_MESSAGE
 import logging
 
@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 class ProductRetrievalGraph:
     def __init__(self):
         self.llm = llm
-
     def retrieve_products_node(self, state: ConversationState) -> dict:
         try:
             banking_type = state.banking_type or "conventional"
-            category = state.product_category or "deposit"
+            category = state.product_category or "credit"
             
-            products = load_products(banking_type, category)
+            kb_cache = KnowledgeBaseCache.get_instance()
+            products = kb_cache.get_credit_cards(banking_type) if category == "credit" else []
             product_names = []
             
             if isinstance(products, list):

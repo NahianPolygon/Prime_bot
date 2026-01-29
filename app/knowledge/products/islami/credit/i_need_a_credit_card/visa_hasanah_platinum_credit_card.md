@@ -1,3 +1,17 @@
+---
+product_id: ISLAMI_CARD_002
+product_name: Visa Hasanah Platinum Credit Card
+banking_type: islami
+category: credit_card
+card_network: 
+tier: platinum
+employment_suitable: ['salaried', 'business_owner']
+age_min: None
+age_max: None
+income_min: None
+keywords: []
+use_cases: ['international_travel', 'dining', 'premium_lifestyle', 'lounge_access', 'business_spending']
+---
 # Visa Hasanah Platinum Credit Card
 
 **Tagline:** Explore the World of Privileges & Enliven Your Lifestyle

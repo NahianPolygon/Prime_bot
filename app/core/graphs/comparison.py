@@ -3,7 +3,7 @@ from app.core.config import llm
 from app.models.conversation_state import ConversationState
 from app.models.graphs import ComparisonResult
 from app.prompts.comparison import COMPARE_PRODUCTS_PROMPT, GENERATE_COMPARISON_MESSAGE
-from app.services.knowledge_service import load_products
+from app.services.knowledge_cache import KnowledgeBaseCache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,18 +33,10 @@ class ComparisonGraph:
     def fetch_product_details_node(self, state: ConversationState) -> dict:
         products = state.eligible_products or []
         banking_type = state.banking_type or "conventional"
-        category = state.product_category or "deposit"
         
-        # Map product categories to knowledge service categories
-        category_map = {
-            "credit": "credit",
-            "deposit": "deposit",
-            "schemes": "schemes"
-        }
-        kb_category = category_map.get(category, "deposit")
-        
-        # Load products from knowledge base
-        all_products = load_products(banking_type, kb_category)
+        # Load products from knowledge base cache
+        kb_cache = KnowledgeBaseCache.get_instance()
+        all_products = kb_cache.get_credit_cards(banking_type)
 
         product_details = {}
         for product_name in products[:3]:

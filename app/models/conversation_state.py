@@ -22,6 +22,11 @@ class IncomeInfo(BaseModel):
 class ConversationState(BaseModel):
     session_id: str
     
+    inquiry_type: Optional[str] = None
+    inquiry_confidence: float = 0.0
+    extracted_context: dict = Field(default_factory=dict)
+    matched_products: List[dict] = Field(default_factory=list)
+    
     intent: Optional[str] = None
     banking_type: Optional[str] = None
     product_category: Optional[str] = None

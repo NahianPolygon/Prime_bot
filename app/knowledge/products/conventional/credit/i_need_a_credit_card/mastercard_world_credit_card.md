@@ -1,3 +1,17 @@
+---
+product_id: CARD_003
+product_name: Mastercard World Credit Card
+banking_type: conventional
+category: credit_card
+card_network: Mastercard
+tier: world
+employment_suitable: ['salaried', 'business_owner']
+age_min: None
+age_max: None
+income_min: None
+keywords: []
+use_cases: ['rewards_earning', 'shopping', 'cashback', 'high_spenders']
+---
 # Mastercard World Credit Card
 
 **Tagline:** Your Gateway to Exclusive Experiences and Access

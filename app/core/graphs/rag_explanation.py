@@ -3,7 +3,7 @@ from app.core.config import llm
 from app.models.conversation_state import ConversationState
 from app.models.graphs import ExplanationResult
 from app.prompts.rag_explanation import RETRIEVE_DOCUMENTS_PROMPT, GROUND_EXPLANATION_PROMPT, FORMAT_EXPLANATION_MESSAGE
-from app.services.knowledge_service import load_products
+from app.services.knowledge_cache import KnowledgeBaseCache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,18 +15,10 @@ class RAGExplanationGraph:
 
     def retrieve_documents_node(self, state: ConversationState) -> dict:
         banking_type = state.banking_type or "conventional"
-        category = state.product_category or "deposit"
         
-        # Map product categories to knowledge service categories
-        category_map = {
-            "credit": "credit",
-            "deposit": "deposit",
-            "schemes": "schemes"
-        }
-        kb_category = category_map.get(category, "deposit")
-        
-        # Load products from knowledge base
-        all_products = load_products(banking_type, kb_category)
+        # Load products from knowledge base cache
+        kb_cache = KnowledgeBaseCache.get_instance()
+        all_products = kb_cache.get_credit_cards(banking_type)
 
         context = []
         for prod in all_products[:2]:

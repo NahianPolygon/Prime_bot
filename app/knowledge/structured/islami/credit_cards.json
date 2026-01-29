@@ -22,6 +22,45 @@
         "self_employed_tenure": "3 years minimum",
         "ettin_required": true
       },
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": 1000000,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "shopping",
+          "travel",
+          "rewards_earning",
+          "lifestyle",
+          "dining"
+        ],
+        "filtering_tags": [
+          "gold_tier",
+          "visa",
+          "islami",
+          "shariah_compliant",
+          "ujrah",
+          "interest_free"
+        ],
+        "quick_match_keywords": [
+          "islamic credit card",
+          "shariah compliant",
+          "hasanah gold",
+          "rewards",
+          "lounge"
+        ],
+        "tier_priority": 2,
+        "banking_type": "islami"
+      },
       "credit_limits": {
         "unsecured_max": 700000,
         "unsecured_currency": "BDT",
@@ -96,7 +135,11 @@
       },
       "installment_program": {
         "interest_rate": 0.0,
-        "tenure_months": [12, 24, 36],
+        "tenure_months": [
+          12,
+          24,
+          36
+        ],
         "min_purchase": 30000,
         "min_purchase_currency": "BDT",
         "eligible_categories": [
@@ -136,7 +179,7 @@
         "Business owners",
         "Frequent travelers (domestic)",
         "Lifestyle seekers",
-        "Education/shopping focused"
+        "Islamic banking customers"
       ],
       "annual_value_estimate": 160000,
       "annual_value_currency": "BDT",
@@ -174,6 +217,48 @@
         "self_employed_tenure": "3 years minimum",
         "ettin_required": true,
         "higher_income_requirement": true
+      },
+      "filtering_metadata": {
+        "suitable_for": [
+          "salaried",
+          "business_owner"
+        ],
+        "income_range": {
+          "min": 1500000,
+          "max": null,
+          "currency": "BDT"
+        },
+        "age_range": {
+          "min": 18,
+          "max": 70
+        },
+        "use_cases": [
+          "international_travel",
+          "dining",
+          "premium_lifestyle",
+          "lounge_access",
+          "business_spending"
+        ],
+        "filtering_tags": [
+          "platinum_tier",
+          "visa",
+          "islami",
+          "shariah_compliant",
+          "ujrah",
+          "interest_free",
+          "premium"
+        ],
+        "quick_match_keywords": [
+          "islamic credit card",
+          "platinum",
+          "shariah compliant",
+          "luxury",
+          "dining",
+          "travel",
+          "hasanah platinum"
+        ],
+        "tier_priority": 3,
+        "banking_type": "islami"
       },
       "credit_limits": {
         "unsecured_max": 1000000,
@@ -336,7 +421,11 @@
       },
       "installment_program": {
         "interest_rate": 0.0,
-        "tenure_months": [12, 24, 36],
+        "tenure_months": [
+          12,
+          24,
+          36
+        ],
         "min_purchase": 30000,
         "min_purchase_currency": "BDT",
         "eligible_categories": [

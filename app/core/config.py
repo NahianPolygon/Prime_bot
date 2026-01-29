@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     GOOGLE_API_KEY: str = ""
     GOOGLE_MODEL: str = "gemini-2.5-flash-lite"
+    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
     ENVIRONMENT: str = "development"
 
     class Config:
