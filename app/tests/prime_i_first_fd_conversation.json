@@ -1,0 +1,40 @@
+{
+  "product": "prime_i_first_fd",
+  "timestamp": "2026-02-02T20:02:17.918132",
+  "status": "FAIL",
+  "product_found": false,
+  "features_found": [],
+  "accuracy": 0.0,
+  "conversation": [
+    {
+      "turn": 1,
+      "user": "I want interest paid immediately when I open the account",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 3.69220232963562
+    },
+    {
+      "turn": 2,
+      "user": "I have 1 lakh to invest",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.981299638748169
+    },
+    {
+      "turn": 3,
+      "user": "I prefer 12 months tenure",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.2098004817962646
+    },
+    {
+      "turn": 4,
+      "user": "My principal should be protected",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.385709524154663
+    },
+    {
+      "turn": 5,
+      "user": "Is interest credited on opening day?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.2485299110412598
+    }
+  ]
+}

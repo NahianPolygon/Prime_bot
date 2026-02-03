@@ -1,0 +1,44 @@
+{
+  "product": "prime_lakhopoti_scheme",
+  "timestamp": "2026-02-02T20:02:01.792656",
+  "status": "PASS",
+  "product_found": true,
+  "features_found": [
+    "lakhopoti",
+    "1 lakh",
+    "terminal benefit"
+  ],
+  "accuracy": 0.75,
+  "conversation": [
+    {
+      "turn": 1,
+      "user": "I want to guarantee 1 lakh at maturity",
+      "bot": "To guarantee BDT 1 lakh at maturity, you can consider the **Prime Lakhopoti Scheme**.\n\nThis scheme guarantees a terminal benefit of BDT 1 lakh at maturity, along with accumulated interest. You can choose flexible timelines of 3, 5, 10, or 15 years for your deposits.",
+      "time": 1.2106919288635254
+    },
+    {
+      "turn": 2,
+      "user": "I can do monthly deposits",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 3.86753511428833
+    },
+    {
+      "turn": 3,
+      "user": "What schemes give terminal benefit?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.2756149768829346
+    },
+    {
+      "turn": 4,
+      "user": "Can I choose 3-5 year tenure?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.049910068511963
+    },
+    {
+      "turn": 5,
+      "user": "How much monthly should I deposit?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.3661556243896484
+    }
+  ]
+}

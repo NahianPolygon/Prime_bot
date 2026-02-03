@@ -9,11 +9,8 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from app.core.graphs.conversation_manager import ConversationManagerGraph
-from app.core.graphs.slot_collection import SlotCollectionGraph
-from app.core.graphs.eligibility import EligibilityGraph
 from app.core.graphs.product_retrieval import ProductRetrievalGraph
-from app.core.graphs.comparison import ComparisonGraph
-from app.core.graphs.rag_explanation import RAGExplanationGraph
+from app.core.graphs.configs import DEPOSIT_ACCOUNTS_CONFIG
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -39,10 +36,8 @@ def visualize_graph(graph_instance, graph_name: str):
         # Build the graph
         compiled_graph = graph_instance.build_graph()
         
-        # Generate filename with timestamp
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         safe_name = graph_name.lower().replace(" ", "_")
-        image_path = IMAGES_DIR / f"{safe_name}_{timestamp}.png"
+        image_path = IMAGES_DIR / f"{safe_name}.png"
         
         # Try to generate PNG using Mermaid
         try:
@@ -82,11 +77,7 @@ def visualize_all_graphs():
     
     graphs = {
         "Conversation Manager": ConversationManagerGraph(),
-        "Slot Collection": SlotCollectionGraph(),
-        "Eligibility": EligibilityGraph(),
-        "Product Retrieval": ProductRetrievalGraph(),
-        "Comparison": ComparisonGraph(),
-        "RAG Explanation": RAGExplanationGraph(),
+        "Product Retrieval": ProductRetrievalGraph(DEPOSIT_ACCOUNTS_CONFIG),
     }
     
     logger.info(f"📁 Saving graphs to: {IMAGES_DIR}\n")

@@ -1,0 +1,40 @@
+{
+  "product": "prime_fixed_deposit_plus",
+  "timestamp": "2026-02-02T20:02:50.667748",
+  "status": "FAIL",
+  "product_found": false,
+  "features_found": [],
+  "accuracy": 0.0,
+  "conversation": [
+    {
+      "turn": 1,
+      "user": "I want the highest interest rates",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 3.815343141555786
+    },
+    {
+      "turn": 2,
+      "user": "I prefer short-term 3-6 months",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.859724760055542
+    },
+    {
+      "turn": 3,
+      "user": "I want premium returns",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.878631114959717
+    },
+    {
+      "turn": 4,
+      "user": "What's your best short-term rate?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.7725419998168945
+    },
+    {
+      "turn": 5,
+      "user": "Can you guarantee 9.75% interest?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.7313637733459473
+    }
+  ]
+}

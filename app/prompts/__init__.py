@@ -1,11 +1,8 @@
-"""Prompt Templates - Organized by graph module"""
+"""
+Prompt templates for Prime Bank chatbot.
 
-# Prompts are now organized in dedicated subfolders:
-# - conversation_manager/: intent and slot validation prompts
-# - slot_collection/: slot selection, extraction, and generation prompts
-# - eligibility/: eligibility assessment and response prompts
-# - product_retrieval/: product retrieval, ranking, and messaging prompts
-# - comparison/: product comparison and messaging prompts
-# - rag_explanation/: document retrieval, grounding, and formatting prompts
-
-__all__ = []
+Organized by domain:
+- conversation/: Greeting, intent classification, product detection
+- product_retrieval/: Slot extraction, slot questions, recommendations
+- eligibility/: Eligibility checking
+"""

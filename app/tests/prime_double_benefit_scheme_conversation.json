@@ -1,0 +1,44 @@
+{
+  "product": "prime_double_benefit_scheme",
+  "timestamp": "2026-02-02T20:03:14.823346",
+  "status": "PASS",
+  "product_found": false,
+  "features_found": [
+    "double benefit",
+    "doubles",
+    "9.25%"
+  ],
+  "accuracy": 0.75,
+  "conversation": [
+    {
+      "turn": 1,
+      "user": "I want my money to double",
+      "bot": "To double your money, you can use the **Prime Double Benefit Deposit Scheme**.\n\n*   **Prime Double Benefit Deposit Scheme**: Doubles your deposited amount in 7 years and 11 months at a fixed 9.25% interest rate. Your initial deposit is returned along with 100% additional interest.",
+      "time": 0.8572888374328613
+    },
+    {
+      "turn": 2,
+      "user": "How long does it take to double?",
+      "bot": "Your money doubles in **7 years and 11 months** with the Prime Double Benefit Deposit Scheme.",
+      "time": 0.7111856937408447
+    },
+    {
+      "turn": 3,
+      "user": "I can do lump sum investment",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 3.866342782974243
+    },
+    {
+      "turn": 4,
+      "user": "What interest rate guarantees doubling?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.0093419551849365
+    },
+    {
+      "turn": 5,
+      "user": "Can I invest 10000 or more?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.373633861541748
+    }
+  ]
+}

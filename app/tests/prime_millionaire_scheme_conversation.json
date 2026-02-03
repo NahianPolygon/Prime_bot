@@ -1,0 +1,45 @@
+{
+  "product": "prime_millionaire_scheme",
+  "timestamp": "2026-02-02T20:03:58.866025",
+  "status": "PASS",
+  "product_found": true,
+  "features_found": [
+    "millionaire",
+    "million",
+    "6-7%",
+    "fixed monthly"
+  ],
+  "accuracy": 0.8,
+  "conversation": [
+    {
+      "turn": 1,
+      "user": "I want to become a millionaire",
+      "bot": "To become a millionaire, you can utilize the **Prime Millionaire Scheme**.\n\nThis scheme is a fixed-monthly-installment deposit designed to help you reach BDT 10 lac through disciplined savings with attractive interest rates (6-7%).\n\n**Next Steps:**\n\n*   Check eligibility and gather documents.\n*   Visit a Prime Bank branch to open an account.\n*   Make an initial deposit (minimum BDT 500).\n*   Start saving consistently.",
+      "time": 0.8504817485809326
+    },
+    {
+      "turn": 2,
+      "user": "I want fixed monthly payments for budgeting",
+      "bot": "To achieve fixed monthly payments for budgeting, consider the following:\n\n*   **Plan Payment:** Schedule your payment before day 50 to benefit from the interest-free window.\n*   **Flexible Goal Setting Scheme:** This scheme allows you to set a target amount and choose a flexible tenure (3, 4, or 5 years). It calculates a fixed monthly deposit based on your goal, enabling systematic achievement through discipline.",
+      "time": 0.8403582572937012
+    },
+    {
+      "turn": 3,
+      "user": "What's the target amount?",
+      "bot": "The target amount is **any amount you choose**.",
+      "time": 0.618126630783081
+    },
+    {
+      "turn": 4,
+      "user": "What monthly installment for 5 years?",
+      "bot": "Based on the 5-Year Plan @ 9% (60 months) table:\n\n*   **BDT 500** monthly installment results in a Maturity Value of BDT 37,925.\n*   **BDT 1,000** monthly installment results in a Maturity Value of BDT 75,850.\n\nYou can choose any amount you can afford, up to BDT 120,000 per month.",
+      "time": 0.8260800838470459
+    },
+    {
+      "turn": 5,
+      "user": "What interest rate is offered?",
+      "bot": "Do you prefer conventional or Islamic (Shariah-compliant) loans?",
+      "time": 3.265570640563965
+    }
+  ]
+}

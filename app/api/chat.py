@@ -1,5 +1,4 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
 from typing import Optional
 import json
 import logging
@@ -9,22 +8,11 @@ logger = logging.getLogger(__name__)
 from app.core.redis import get_redis
 from app.core.graphs.conversation_manager import ConversationManagerGraph
 from app.models.conversation_state import ConversationState, UserProfile
+from app.models.api.schemas import ChatRequest, ChatResponse
 
 router = APIRouter()
 conversation_graph = ConversationManagerGraph()
 compiled_graph = conversation_graph.build_graph()
-
-
-class ChatRequest(BaseModel):
-    message: str
-    session_id: Optional[str] = "default"
-
-
-class ChatResponse(BaseModel):
-    response: str
-    session_id: str
-    intent: Optional[str] = None
-    domain: Optional[str] = None
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -35,7 +23,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     try:
         logger.info(f"📥 [STATE] Loading state for session: {request.session_id}")
         state = await _load_state(redis, request.session_id)
-        logger.info(f"✅ [STATE] State loaded - Intent: {state.intent}, Banking Type: {state.banking_type}")
+        logger.info(f"✅ [STATE] State loaded - Intent: {state.intent}, Banking Type: {state.banking_type}, Product Type In Progress: {state.product_type_in_progress}")
         
         state.conversation_history.append({
             "role": "user",
@@ -47,15 +35,32 @@ async def chat(request: ChatRequest) -> ChatResponse:
         
         try:
             logger.info(f"🚀 [GRAPH] Invoking ConversationManagerGraph...")
-            result_dict = compiled_graph.invoke(state_dict)
+            
+            result_obj = compiled_graph.invoke(state)
             logger.info(f"✅ [GRAPH] Graph execution completed")
+            logger.info(f"🔍 [GRAPH] Result type: {type(result_obj).__name__}")
             
-            if isinstance(result_dict, ConversationState):
-                result_state = result_dict
+            
+            if isinstance(result_obj, ConversationState):
+                result_state = result_obj
+            elif isinstance(result_obj, dict):
+                logger.info(f"🔍 [GRAPH] Result dict banking_type: {result_obj.get('banking_type')}")
+                
+                logger.info(f"🔍 [MERGE] Before merge: state has banking_type={state_dict.get('banking_type')}, result has={result_obj.get('banking_type')}")
+                merged_dict = {**state_dict, **result_obj}
+                logger.info(f"🔍 [MERGE] After merge: merged has banking_type={merged_dict.get('banking_type')}")
+                result_state = ConversationState(**merged_dict)
+                logger.info(f"🔍 [MERGE] After ConversationState creation: banking_type={result_state.banking_type}")
             else:
-                result_state = ConversationState(**result_dict)
+                
+                if hasattr(result_obj, 'model_dump'):
+                    merged_dict = {**state_dict, **result_obj.model_dump()}
+                else:
+                    merged_dict = {**state_dict, **dict(result_obj)}
+                result_state = ConversationState(**merged_dict)
             
-            logger.info(f"📊 [RESULT] Response: {result_state.response[:50] if result_state.response else 'Empty'}")
+            logger.info(f"📊 [RESULT] Response: {result_state.response if result_state.response else 'Empty'}")
+            logger.info(f"🔹 [RESULT] Product Type In Progress: {result_state.product_type_in_progress}, Current Slot: {result_state.current_slot}")
         except Exception as graph_error:
             logger.error(f"❌ [GRAPH] Graph execution error: {type(graph_error).__name__}: {str(graph_error)}", exc_info=True)
             return ChatResponse(
@@ -74,6 +79,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         logger.info(f"📝 [HISTORY] Added assistant response to conversation history")
         
         logger.info(f"💾 [SAVE] Saving state to Redis for session: {request.session_id}")
+        logger.info(f"🔍 [SAVE] State.banking_type={result_state.banking_type}, State.gender={result_state.gender}, State.age={result_state.age}, State.occupation={result_state.occupation}, State.product_type_in_progress={result_state.product_type_in_progress}")
         await _save_state(redis, request.session_id, result_state)
         logger.info(f"✅ [SAVE] State saved successfully")
         
@@ -129,12 +135,35 @@ async def _save_state(redis, session_id: str, state: ConversationState) -> None:
                 "product_category": state.product_category,
                 "product_type": state.product_type,
                 "product_name": state.product_name,
+                "account_goal": state.account_goal,
+                "account_purpose": state.account_purpose,
+                "account_type_preference": state.account_type_preference,
+                "age": state.age,
+                "gender": state.gender,
+                "occupation": state.occupation,
+                "health_benefits_interest": state.health_benefits_interest,
+                "locker_interest": state.locker_interest,
+                "spending_pattern": state.spending_pattern,
+                "card_tier_preference": state.card_tier_preference,
+                "annual_income": state.annual_income,
+                "loan_purpose": state.loan_purpose,
+                "amount_needed": state.amount_needed,
+                "repayment_period": state.repayment_period,
+                "monthly_savings": state.monthly_savings,
+                "primary_use": state.primary_use,
+                "travel_frequency": state.travel_frequency,
+                "credit_tier": state.credit_tier,
+                "loan_amount": state.loan_amount,
+                "repayment_tenure": state.repayment_tenure,
                 "user_profile": state.user_profile.model_dump(),
                 "conversation_history": state.conversation_history,
                 "response": state.response,
                 "missing_slots": state.missing_slots,
                 "eligible_products": state.eligible_products,
                 "comparison_mode": state.comparison_mode,
+                "product_type_in_progress": state.product_type_in_progress,
+                "current_slot": state.current_slot,
+                "next_action": state.next_action,
                 "last_agent": state.last_agent
             }
             await redis.set(

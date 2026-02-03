@@ -1,0 +1,40 @@
+{
+  "product": "prime_kotipoti_dps",
+  "timestamp": "2026-02-02T20:01:47.422440",
+  "status": "FAIL",
+  "product_found": false,
+  "features_found": [],
+  "accuracy": 0.0,
+  "conversation": [
+    {
+      "turn": 1,
+      "user": "Hi, I want to save for long-term wealth building",
+      "bot": "Hello there! It's wonderful to hear you're focused on long-term wealth building. I'm Prime Bank's friendly assistant, and I can certainly help you explore the best savings and investment options to achieve your financial goals.",
+      "time": 1.4824774265289307
+    },
+    {
+      "turn": 2,
+      "user": "I can save monthly amount",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 3.3418776988983154
+    },
+    {
+      "turn": 3,
+      "user": "I'm looking for 9% interest rate",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 1.3813362121582031
+    },
+    {
+      "turn": 4,
+      "user": "Can I get loan facility during the scheme?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 1.4738717079162598
+    },
+    {
+      "turn": 5,
+      "user": "What's the tenure options available?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 1.5046279430389404
+    }
+  ]
+}

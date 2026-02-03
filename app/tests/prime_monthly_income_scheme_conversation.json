@@ -1,0 +1,40 @@
+{
+  "product": "prime_monthly_income_scheme",
+  "timestamp": "2026-02-02T20:04:11.584282",
+  "status": "FAIL",
+  "product_found": false,
+  "features_found": [],
+  "accuracy": 0.0,
+  "conversation": [
+    {
+      "turn": 1,
+      "user": "I need regular monthly income from my investment",
+      "bot": "What's your occupation? A) Student, B) Teacher, C) Salaried employee, D) Business owner, E) Other?",
+      "time": 3.5166873931884766
+    },
+    {
+      "turn": 2,
+      "user": "I want my principal protected",
+      "bot": "What's your occupation? A) Student, B) Teacher, C) Salaried employee, D) Business owner, E) Other?",
+      "time": 1.925652265548706
+    },
+    {
+      "turn": 3,
+      "user": "I have 100000 to invest",
+      "bot": "What's your occupation? A) Student, B) Teacher, C) Salaried employee, D) Business owner, E) Other?",
+      "time": 1.392040491104126
+    },
+    {
+      "turn": 4,
+      "user": "Is this suitable for retirees?",
+      "bot": "What's your occupation? A) Student, B) Teacher, C) Salaried employee, D) Business owner, E) Other?",
+      "time": 1.689328908920288
+    },
+    {
+      "turn": 5,
+      "user": "Can I get monthly payouts?",
+      "bot": "What's your occupation? A) Student, B) Teacher, C) Salaried employee, D) Business owner, E) Other?",
+      "time": 1.5802373886108398
+    }
+  ]
+}

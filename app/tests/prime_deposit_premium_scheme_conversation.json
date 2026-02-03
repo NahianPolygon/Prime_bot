@@ -1,0 +1,40 @@
+{
+  "product": "prime_deposit_premium_scheme",
+  "timestamp": "2026-02-02T20:03:30.204309",
+  "status": "FAIL",
+  "product_found": false,
+  "features_found": [],
+  "accuracy": 0.0,
+  "conversation": [
+    {
+      "turn": 1,
+      "user": "I want monthly deposit scheme with high interest",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 3.778074264526367
+    },
+    {
+      "turn": 2,
+      "user": "Starting with 500 per month",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.4904472827911377
+    },
+    {
+      "turn": 3,
+      "user": "I want 9% interest rate",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.377551555633545
+    },
+    {
+      "turn": 4,
+      "user": "Do you offer loan facility?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 1.9247324466705322
+    },
+    {
+      "turn": 5,
+      "user": "What are the tenor options?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.2003800868988037
+    }
+  ]
+}

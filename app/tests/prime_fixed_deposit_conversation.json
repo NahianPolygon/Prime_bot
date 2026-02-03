@@ -1,0 +1,40 @@
+{
+  "product": "prime_fixed_deposit",
+  "timestamp": "2026-02-02T20:02:33.028017",
+  "status": "FAIL",
+  "product_found": false,
+  "features_found": [],
+  "accuracy": 0.0,
+  "conversation": [
+    {
+      "turn": 1,
+      "user": "I want a lump sum investment option",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 3.6353189945220947
+    },
+    {
+      "turn": 2,
+      "user": "I prefer 6-12 months tenure",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.7710275650024414
+    },
+    {
+      "turn": 3,
+      "user": "I have at least 10000 to deposit",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 1.865494966506958
+    },
+    {
+      "turn": 4,
+      "user": "What's the interest rate for 6 months?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.2434661388397217
+    },
+    {
+      "turn": 5,
+      "user": "What are the tenure options?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.0087320804595947
+    }
+  ]
+}

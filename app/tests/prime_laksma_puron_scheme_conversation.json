@@ -1,0 +1,40 @@
+{
+  "product": "prime_laksma_puron_scheme",
+  "timestamp": "2026-02-02T20:03:49.799207",
+  "status": "FAIL",
+  "product_found": false,
+  "features_found": [],
+  "accuracy": 0.0,
+  "conversation": [
+    {
+      "turn": 1,
+      "user": "I have a custom financial goal in mind",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 4.430485010147095
+    },
+    {
+      "turn": 2,
+      "user": "I want to set my own target amount",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 3.871778726577759
+    },
+    {
+      "turn": 3,
+      "user": "I prefer 3-5 year tenure",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 3.0641283988952637
+    },
+    {
+      "turn": 4,
+      "user": "What interest rate for this scheme?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.801943778991699
+    },
+    {
+      "turn": 5,
+      "user": "How do I calculate monthly deposit?",
+      "bot": "Would you prefer conventional or Islamic (Shariah-compliant) banking?",
+      "time": 2.7950077056884766
+    }
+  ]
+}

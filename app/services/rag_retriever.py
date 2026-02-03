@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
 from typing import List, Dict
+import json
+import re
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
@@ -35,7 +37,7 @@ class RAGRetriever:
                     host=settings.QDRANT_HOST,
                     port=settings.QDRANT_PORT
                 )
-                self.collection_name = "prime_products"
+                self.collection_name = "prime_knowledge_base"
                 logger.info(f"✅ RAG: Connected to Qdrant at {settings.QDRANT_HOST}:{settings.QDRANT_PORT}")
             except Exception as e:
                 logger.error(f"❌ RAG: Failed to connect to Qdrant: {e}")
@@ -80,58 +82,116 @@ class RAGRetriever:
         except Exception as e:
             logger.warning(f"Could not check collection: {e}")
         
-        logger.info("🔨 RAG: Building index from MD files...")
+        logger.info("🔨 RAG: Building index from all MD files in knowledge base...")
+        
+        md_files = list(self.kb_path.glob('**/*.md'))
+        total_files = len(md_files)
+        
+        if total_files == 0:
+            logger.warning("⚠️  RAG: No MD files found in knowledge base")
+            return
+        
         points = []
         point_id = 1
+        total_chunks = 0
         
-        for banking_type in ["conventional", "islami"]:
-            for category in ["credit", "save"]:
-                category_path = self.kb_path / banking_type / category
+        for file_idx, md_file in enumerate(md_files, 1):
+            try:
+                progress_pct = int((file_idx / total_files) * 100)
+                bar_length = 40
+                filled = int((progress_pct / 100) * bar_length)
+                bar = '█' * filled + '░' * (bar_length - filled)
+                logger.info(f"📊 RAG: [{bar}] {progress_pct}% ({file_idx}/{total_files}) - {md_file.name}")
                 
-                if category == "credit":
-                    subdir = category_path / "i_need_a_credit_card"
-                    prod_type = "credit_card"
-                else:
-                    subdir = None
-                    prod_type = None
+                content = md_file.read_text(encoding='utf-8')
+                metadata = self._extract_metadata(content)
+                cleaned_content = self._clean_md_content(content)
+                chunks = self._chunk_content(cleaned_content, chunk_size=600, overlap=150)
                 
-                if subdir and subdir.exists():
-                    for md_file in subdir.glob("*.md"):
-                        try:
-                            content = md_file.read_text(encoding='utf-8')
-                            chunks = self._chunk_content(content, 500, 100)
-                            
-                            for chunk_text in chunks:
-                                embedding = self.embedder.encode(chunk_text)
-                                
-                                point = PointStruct(
-                                    id=point_id,
-                                    vector=embedding.tolist(),
-                                    payload={
-                                        'file': md_file.name,
-                                        'banking_type': banking_type,
-                                        'product_type': prod_type,
-                                        'path': str(md_file),
-                                        'chunk': chunk_text[:500]
-                                    }
-                                )
-                                points.append(point)
-                                point_id += 1
-                        except Exception as e:
-                            logger.error(f"Error reading {md_file}: {e}")
+                for chunk_idx, chunk_text in enumerate(chunks):
+                    if not chunk_text.strip():
+                        continue
+                    
+                    embedding = self.embedder.encode(chunk_text)
+                    
+                    point = PointStruct(
+                        id=point_id,
+                        vector=embedding.tolist(),
+                        payload={
+                            'file': md_file.name,
+                            'banking_type': metadata.get('banking_type', md_file.parent.parent.parent.name),
+                            'category': metadata.get('category', md_file.parent.parent.name),
+                            'product_name': metadata.get('product_name', md_file.stem),
+                            'product_id': metadata.get('product_id', ''),
+                            'card_network': metadata.get('card_network', ''),
+                            'tier': metadata.get('tier', ''),
+                            'path': str(md_file),
+                            'chunk_idx': chunk_idx,
+                            'chunk_text': chunk_text[:800]
+                        }
+                    )
+                    points.append(point)
+                    point_id += 1
+                    total_chunks += 1
+            except Exception as e:
+                logger.error(f"Error processing {md_file}: {e}")
         
         if points:
             try:
+                logger.info(f"📊 RAG: [{'█' * 40}] 100% - Uploading {total_chunks} chunks to Qdrant...")
                 self.client.upsert(
                     collection_name=self.collection_name,
                     points=points
                 )
-                logger.info(f"✅ RAG: Indexed {len(points)} document chunks in Qdrant")
+                logger.info(f"✅ RAG: Indexed {total_chunks} document chunks from {total_files} MD files successfully!")
             except Exception as e:
                 logger.error(f"Error upserting points: {e}")
     
-    def _chunk_content(self, text: str, chunk_size: int = 500, overlap: int = 100) -> List[str]:
-        sentences = [s.strip() for s in text.split('.') if s.strip()]
+    def _extract_metadata(self, md_content: str) -> Dict:
+        metadata = {}
+        
+        lines = md_content.split('\n')
+        if lines[0].strip() == '---':
+            end_idx = 1
+            while end_idx < len(lines) and lines[end_idx].strip() != '---':
+                end_idx += 1
+            
+            for line in lines[1:end_idx]:
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    key = key.strip()
+                    value = value.strip().strip("'\"[]")
+                    
+                    if value.lower() in ['true', 'false']:
+                        metadata[key] = value.lower() == 'true'
+                    elif value.isdigit():
+                        metadata[key] = int(value)
+                    else:
+                        metadata[key] = value
+        
+        return metadata
+    
+    def _clean_md_content(self, content: str) -> str:
+        lines = content.split('\n')
+        
+        if lines and lines[0].strip() == '---':
+            end_idx = 1
+            while end_idx < len(lines) and lines[end_idx].strip() != '---':
+                end_idx += 1
+            lines = lines[end_idx+1:]
+        
+        cleaned = []
+        for line in lines:
+            line = line.rstrip()
+            line = re.sub(r'^#+\s+', '', line)
+            line = re.sub(r'\*{1,2}', '', line)
+            line = re.sub(r'_+', '', line)
+            cleaned.append(line)
+        
+        return '\n'.join(cleaned)
+    
+    def _chunk_content(self, text: str, chunk_size: int = 600, overlap: int = 150) -> List[str]:
+        sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 10]
         chunks = []
         current_chunk = []
         current_length = 0
@@ -140,19 +200,25 @@ class RAGRetriever:
             sentence_length = len(sentence.split())
             
             if current_length + sentence_length > chunk_size and current_chunk:
-                chunks.append('. '.join(current_chunk) + '.')
-                current_chunk = current_chunk[-overlap:] if overlap else []
+                chunk_text = '. '.join(current_chunk) + '.'
+                if len(chunk_text.split()) > 20:
+                    chunks.append(chunk_text)
+                
+                overlap_count = max(1, int(len(current_chunk) * (overlap / chunk_size)))
+                current_chunk = current_chunk[-overlap_count:] if overlap_count > 0 else []
                 current_length = sum(len(s.split()) for s in current_chunk)
             
             current_chunk.append(sentence)
             current_length += sentence_length
         
         if current_chunk:
-            chunks.append('. '.join(current_chunk) + '.')
+            chunk_text = '. '.join(current_chunk) + '.'
+            if len(chunk_text.split()) > 20:
+                chunks.append(chunk_text)
         
-        return [c for c in chunks if c.strip()]
+        return [c.strip() for c in chunks if c.strip()]
     
-    def retrieve(self, query: str, top_k: int = 3) -> List[Dict]:
+    def retrieve(self, query: str, top_k: int = 5, filters: Dict = None) -> List[Dict]:
         if not self.embedder or not self.client:
             logger.warning("⚠️  RAG: Not available for retrieval")
             return []
@@ -160,28 +226,89 @@ class RAGRetriever:
         try:
             query_embedding = self.embedder.encode(query).tolist()
             
-            results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=query_embedding,
-                limit=top_k
-            )
+            search_kwargs = {
+                "collection_name": self.collection_name,
+                "query_vector": query_embedding,
+                "limit": top_k
+            }
+            
+            if filters:
+                search_kwargs["query_filter"] = filters
+            
+            results = self.client.search(**search_kwargs)
             
             formatted_results = []
             for hit in results:
                 formatted_results.append({
-                    'chunk': hit.payload.get('chunk', ''),
+                    'chunk': hit.payload.get('chunk_text', ''),
+                    'similarity': hit.score,
                     'metadata': {
                         'file': hit.payload.get('file', ''),
                         'banking_type': hit.payload.get('banking_type', ''),
-                        'product_type': hit.payload.get('product_type', ''),
-                        'path': hit.payload.get('path', '')
-                    },
-                    'similarity': hit.score
+                        'category': hit.payload.get('category', ''),
+                        'product_name': hit.payload.get('product_name', ''),
+                        'product_id': hit.payload.get('product_id', ''),
+                        'card_network': hit.payload.get('card_network', ''),
+                        'tier': hit.payload.get('tier', ''),
+                        'path': hit.payload.get('path', ''),
+                        'chunk_idx': hit.payload.get('chunk_idx', 0)
+                    }
                 })
             
             return formatted_results
         except Exception as e:
             logger.error(f"Error during retrieval: {e}")
+            return []
+    
+    def retrieve_by_product(self, product_name: str, top_k: int = 10) -> List[Dict]:
+        if not self.client:
+            return []
+        
+        try:
+            results = self.client.scroll(
+                collection_name=self.collection_name,
+                limit=top_k,
+                query_filter={
+                    "must": [
+                        {"key": "product_name", "match": {"value": product_name}}
+                    ]
+                }
+            )
+            return results[0] if results else []
+        except Exception as e:
+            logger.error(f"Error retrieving by product: {e}")
+            return []
+    
+    def retrieve_by_banking_type(self, banking_type: str, top_k: int = 10) -> List[Dict]:
+        if not self.embedder or not self.client:
+            return []
+        
+        query_embedding = self.embedder.encode(banking_type).tolist()
+        
+        try:
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                limit=top_k,
+                query_filter={
+                    "must": [
+                        {"key": "banking_type", "match": {"value": banking_type}}
+                    ]
+                }
+            )
+            
+            formatted = []
+            for hit in results:
+                formatted.append({
+                    'chunk': hit.payload.get('chunk_text', ''),
+                    'metadata': {
+                        'product_name': hit.payload.get('product_name', ''),
+                        'banking_type': hit.payload.get('banking_type', '')
+                    }
+                })
+            return formatted
+        except Exception as e:
+            logger.error(f"Error retrieving by banking type: {e}")
             return []
     
     @classmethod

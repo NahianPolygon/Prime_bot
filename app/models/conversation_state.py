@@ -29,15 +29,39 @@ class ConversationState(BaseModel):
     
     intent: Optional[str] = None
     banking_type: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
     product_category: Optional[str] = None
     product_type: Optional[str] = None
     product_name: Optional[str] = None
+    account_goal: Optional[str] = None
+    account_purpose: Optional[str] = None
+    account_type_preference: Optional[str] = None
+    health_benefits_interest: Optional[str] = None
+    locker_interest: Optional[str] = None
+    occupation: Optional[str] = None
+    spending_pattern: Optional[str] = None
+    card_tier_preference: Optional[str] = None
+    annual_income: Optional[str] = None
+    loan_purpose: Optional[str] = None
+    amount_needed: Optional[str] = None
+    repayment_period: Optional[str] = None
+    monthly_savings: Optional[str] = None
+    primary_use: Optional[str] = None
+    travel_frequency: Optional[str] = None
+    credit_tier: Optional[str] = None
+    loan_amount: Optional[str] = None
+    repayment_tenure: Optional[str] = None
     
     user_profile: UserProfile = Field(default_factory=UserProfile)
     
     missing_slots: List[str] = Field(default_factory=list)
     eligible_products: List[str] = Field(default_factory=list)
     comparison_mode: bool = False
+    
+    product_type_in_progress: Optional[str] = None
+    current_slot: Optional[str] = None
+    next_action: Optional[str] = None  # For subgraph routing
     
     conversation_history: List[dict] = Field(default_factory=list)
     last_agent: Optional[str] = None

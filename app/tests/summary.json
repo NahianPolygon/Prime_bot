@@ -1,0 +1,99 @@
+{
+  "timestamp": "2026-02-02T20:04:12.587907",
+  "total_tests": 11,
+  "passed": 3,
+  "partial": 0,
+  "failed": 8,
+  "results": [
+    {
+      "product": "prime_kotipoti_dps",
+      "status": "FAIL",
+      "product_found": false,
+      "features_found": [],
+      "accuracy": 0.0
+    },
+    {
+      "product": "prime_lakhopoti_scheme",
+      "status": "PASS",
+      "product_found": true,
+      "features_found": [
+        "lakhopoti",
+        "1 lakh",
+        "terminal benefit"
+      ],
+      "accuracy": 0.75
+    },
+    {
+      "product": "prime_i_first_fd",
+      "status": "FAIL",
+      "product_found": false,
+      "features_found": [],
+      "accuracy": 0.0
+    },
+    {
+      "product": "prime_fixed_deposit",
+      "status": "FAIL",
+      "product_found": false,
+      "features_found": [],
+      "accuracy": 0.0
+    },
+    {
+      "product": "prime_fixed_deposit_plus",
+      "status": "FAIL",
+      "product_found": false,
+      "features_found": [],
+      "accuracy": 0.0
+    },
+    {
+      "product": "prime_edu_dps",
+      "status": "FAIL",
+      "product_found": false,
+      "features_found": [],
+      "accuracy": 0.0
+    },
+    {
+      "product": "prime_double_benefit_scheme",
+      "status": "PASS",
+      "product_found": false,
+      "features_found": [
+        "double benefit",
+        "doubles",
+        "9.25%"
+      ],
+      "accuracy": 0.75
+    },
+    {
+      "product": "prime_deposit_premium_scheme",
+      "status": "FAIL",
+      "product_found": false,
+      "features_found": [],
+      "accuracy": 0.0
+    },
+    {
+      "product": "prime_laksma_puron_scheme",
+      "status": "FAIL",
+      "product_found": false,
+      "features_found": [],
+      "accuracy": 0.0
+    },
+    {
+      "product": "prime_millionaire_scheme",
+      "status": "PASS",
+      "product_found": true,
+      "features_found": [
+        "millionaire",
+        "million",
+        "6-7%",
+        "fixed monthly"
+      ],
+      "accuracy": 0.8
+    },
+    {
+      "product": "prime_monthly_income_scheme",
+      "status": "FAIL",
+      "product_found": false,
+      "features_found": [],
+      "accuracy": 0.0
+    }
+  ]
+}

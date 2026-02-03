@@ -1,381 +1,312 @@
 from langgraph.graph import StateGraph, START, END
 from typing import Literal
+import logging
+import json
 from app.core.config import llm
 from app.models.conversation_state import ConversationState
-from app.models.graphs import IntentClassification, SlotRequirements
-from app.core.graphs.slot_collection import SlotCollectionGraph
-from app.core.graphs.eligibility import EligibilityGraph
-from app.core.graphs.product_retrieval import ProductRetrievalGraph
-from app.core.graphs.comparison import ComparisonGraph
-from app.core.graphs.rag_explanation import RAGExplanationGraph
-from app.prompts.conversation_manager import INTENT_PROMPT, SLOT_VALIDATION_PROMPT, GREETING_PROMPT
-from app.prompts.slot_collection import EXTRACT_SLOT_PROMPT
-from app.models.graphs import SlotExtractionResult
-from app.services.product_matcher import ProductMatcher
-from app.services.knowledge_cache import KnowledgeBaseCache
 from app.services.inquiry_classifier import InquiryClassifier
-import json
-import logging
+from app.services.rag_retriever import RAGRetriever
+from app.core.graphs.product_retrieval import ProductRetrievalGraph
+from app.core.graphs.configs import DEPOSIT_ACCOUNTS_CONFIG, CREDIT_CARDS_CONFIG, LOANS_CONFIG
+from app.prompts.conversation.greeting import GREETING_RESPONSE_PROMPT
+from app.prompts.conversation.product_detection import DETECT_PRODUCT_TYPE_PROMPT
+from app.prompts.conversation.comparison import PREPARE_COMPARISON_PROMPT, COMPARISON_CLARIFICATION_PROMPT
+from app.prompts.conversation.eligibility import ELIGIBILITY_CHECK_PROMPT, ELIGIBILITY_REQUEST_INFO_PROMPT
+from app.prompts.conversation.rag_explanation import EXPLAIN_WITH_RAG_PROMPT, NO_KNOWLEDGE_RESPONSE, UNCLEAR_RESPONSE
 
 logger = logging.getLogger(__name__)
-
 
 class ConversationManagerGraph:
     def __init__(self):
         self.llm = llm
+        self.classifier = InquiryClassifier()
+        self.rag = RAGRetriever()
+        self.product_retrieval_graphs = {
+            "deposits": ProductRetrievalGraph(DEPOSIT_ACCOUNTS_CONFIG),
+            "credit_cards": ProductRetrievalGraph(CREDIT_CARDS_CONFIG),
+            "loans": ProductRetrievalGraph(LOANS_CONFIG)
+        }
         self._graph = None
-        self.slot_collection_graph = SlotCollectionGraph()
-        self.eligibility_graph = EligibilityGraph()
-        self.product_retrieval_graph = ProductRetrievalGraph()
-        self.comparison_graph = ComparisonGraph()
-        self.rag_explanation_graph = RAGExplanationGraph()
-        self.product_matcher = ProductMatcher(llm)
-        self.kb_cache = KnowledgeBaseCache.get_instance()
-
-
-    def extract_slot_if_needed_node(self, state: ConversationState) -> dict:
-        """Extract slot value if we're responding to a slot collection prompt"""
-        logger.info(f"🔨 [EXTRACT_SLOT] Node entered - Missing slots: {state.missing_slots}")
-        
-        if not state.missing_slots or state.missing_slots == []:
-            logger.info(f"✅ [EXTRACT_SLOT] No missing slots - skipping extraction")
-            return {}
-        
-        # Check if we have a current_slot being asked
-        current_slot = state.missing_slots[0] if state.missing_slots else None
-        if not current_slot:
-            logger.info(f"⚠️  [EXTRACT_SLOT] No current slot identified")
-            return {}
-        
-        user_message = state.conversation_history[-1]["content"] if state.conversation_history else ""
-        
-        try:
-            slot_types = {
-                "age": "numeric",
-                "income_monthly": "numeric",
-                "income_yearly": "numeric",
-                "deposit": "numeric",
-                "employment_type": "categorical",
-                "banking_type": "categorical",
-                "product_category": "categorical"
-            }
-
-            prompt = EXTRACT_SLOT_PROMPT.format(
-                slot_name=current_slot,
-                user_message=user_message,
-                slot_type=slot_types.get(current_slot, "string")
-            )
-
-            logger.info(f"🔨 [EXTRACT_SLOT] Extracting value for slot: {current_slot}")
-            structured_llm = self.llm.with_structured_output(SlotExtractionResult)
-            result = structured_llm.invoke(prompt)
-            logger.info(f"📊 [EXTRACT_SLOT] LLM response - Valid: {result.is_valid}, Confidence: {result.confidence}, Value: {result.extracted_value}")
-
-            updates = {}
-            if result.is_valid and result.confidence > 0.5:
-                logger.info(f"✅ [EXTRACT_SLOT] ACCEPTED - Extracted value: {result.extracted_value} (confidence: {result.confidence})")
-                
-                if current_slot == "age":
-                    updates["user_profile"] = state.user_profile.model_copy(
-                        update={"age": int(float(result.extracted_value))}
-                    )
-                elif current_slot == "income_monthly":
-                    updates["user_profile"] = state.user_profile.model_copy(
-                        update={"income_monthly": float(result.extracted_value)}
-                    )
-                elif current_slot == "income_yearly":
-                    updates["user_profile"] = state.user_profile.model_copy(
-                        update={"income_yearly": float(result.extracted_value)}
-                    )
-                elif current_slot == "employment_type":
-                    updates["user_profile"] = state.user_profile.model_copy(
-                        update={"employment_type": result.extracted_value.lower()}
-                    )
-                elif current_slot == "banking_type":
-                    updates["banking_type"] = result.extracted_value.lower()
-                elif current_slot == "product_category":
-                    updates["product_category"] = result.extracted_value.lower()
-                
-                new_slots = state.missing_slots.copy()
-                new_slots.pop(0)
-                updates["missing_slots"] = new_slots
-                logger.info(f"✅ [EXTRACT_SLOT] Removed '{current_slot}' from missing slots - Remaining: {new_slots}")
-            else:
-                logger.warning(f"❌ [EXTRACT_SLOT] REJECTED - is_valid={result.is_valid}, confidence={result.confidence} (need > 0.5) for value: {result.extracted_value}")
-
-            return updates
-        except Exception as e:
-            logger.error(f"❌ [EXTRACT_SLOT] Error: {str(e)}", exc_info=True)
-            return {}
 
     def classify_intent_node(self, state: ConversationState) -> dict:
-        logger.info(f"🔷 [CLASSIFY_INTENT] Starting intent classification...")
-        
-        if state.intent and state.missing_slots:
-            logger.info(f"✅ [CLASSIFY_INTENT] Intent already set to '{state.intent}' during slot collection - preserving it")
+        # If we're in the middle of product retrieval, skip classification and continue the flow
+        logger.info(f"🔍 [CLASSIFY] Checking product_type_in_progress: {state.product_type_in_progress}")
+        if state.product_type_in_progress:
+            logger.info(f"✅ [CLASSIFY] Skipping classification - continuing product flow for {state.product_type_in_progress}")
             return {
-                "intent": state.intent,
-                "banking_type": state.banking_type,
-                "product_category": state.product_category,
-                "last_agent": "classify_intent"
+                "intent": "PRODUCT_INFO_QUERY",
+                "inquiry_confidence": 1.0
             }
         
-        message = state.conversation_history[-1]["content"] if state.conversation_history else ""
-        history = "\n".join([
-            f"{msg['role']}: {msg['content']}" 
-            for msg in state.conversation_history[-3:]
-        ])
-
-        prompt = INTENT_PROMPT.format(
-            user_message=message,
-            history=history or "No prior history"
-        )
-        logger.info(f"📝 [CLASSIFY_INTENT] Calling LLM for intent detection...")
-
-        structured_llm = self.llm.with_structured_output(IntentClassification)
-        result = structured_llm.invoke(prompt)
-        logger.info(f"✅ [CLASSIFY_INTENT] Intent classified: {result.intent} | Banking Type: {result.banking_type} | Category: {result.product_category}")
-
-        
-        message_lower = message.lower()
-        has_explicit_banking_type = any(word in message_lower for word in ["conventional", "islami", "islamic", "shariah", "sharia"])
-        
-        
-        banking_type = result.banking_type if has_explicit_banking_type else None
-        if not has_explicit_banking_type:
-            logger.info(f"📝 [CLASSIFY_INTENT] User didn't explicitly mention banking type - will ask later")
-
-        return {
-            "intent": result.intent,
-            "banking_type": banking_type,
-            "product_category": result.product_category,
-            "last_agent": "classify_intent"
-        }
-
-    def validate_slots_node(self, state: ConversationState) -> dict:
-        logger.info(f"🔶 [VALIDATE_SLOTS] Validating required slots for intent: {state.intent}")
-        history = "\n".join([
-            f"{msg['role']}: {msg['content']}" 
-            for msg in state.conversation_history[-3:]
-        ])
-        profile = json.dumps(state.user_profile.model_dump(), default=str)
-
-        prompt = SLOT_VALIDATION_PROMPT.format(
-            intent=state.intent,
-            profile=profile,
-            history=history
-        )
-        logger.info(f"📝 [VALIDATE_SLOTS] Calling LLM for slot validation...")
-
-        structured_llm = self.llm.with_structured_output(SlotRequirements)
-        result = structured_llm.invoke(prompt)
-        
-        filtered_slots = []
-        
-        # ALWAYS ask for banking_type first if not set
-        if not state.banking_type:
-            logger.info(f"🔴 [VALIDATE_SLOTS] Banking type NOT set - adding to front of queue (PRIORITY)")
-            filtered_slots.append("banking_type")
-        
-        # Then filter other slots that have already been extracted
-        for slot in result.missing_slots:
-            if slot == "banking_type":
-                # Skip banking_type from LLM list if we already added it above
-                if state.banking_type:
-                    logger.info(f"⏭️  [VALIDATE_SLOTS] Skipping 'banking_type' - already extracted: {state.banking_type}")
-                continue
-            if slot == "age" and state.user_profile.age:
-                logger.info(f"⏭️  [VALIDATE_SLOTS] Skipping 'age' - already extracted: {state.user_profile.age}")
-                continue
-            if slot == "income_monthly" and state.user_profile.income_monthly:
-                logger.info(f"⏭️  [VALIDATE_SLOTS] Skipping 'income_monthly' - already extracted: {state.user_profile.income_monthly}")
-                continue
-            if slot == "income_yearly" and state.user_profile.income_yearly:
-                logger.info(f"⏭️  [VALIDATE_SLOTS] Skipping 'income_yearly' - already extracted: {state.user_profile.income_yearly}")
-                continue
-            if slot == "employment_type" and state.user_profile.employment_type:
-                logger.info(f"⏭️  [VALIDATE_SLOTS] Skipping 'employment_type' - already extracted: {state.user_profile.employment_type}")
-                continue
-            if slot == "product_category" and state.product_category:
-                logger.info(f"⏭️  [VALIDATE_SLOTS] Skipping 'product_category' - already extracted: {state.product_category}")
-                continue
-            filtered_slots.append(slot)
-        
-        logger.info(f"✅ [VALIDATE_SLOTS] Missing slots (after filtering, priority order): {filtered_slots} | Reason: {result.reason}")
-
-        return {
-            "missing_slots": filtered_slots,
-            "last_agent": "validate_slots"
-        }
-
-    def route_to_subgraph_node(self, state: ConversationState) -> dict:
-        logger.info(f"🏠 [ROUTE_SUBGRAPH] Routing to appropriate subgraph...")
-        state_dict = state.model_dump() if isinstance(state, ConversationState) else state
-        
-        try:
-            if state.missing_slots:
-                logger.info(f"📋 [ROUTE_SUBGRAPH] Missing slots detected: {state.missing_slots} → Invoking SlotCollectionGraph")
-                result_dict = self.slot_collection_graph.invoke(state_dict)
-            elif state.intent == "eligibility":
-                logger.info(f"📋 [ROUTE_SUBGRAPH] Intent is 'eligibility' → Invoking EligibilityGraph")
-                result_dict = self.eligibility_graph.invoke(state_dict)
-            elif state.intent == "compare":
-                logger.info(f"📋 [ROUTE_SUBGRAPH] Intent is 'compare' → Invoking ComparisonGraph")
-                result_dict = self.comparison_graph.invoke(state_dict)
-            elif state.intent == "explain":
-                logger.info(f"📋 [ROUTE_SUBGRAPH] Intent is 'explain' → Invoking RAGExplanationGraph")
-                result_dict = self.rag_explanation_graph.invoke(state_dict)
-            else:
-                logger.info(f"📋 [ROUTE_SUBGRAPH] Default intent → Invoking ProductRetrievalGraph")
-                result_dict = self.product_retrieval_graph.invoke(state_dict)
-            
-            logger.info(f"✅ [ROUTE_SUBGRAPH] Subgraph execution completed")
-            result_state = ConversationState(**result_dict) if isinstance(result_dict, dict) else result_dict
-        except Exception as e:
-            logger.error(f"❌ [ROUTE_SUBGRAPH] Subgraph error: {type(e).__name__}: {str(e)}", exc_info=True)
-            return {
-                "response": f"I encountered an error: {str(e)}. Please try again.",
-                "last_agent": "route_to_subgraph_error"
-            }
-        
-        return {
-            "user_profile": result_state.user_profile,
-            "missing_slots": result_state.missing_slots if result_state.missing_slots else [],
-            "response": result_state.response,
-            "eligible_products": result_state.eligible_products if result_state.eligible_products else [],
-            "comparison_mode": result_state.comparison_mode,
-            "banking_type": result_state.banking_type,
-            "product_category": result_state.product_category,
-            "last_agent": "route_to_subgraph"
-        }
-
-    def classify_inquiry_type_node(self, state: ConversationState) -> dict:
+        user_message = state.conversation_history[-1]["content"] if state.conversation_history else ""
         logger.info(f"⚡ [CLASSIFY_INQUIRY] Pattern-based classification (fast)")
         
-        message = state.conversation_history[-1]["content"] if state.conversation_history else ""
-        
-        classification = InquiryClassifier.classify(message)
+        classification = self.classifier.classify(user_message)
         logger.info(f"✅ [CLASSIFY_INQUIRY] Type: {classification.inquiry_type}, Confidence: {classification.confidence}")
         
-        if classification.inquiry_type == "GREETING":
-            greeting_prompt = GREETING_PROMPT.format(user_message=message)
-            greeting_response = self.llm.invoke(greeting_prompt)
-            return {
-                "response": greeting_response.content,
-                "inquiry_type": "GREETING",
-                "inquiry_confidence": classification.confidence,
-                "last_agent": "classify_inquiry"
-            }
-        
         return {
-            "inquiry_type": classification.inquiry_type,
+            "intent": classification.inquiry_type,
             "inquiry_confidence": classification.confidence,
-            "extracted_context": classification.extracted_context.model_dump(),
-            "last_agent": "classify_inquiry"
+            "banking_type": classification.extracted_context.banking_type or state.banking_type,
+            "product_category": classification.extracted_context.product_category or state.product_category,
+            "user_profile": state.user_profile.model_copy(update={
+                "age": classification.extracted_context.age or state.user_profile.age,
+                "employment_type": classification.extracted_context.employment or state.user_profile.employment_type,
+                "income_yearly": classification.extracted_context.income or state.user_profile.income_yearly
+            })
         }
 
-    def product_matcher_node(self, state: ConversationState) -> dict:
-        logger.info(f"🎯 [PRODUCT_MATCHER] Starting product matching for credit cards...")
+    def handle_greeting_node(self, state: ConversationState) -> dict:
+        user_message = state.conversation_history[-1]["content"]
+        
+        prompt = GREETING_RESPONSE_PROMPT.format(user_message=user_message)
+        response = self.llm.invoke(prompt)
+        
+        return {
+            "response": response.content,
+            "last_agent": "greeting_handler"
+        }
+
+    def retrieve_products_node(self, state: ConversationState) -> dict:
+        # If we're continuing a product retrieval flow, use the stored product_type
+        if state.product_type_in_progress:
+            product_type = state.product_type_in_progress
+        else:
+            product_type = self._detect_product_type(state)
+            
+        if product_type not in self.product_retrieval_graphs:
+            return {
+                "response": "I can help you with deposits, credit cards, or loans. Which are you interested in?",
+                "last_agent": "product_retrieval"
+            }
+        
+        guide = self.product_retrieval_graphs[product_type]
+        result = guide.invoke(state)
+        
+        logger.info(f"📤 [RETRIEVE_PRODUCTS] Subgraph returned: response={bool(result.get('response'))}, last_agent={result.get('last_agent')}, next_action={result.get('next_action')}")
+        
+        # Mark that we're in product retrieval flow if there are missing slots (next_action="collect")
+        if result.get("next_action") == "collect":
+            # This is a slot collection response - include all extracted slot updates
+            logger.info(f"✅ [RETRIEVE_PRODUCTS] Returning slot collection response with product_type_in_progress={product_type}")
+            return {
+                **result,  # Include all updates from subgraph (extracted slots, etc.)
+                "last_agent": "product_retrieval",
+                "product_type_in_progress": product_type,
+            }
+        
+        # Regular response from search/recommend
+        logger.info(f"✅ [RETRIEVE_PRODUCTS] Returning search/recommend response")
+        return {
+            **result,
+            "last_agent": "product_retrieval"
+        }
+    
+    def _detect_product_type(self, state: ConversationState) -> str:
+        """Use LLM to detect product type from user message context"""
+        message = state.conversation_history[-1]["content"] if state.conversation_history else ""
+        
+        if not message:
+            return state.product_category or "deposits"
+        
+        # Try LLM-based detection first
+        try:
+            prompt = DETECT_PRODUCT_TYPE_PROMPT.format(message=message)
+
+            response = self.llm.invoke(prompt)
+            detected = response.content.strip().lower()
+            
+            # Validate response
+            if detected in ["deposits", "credit_cards", "loans"]:
+                logger.debug(f"📊 [DETECT_PRODUCT] LLM detected: {detected}")
+                return detected
+        except Exception as e:
+            logger.warning(f"LLM product detection failed: {e}. Using fallback.")
+        
+        # Fallback: simple keyword matching if LLM fails
+        message_lower = message.lower()
+        if any(kw in message_lower for kw in ["save", "savings", "deposit", "account", "scheme", "interest", "recurring"]):
+            return "deposits"
+        elif any(kw in message_lower for kw in ["credit card", "card", "cashback", "reward"]):
+            return "credit_cards"
+        elif any(kw in message_lower for kw in ["loan", "borrow", "lending"]):
+            return "loans"
+        
+        return state.product_category or "deposits"
+
+    def check_eligibility_node(self, state: ConversationState) -> dict:
+        user_message = state.conversation_history[-1]["content"]
+        
+        if state.matched_products:
+            products = state.matched_products
+        else:
+            rag_chunks = self.rag.retrieve(user_message, top_k=5)
+            products = [{"name": chunk.get("metadata", {}).get("product_name", "Product"), 
+                        "knowledge_chunks": [chunk.get("chunk", "")]} for chunk in rag_chunks]
+        
+        if not products or not state.user_profile.age:
+            return {
+                "response": ELIGIBILITY_REQUEST_INFO_PROMPT,
+                "missing_slots": ["age", "employment_type"],
+                "last_agent": "eligibility_check"
+            }
+        
+        eligible = [p.get('name', '') for p in products]
+        chunks = "\n".join(["\n".join(p.get('knowledge_chunks', [])) for p in products if p.get('knowledge_chunks')])
+        
+        prompt = ELIGIBILITY_CHECK_PROMPT.format(
+            age=state.user_profile.age,
+            employment=state.user_profile.employment_type,
+            income=state.user_profile.income_yearly,
+            products=', '.join(eligible),
+            knowledge_context=chunks if chunks else 'Product eligibility information available'
+        )
         
         try:
-            context_dict = state.extracted_context or {}
-            from app.services.product_matcher import ExtractedContext
-            context = ExtractedContext(**context_dict)
-            
-            logger.info(f"📝 [PRODUCT_MATCHER] Extracted context: banking_type={context.banking_type}, employment={context.employment}, keywords={context.keywords}")
-            
-            products = self.kb_cache.get_credit_cards(context.banking_type)
-            logger.info(f"📦 [PRODUCT_MATCHER] Loaded {len(products)} products from knowledge base")
-            
-            matched_products = self.product_matcher.filter_credit_cards(products, context)
-            logger.info(f"✅ [PRODUCT_MATCHER] Matched {len(matched_products)} products after filtering")
-            
-            user_query = state.conversation_history[-1]["content"] if state.conversation_history else ""
-            response = self.product_matcher.format_products_response(matched_products, user_query)
-            
+            response = self.llm.invoke(prompt)
             return {
-                "response": response,
-                "matched_products": matched_products,
-                "last_agent": "product_matcher"
+                "response": response.content,
+                "eligible_products": eligible,
+                "matched_products": products,
+                "last_agent": "eligibility_check"
             }
         except Exception as e:
-            logger.error(f"❌ [PRODUCT_MATCHER] Error: {str(e)}")
+            logger.error(f"Error in eligibility check: {e}")
             return {
-                "response": "I couldn't retrieve product information. Please try again.",
-                "matched_products": [],
-                "last_agent": "product_matcher_error"
+                "response": f"Based on your profile, you're eligible for: {', '.join(eligible)}",
+                "eligible_products": eligible,
+                "matched_products": products,
+                "last_agent": "eligibility_check"
             }
+
+    def compare_products_node(self, state: ConversationState) -> dict:
+        user_message = state.conversation_history[-1]["content"]
+        
+        rag_chunks = self.rag.retrieve(user_message, top_k=5)
+        products = [{"name": chunk.get("metadata", {}).get("product_name", "Product"), 
+                    "knowledge_chunks": [chunk.get("chunk", "")]} for chunk in rag_chunks]
+        
+        if len(products) < 2:
+            return {
+                "response": "I need at least 2 products to compare. Let me search for more options.",
+                "last_agent": "comparison"
+            }
+        
+        product_names = [p.get('name') for p in products[:3]]
+        chunks = "\n".join(["\n".join(p.get('knowledge_chunks', [])) for p in products[:3] if p.get('knowledge_chunks')])
+        
+        # Check if user mentioned specific product/banking types
+        message_lower = user_message.lower()
+        product_keywords = ["deposit", "savings", "credit card", "card", "loan", "investment", "scheme"]
+        banking_keywords = ["conventional", "islamic", "islami", "shariah"]
+        
+        has_product_mention = any(kw in message_lower for kw in product_keywords)
+        has_banking_mention = any(kw in message_lower for kw in banking_keywords)
+        
+        # If too vague, ask for clarification
+        if not has_product_mention and not has_banking_mention:
+            return {
+                "response": COMPARISON_CLARIFICATION_PROMPT,
+                "last_agent": "comparison"
+            }
+        
+        prompt = PREPARE_COMPARISON_PROMPT.format(
+            num_products=len(product_names),
+            user_message=user_message,
+            product_names=', '.join(product_names),
+            chunks=chunks if chunks else 'Product details available in system'
+        )
+        
+        try:
+            response = self.llm.invoke(prompt)
+            return {
+                "response": response.content,
+                "comparison_mode": True,
+                "last_agent": "comparison"
+            }
+        except Exception as e:
+            logger.error(f"Error in comparison: {e}")
+            return {
+                "response": f"Comparing {', '.join(product_names[:2])} for you...",
+                "comparison_mode": True,
+                "last_agent": "comparison"
+            }
+
+    def explain_with_rag_node(self, state: ConversationState) -> dict:
+        user_message = state.conversation_history[-1]["content"]
+        
+        rag_chunks = self.rag.retrieve(user_message, top_k=5)
+        
+        if not rag_chunks:
+            return {
+                "response": NO_KNOWLEDGE_RESPONSE,
+                "last_agent": "rag_explanation"
+            }
+        
+        chunk_texts = "\n".join([c.get('chunk', '') for c in rag_chunks[:3]])
+        
+        prompt = EXPLAIN_WITH_RAG_PROMPT.format(
+            user_message=user_message,
+            knowledge_context=chunk_texts
+        )
+        
+        try:
+            response = self.llm.invoke(prompt)
+            return {
+                "response": response.content,
+                "last_agent": "rag_explanation"
+            }
+        except Exception as e:
+            logger.error(f"Error in RAG explanation: {e}")
+            return {
+                "response": UNCLEAR_RESPONSE,
+                "last_agent": "rag_explanation"
+            }
+
+
+    def route_conversation(self, state: ConversationState) -> Literal["greeting", "product_retrieval", "eligibility", "comparison", "explanation"]:
+        intent = state.intent
+        
+        if intent == "GREETING":
+            return "greeting"
+        elif intent == "COMPARISON_QUERY":
+            return "comparison"
+        elif intent == "ELIGIBILITY_QUERY":
+            return "eligibility"
+        elif intent == "PRODUCT_INFO_QUERY":
+            return "product_retrieval"
+        
+        return "explanation"
 
     def build_graph(self):
         graph = StateGraph(ConversationState)
         
-        graph.add_node("classify_inquiry", self.classify_inquiry_type_node)
-        graph.add_node("product_matcher", self.product_matcher_node)
-        graph.add_node("extract_slot", self.extract_slot_if_needed_node)
-        graph.add_node("classify_intent", self.classify_intent_node)
-        graph.add_node("validate_slots", self.validate_slots_node)
-        graph.add_node("route_to_subgraph", self.route_to_subgraph_node)
+        graph.add_node("classify", self.classify_intent_node)
+        graph.add_node("greeting", self.handle_greeting_node)
+        graph.add_node("product_retrieval", self.retrieve_products_node)
+        graph.add_node("eligibility", self.check_eligibility_node)
+        graph.add_node("comparison", self.compare_products_node)
+        graph.add_node("explanation", self.explain_with_rag_node)
         
-        graph.add_edge(START, "classify_inquiry")
-        
-        def route_after_inquiry(state: ConversationState) -> str:
-            inquiry_type = state.inquiry_type
-            confidence = state.inquiry_confidence
-            
-            # If it's a greeting, end immediately
-            if inquiry_type == "GREETING":
-                logger.info(f"🎯 [ROUTE] Greeting detected → END")
-                return END
-            
-            if confidence >= 0.7 and inquiry_type == "PRODUCT_INFO_QUERY":
-                logger.info(f"🎯 [ROUTE] FAQ Query detected (confidence: {confidence}) → Product Matcher")
-                return "product_matcher"
-            
-            if confidence >= 0.7 and inquiry_type == "MIXED_QUERY":
-                logger.info(f"🎯 [ROUTE] Mixed Query detected (confidence: {confidence}) → Product Matcher")
-                return "product_matcher"
-            
-            logger.info(f"🎯 [ROUTE] Eligibility Query (confidence: {confidence}) → Slot Extraction")
-            return "extract_slot"
-        
-        graph.add_conditional_edges("classify_inquiry", route_after_inquiry, {
-            END: END,
-            "product_matcher": "product_matcher",
-            "extract_slot": "extract_slot"
+        graph.add_edge(START, "classify")
+        graph.add_conditional_edges("classify", self.route_conversation, {
+            "greeting": "greeting",
+            "product_retrieval": "product_retrieval",
+            "eligibility": "eligibility",
+            "comparison": "comparison",
+            "explanation": "explanation"
         })
         
-        graph.add_edge("product_matcher", END)
-        graph.add_edge("extract_slot", "classify_intent")
-        graph.add_edge("classify_intent", "validate_slots")
-        graph.add_edge("validate_slots", "route_to_subgraph")
-        graph.add_edge("route_to_subgraph", END)
+        graph.add_edge("greeting", END)
+        graph.add_edge("product_retrieval", END)
+        graph.add_edge("eligibility", END)
+        graph.add_edge("comparison", END)
+        graph.add_edge("explanation", END)
         
         self._graph = graph.compile()
         return self._graph
-        
-        self._graph = graph.compile()
-        return self._graph
-    
+
     def visualize(self):
-        if self._graph is None:
+        if not self._graph:
             self.build_graph()
-        mermaid_dict = self._graph.get_graph().to_dict()
-        return mermaid_dict
-    
-    def invoke(self, state: ConversationState) -> ConversationState:
-        graph = self.build_graph()
-        result = graph.invoke(state)
-        
-        updated_fields = {
-            "intent": result.get("intent", state.intent),
-            "banking_type": result.get("banking_type", state.banking_type),
-            "product_category": result.get("product_category", state.product_category),
-            "user_profile": result.get("user_profile", state.user_profile),
-            "missing_slots": result.get("missing_slots", state.missing_slots),
-            "response": result.get("response", state.response),
-            "eligible_products": result.get("eligible_products", state.eligible_products),
-            "comparison_mode": result.get("comparison_mode", state.comparison_mode),
-            "last_agent": result.get("last_agent", state.last_agent)
-        }
-        
-        return ConversationState(**{**state.model_dump(), **updated_fields})
+        return self._graph.get_graph().to_dict()

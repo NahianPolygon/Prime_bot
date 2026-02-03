@@ -278,6 +278,9 @@
         const chatMessages = document.getElementById('chatMessages');
 
         const API_URL = 'http://localhost:8000/api/chat';
+        
+        // Generate unique session ID for this conversation
+        const SESSION_ID = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
         // Send message on button click
         sendBtn.addEventListener('click', sendMessage);
@@ -321,7 +324,10 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ message: message })
+                    body: JSON.stringify({ 
+                        message: message,
+                        session_id: SESSION_ID
+                    })
                 });
 
                 typingDiv.remove();
