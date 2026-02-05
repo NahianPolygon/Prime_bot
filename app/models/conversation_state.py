@@ -31,6 +31,7 @@ class ConversationState(BaseModel):
     banking_type: Optional[str] = None
     age: Optional[int] = None
     gender: Optional[str] = None
+    remittance_status: Optional[str] = None
     product_category: Optional[str] = None
     product_type: Optional[str] = None
     product_name: Optional[str] = None
@@ -57,7 +58,26 @@ class ConversationState(BaseModel):
     
     missing_slots: List[str] = Field(default_factory=list)
     eligible_products: List[str] = Field(default_factory=list)
+    suggested_products: List[dict] = Field(default_factory=list)
+    comparison_products: List[dict] = Field(default_factory=list)
     comparison_mode: bool = False
+    
+    products_identified: bool = False
+    clarification_message: Optional[str] = None
+    comparison_status: Optional[str] = None
+    
+    comparison_banking_type: Optional[str] = None
+    comparison_deposit_frequency: Optional[str] = None
+    comparison_tenure_range: Optional[str] = None
+    comparison_purpose: Optional[str] = None
+    comparison_interest_priority: Optional[str] = None
+    comparison_flexibility_priority: Optional[str] = None
+    comparison_feature_priorities: List[str] = Field(default_factory=list)
+    comparison_initial_budget: Optional[float] = None
+    comparison_monthly_budget: Optional[float] = None
+    comparison_collected_slots: List[str] = Field(default_factory=list)
+    comparison_slot_to_collect: Optional[str] = None
+    comparison_product_type: Optional[str] = None  # Product type being compared (deposits, credit_cards, loans)
     
     product_type_in_progress: Optional[str] = None
     current_slot: Optional[str] = None

@@ -35,9 +35,14 @@ EXTRACTION RULES:
    - "Long-term/5+ years" → preferred_tenure: Long-term
    - "Premium/High/Best/9.75%" → premium_returns: Yes
    - "Highest/Maximum rates" → premium_returns: Yes
-5. If the user mentions a NUMBER for deposit/amount, extract it
-6. If UNCLEAR or NOT mentioned, return null
-7. Be AGGRESSIVE in extraction - assume user is helping us understand their need
+5. GENDER INFERENCE - Infer gender from gendered occupations and contextual clues:
+   - Female terms: "housewife", "nurse", "teacher", "secretary", "stewardess", "actress", "hairdresser", "nanny", "maid", "woman", "lady", "girl", "she/her", "mother", "wife", "girlfriend", "daughter"
+   - Male terms: "businessman", "engineer", "mechanic", "driver", "policeman", "actor", "barber", "waiter", "man", "guy", "boy", "he/him", "father", "husband", "boyfriend", "son"
+   - SMART LOGIC: When extracting gender, ALSO check Already Collected Slots for occupation! If occupation="housewife" or "nurse" etc., infer gender="female". If occupation="engineer" or "businessman", infer gender="male"
+   - Example: If occupation already extracted as "housewife", you can infer gender="female" even if user didn't explicitly say it
+6. If the user mentions a NUMBER for deposit/amount, extract it
+7. If UNCLEAR or NOT mentioned, return null
+8. Be AGGRESSIVE in extraction - assume user is helping us understand their need
 
 CONFIDENCE SCORING:
 - 1.0 = Explicitly stated by user OR direct yes/no to current question

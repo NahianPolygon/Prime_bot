@@ -11,8 +11,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-    volumes:
-      - redis_data:/data
     networks:
       - prime_bot_network
 
@@ -72,7 +70,6 @@ services:
       - prime_bot_network
 
 volumes:
-  redis_data:
   qdrant_data:
 
 networks:

@@ -10,6 +10,7 @@ sys.path.insert(0, str(project_root))
 
 from app.core.graphs.conversation_manager import ConversationManagerGraph
 from app.core.graphs.product_retrieval import ProductRetrievalGraph
+from app.core.graphs.comparison import ComparisonGraph
 from app.core.graphs.configs import DEPOSIT_ACCOUNTS_CONFIG
 
 # Setup logging
@@ -78,6 +79,7 @@ def visualize_all_graphs():
     graphs = {
         "Conversation Manager": ConversationManagerGraph(),
         "Product Retrieval": ProductRetrievalGraph(DEPOSIT_ACCOUNTS_CONFIG),
+        "Comparison": ComparisonGraph(),
     }
     
     logger.info(f"📁 Saving graphs to: {IMAGES_DIR}\n")

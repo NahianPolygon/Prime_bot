@@ -7,10 +7,10 @@ from app.models.conversation_state import ConversationState
 from app.services.inquiry_classifier import InquiryClassifier
 from app.services.rag_retriever import RAGRetriever
 from app.core.graphs.product_retrieval import ProductRetrievalGraph
+from app.core.graphs.comparison import ComparisonGraph
 from app.core.graphs.configs import DEPOSIT_ACCOUNTS_CONFIG, CREDIT_CARDS_CONFIG, LOANS_CONFIG
 from app.prompts.conversation.greeting import GREETING_RESPONSE_PROMPT
 from app.prompts.conversation.product_detection import DETECT_PRODUCT_TYPE_PROMPT
-from app.prompts.conversation.comparison import PREPARE_COMPARISON_PROMPT, COMPARISON_CLARIFICATION_PROMPT
 from app.prompts.conversation.eligibility import ELIGIBILITY_CHECK_PROMPT, ELIGIBILITY_REQUEST_INFO_PROMPT
 from app.prompts.conversation.rag_explanation import EXPLAIN_WITH_RAG_PROMPT, NO_KNOWLEDGE_RESPONSE, UNCLEAR_RESPONSE
 
@@ -26,11 +26,34 @@ class ConversationManagerGraph:
             "credit_cards": ProductRetrievalGraph(CREDIT_CARDS_CONFIG),
             "loans": ProductRetrievalGraph(LOANS_CONFIG)
         }
+        self.comparison_graph = ComparisonGraph()
         self._graph = None
 
     def classify_intent_node(self, state: ConversationState) -> dict:
-        # If we're in the middle of product retrieval, skip classification and continue the flow
         logger.info(f"🔍 [CLASSIFY] Checking product_type_in_progress: {state.product_type_in_progress}")
+        logger.info(f"🔍 [CLASSIFY] Checking comparison_status: {state.comparison_status}")
+        
+        user_message = state.conversation_history[-1]["content"] if state.conversation_history else ""
+        message_lower = user_message.lower()
+        
+        if state.comparison_status == "collecting_slots":
+            logger.info(f"✅ [CLASSIFY] Skipping classification - continuing comparison slot collection")
+            return {
+                "intent": "COMPARISON_QUERY",
+                "inquiry_confidence": 1.0
+            }
+        
+        # CHECK FOR COMPARISON KEYWORDS FIRST - highest priority
+        comparison_keywords = ["compare", "versus", "vs", "comparison", "what's the difference", "compare these"]
+        user_wants_comparison = any(kw in message_lower for kw in comparison_keywords)
+        
+        if user_wants_comparison:
+            logger.info(f"✅ [CLASSIFY] Comparison keywords detected - routing to COMPARISON_QUERY")
+            return {
+                "intent": "COMPARISON_QUERY",
+                "inquiry_confidence": 1.0
+            }
+        
         if state.product_type_in_progress:
             logger.info(f"✅ [CLASSIFY] Skipping classification - continuing product flow for {state.product_type_in_progress}")
             return {
@@ -180,57 +203,73 @@ class ConversationManagerGraph:
             }
 
     def compare_products_node(self, state: ConversationState) -> dict:
-        user_message = state.conversation_history[-1]["content"]
+        logger.info(f"📊 [COMPARE] Invoking ComparisonGraph subgraph")
+        logger.info(f"   matched_products: {len(state.matched_products) if state.matched_products else 0}")
+        logger.info(f"   suggested_products: {len(state.suggested_products) if state.suggested_products else 0}")
         
-        rag_chunks = self.rag.retrieve(user_message, top_k=5)
-        products = [{"name": chunk.get("metadata", {}).get("product_name", "Product"), 
-                    "knowledge_chunks": [chunk.get("chunk", "")]} for chunk in rag_chunks]
+        result = self.comparison_graph.invoke(state)
         
-        if len(products) < 2:
-            return {
-                "response": "I need at least 2 products to compare. Let me search for more options.",
-                "last_agent": "comparison"
-            }
+        logger.info(f"✅ [COMPARE] ComparisonGraph returned response")
+        logger.info(f"   result keys: {list(result.keys())}")
         
-        product_names = [p.get('name') for p in products[:3]]
-        chunks = "\n".join(["\n".join(p.get('knowledge_chunks', [])) for p in products[:3] if p.get('knowledge_chunks')])
+        updates = {
+            "response": result.get("response", ""),
+            "last_agent": "comparison"
+        }
         
-        # Check if user mentioned specific product/banking types
-        message_lower = user_message.lower()
-        product_keywords = ["deposit", "savings", "credit card", "card", "loan", "investment", "scheme"]
-        banking_keywords = ["conventional", "islamic", "islami", "shariah"]
+        # Get detected product type from result
+        detected_product_type = result.get("comparison_product_type", state.comparison_product_type)
         
-        has_product_mention = any(kw in message_lower for kw in product_keywords)
-        has_banking_mention = any(kw in message_lower for kw in banking_keywords)
+        # Check for appropriate slots based on product type
+        all_slots_collected = False
+        if detected_product_type == "credit_cards":
+            banking_type = result.get("comparison_banking_type")
+            spending_pattern = result.get("comparison_spending_pattern")
+            card_tier = result.get("comparison_card_tier")
+            income = result.get("comparison_income")
+            logger.info(f"   CREDIT_CARD slot VALUES: banking_type={banking_type}, spending_pattern={spending_pattern}, card_tier={card_tier}, income={income}")
+            all_slots_collected = (banking_type and spending_pattern and card_tier and income)
+            logger.info(f"   Checking CREDIT_CARD slots: banking_type={bool(banking_type)}, spending_pattern={bool(spending_pattern)}, card_tier={bool(card_tier)}, income={bool(income)}")
+        elif detected_product_type == "loans":
+            all_slots_collected = (
+                result.get("comparison_banking_type") and
+                result.get("comparison_loan_purpose") and
+                result.get("comparison_loan_amount") and
+                result.get("comparison_repayment_period")
+            )
+            logger.info(f"   Checking LOAN slots: banking_type={bool(result.get('comparison_banking_type'))}, purpose={bool(result.get('comparison_loan_purpose'))}, amount={bool(result.get('comparison_loan_amount'))}, repayment={bool(result.get('comparison_repayment_period'))}")
+        else:  # deposits (default)
+            all_slots_collected = (
+                result.get("comparison_banking_type") and
+                result.get("comparison_deposit_frequency") and
+                result.get("comparison_tenure_range") and
+                result.get("comparison_purpose")
+            )
+            logger.info(f"   Checking DEPOSIT slots: banking_type={bool(result.get('comparison_banking_type'))}, frequency={bool(result.get('comparison_deposit_frequency'))}, tenure={bool(result.get('comparison_tenure_range'))}, purpose={bool(result.get('comparison_purpose'))}")
         
-        # If too vague, ask for clarification
-        if not has_product_mention and not has_banking_mention:
-            return {
-                "response": COMPARISON_CLARIFICATION_PROMPT,
-                "last_agent": "comparison"
-            }
+        logger.info(f"   all_slots_collected={all_slots_collected}")
         
-        prompt = PREPARE_COMPARISON_PROMPT.format(
-            num_products=len(product_names),
-            user_message=user_message,
-            product_names=', '.join(product_names),
-            chunks=chunks if chunks else 'Product details available in system'
-        )
+        # Set comparison status
+        if "response" in result and not all_slots_collected:
+            updates["comparison_status"] = "collecting_slots"
+            logger.info(f"   Setting comparison_status=collecting_slots")
+        else:
+            updates["comparison_status"] = "completed"
+            logger.info(f"   Setting comparison_status=completed")
         
-        try:
-            response = self.llm.invoke(prompt)
-            return {
-                "response": response.content,
-                "comparison_mode": True,
-                "last_agent": "comparison"
-            }
-        except Exception as e:
-            logger.error(f"Error in comparison: {e}")
-            return {
-                "response": f"Comparing {', '.join(product_names[:2])} for you...",
-                "comparison_mode": True,
-                "last_agent": "comparison"
-            }
+        # Always propagate product type
+        if detected_product_type:
+            updates["comparison_product_type"] = detected_product_type
+            logger.info(f"   Set comparison_product_type={detected_product_type}")
+        
+        # Copy all comparison slot values from result
+        for key in result.keys():
+            if key.startswith("comparison_"):
+                updates[key] = result[key]
+                logger.info(f"   Set {key}={result[key]}")
+        
+        logger.info(f"   Final updates keys: {list(updates.keys())}")
+        return updates
 
     def explain_with_rag_node(self, state: ConversationState) -> dict:
         user_message = state.conversation_history[-1]["content"]
@@ -266,17 +305,73 @@ class ConversationManagerGraph:
 
     def route_conversation(self, state: ConversationState) -> Literal["greeting", "product_retrieval", "eligibility", "comparison", "explanation"]:
         intent = state.intent
+        user_message = state.conversation_history[-1]["content"] if state.conversation_history else ""
+        
+        logger.info(f"🚦 [ROUTE] Intent: {intent}")
         
         if intent == "GREETING":
+            logger.info(f"   → routing to GREETING")
             return "greeting"
+        
         elif intent == "COMPARISON_QUERY":
-            return "comparison"
+            logger.info(f"   → COMPARISON_QUERY detected")
+            
+            if state.comparison_status == "collecting_slots":
+                logger.info(f"   → comparison_status=collecting_slots → routing to COMPARISON (continue slot collection)")
+                return "comparison"
+            
+            has_matched_products = bool(state.matched_products)
+            has_user_mentioned_products = self._user_mentioned_specific_products(user_message)
+            
+            logger.info(f"      has_matched_products={has_matched_products}, mentioned_products={has_user_mentioned_products}")
+            
+            if has_matched_products or has_user_mentioned_products:
+                logger.info(f"   → routing to COMPARISON (products available or mentioned)")
+                return "comparison"
+            else:
+                logger.info(f"   → routing to PRODUCT_RETRIEVAL (need to discover products)")
+                return "product_retrieval"
+        
         elif intent == "ELIGIBILITY_QUERY":
+            logger.info(f"   → routing to ELIGIBILITY")
             return "eligibility"
+        
         elif intent == "PRODUCT_INFO_QUERY":
+            logger.info(f"   → routing to PRODUCT_RETRIEVAL")
             return "product_retrieval"
         
+        logger.info(f"   → routing to EXPLANATION (default)")
         return "explanation"
+    
+    def _user_mentioned_specific_products(self, user_message: str) -> bool:
+        """Check if user mentioned specific product names or types"""
+        message_lower = user_message.lower()
+        
+        # Specific product name keywords
+        product_name_keywords = [
+            "prime", "youth", "teacher", "edu dps", "fixed deposit", "fd",
+            "credit card", "loan", "savings account", "current account",
+            "hasanah", "deposit scheme", "dps", "pps"
+        ]
+        
+        # Product type keywords (when asking for category comparison)
+        product_type_keywords = [
+            "credit card", "deposit", "scheme", "savings account", 
+            "current account", "loan", "investment", "fixed deposit"
+        ]
+        
+        has_product_name = any(kw in message_lower for kw in product_name_keywords)
+        has_product_type = any(kw in message_lower for kw in product_type_keywords)
+        has_comparison_markers = any(marker in message_lower for marker in ["vs", "versus", "between", "two", "compare"])
+        
+        # User mentioned products if they have:
+        # 1. Specific product names, OR
+        # 2. Product types + comparison markers
+        mentioned = has_product_name or (has_product_type and has_comparison_markers)
+        
+        logger.info(f"📋 [PRODUCT_MENTION] name={has_product_name}, type={has_product_type}, comparison={has_comparison_markers} → mentioned={mentioned}")
+        
+        return mentioned
 
     def build_graph(self):
         graph = StateGraph(ConversationState)

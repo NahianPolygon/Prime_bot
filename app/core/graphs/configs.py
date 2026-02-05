@@ -33,6 +33,12 @@ DEPOSIT_ACCOUNTS_CONFIG = ProductGuideConfig(
             extract_pattern=r"(\d{1,3})\s*(year|years|old|yo)"
         ),
         SlotDefinition(
+            name="remittance_status",
+            question="Are you receiving remittances from abroad (from family or employer)?",
+            keywords=["remittance", "abroad", "nrb", "non-resident", "overseas", "foreign", "husband", "father", "relative"],
+            extract_pattern=r"(remittance|abroad|nrb|non-resident|overseas|foreign|husband|father)"
+        ),
+        SlotDefinition(
             name="account_goal",
             question="What's your primary goal? A) Regular savings, B) Monthly income/profit, C) Lump sum investment, or D) I'm not sure?",
             keywords=["savings", "income", "profit", "investment", "monthly", "lump sum", "wealth"],
@@ -102,6 +108,12 @@ CREDIT_CARDS_CONFIG = ProductGuideConfig(
             keywords=["lac", "lakh", "crore", "5 lac", "10 lac", "20 lac"],
             extract_pattern=r"(\d+)\s*(lac|lakh|crore)|below|above"
         ),
+        SlotDefinition(
+            name="age",
+            question="What's your age? This helps us check eligibility criteria.",
+            keywords=["year", "old", "age"],
+            extract_pattern=r"(\d{1,3})\s*(year|years|old|yo)"
+        ),
     ],
     rag_filters={"category": "credit_card"},
     intro_message="Perfect! Let me find the ideal credit card for you...",
@@ -140,4 +152,110 @@ LOANS_CONFIG = ProductGuideConfig(
     rag_filters={"category": "loan"},
     intro_message="Let me help you find the perfect loan product...",
     recommendation_prompt_template=LOANS_RECOMMENDATION_PROMPT_TEMPLATE,
+)
+
+# ============================================================================
+# COMPARISON CONFIGS - Product-type specific slots for comparison queries
+# ============================================================================
+
+DEPOSIT_COMPARISON_CONFIG = ProductGuideConfig(
+    product_type="deposits",
+    display_name="Deposit Products Comparison",
+    slots=[
+        SlotDefinition(
+            name="comparison_banking_type",
+            question="Do you prefer Islamic or Conventional banking, or are you flexible?",
+            keywords=["conventional", "islami", "islamic", "shariah", "flexible"],
+            extract_pattern=r"(conventional|islami|islamic|shariah|flexible)"
+        ),
+        SlotDefinition(
+            name="comparison_deposit_frequency",
+            question="Do you prefer lump-sum deposits (Fixed Deposits) or monthly deposits (DPS)?",
+            keywords=["lump sum", "monthly", "dps", "fixed", "flexible"],
+            extract_pattern=r"(lump|monthly|dps|fixed|flexible)"
+        ),
+        SlotDefinition(
+            name="comparison_tenure_range",
+            question="What's your timeline? (short: 1-3 months, medium: 6-12 months, long: 2-5 years, or very long: 5+ years)",
+            keywords=["short", "medium", "long", "very long", "month", "year"],
+            extract_pattern=r"(short|medium|long|very long|month|year)"
+        ),
+        SlotDefinition(
+            name="comparison_purpose",
+            question="What's the main purpose? (general savings, education, wealth-building, retirement, or monthly income)",
+            keywords=["general", "education", "wealth", "retirement", "income"],
+            extract_pattern=r"(general|education|wealth|retirement|income)"
+        ),
+    ],
+    rag_filters={"category": "deposit"},
+    intro_message="Great! Let me help you compare deposit products.",
+    recommendation_prompt_template="",
+)
+
+CREDIT_CARD_COMPARISON_CONFIG = ProductGuideConfig(
+    product_type="credit_cards",
+    display_name="Credit Cards Comparison",
+    slots=[
+        SlotDefinition(
+            name="comparison_banking_type",
+            question="Do you prefer conventional or Islamic (Shariah-compliant) credit cards?",
+            keywords=["conventional", "islami", "islamic", "shariah", "flexible"],
+            extract_pattern=r"(conventional|islami|islamic|shariah|flexible)"
+        ),
+        SlotDefinition(
+            name="comparison_spending_pattern",
+            question="What's your typical spending pattern? (travel, shopping, business, or all-purpose)",
+            keywords=["travel", "shopping", "business", "purpose", "all"],
+            extract_pattern=r"(travel|shopping|business|purpose|all)"
+        ),
+        SlotDefinition(
+            name="comparison_card_tier",
+            question="What card tier interests you? (gold, platinum, world elite, or no preference)",
+            keywords=["gold", "platinum", "world", "elite", "preference"],
+            extract_pattern=r"(gold|platinum|world|elite|preference)"
+        ),
+        SlotDefinition(
+            name="comparison_income",
+            question="What's your approximate annual income? (helps match card eligibility)",
+            keywords=["lac", "lakh", "crore", "income", "annual"],
+            extract_pattern=r"(\d+)\s*(lac|lakh|crore)|annual"
+        ),
+    ],
+    rag_filters={"category": "credit_card"},
+    intro_message="Let me help you compare credit cards.",
+    recommendation_prompt_template="",
+)
+
+LOAN_COMPARISON_CONFIG = ProductGuideConfig(
+    product_type="loans",
+    display_name="Loans Comparison",
+    slots=[
+        SlotDefinition(
+            name="comparison_banking_type",
+            question="Do you prefer conventional or Islamic (Shariah-compliant) loans?",
+            keywords=["conventional", "islami", "islamic", "shariah", "flexible"],
+            extract_pattern=r"(conventional|islami|islamic|shariah|flexible)"
+        ),
+        SlotDefinition(
+            name="comparison_loan_purpose",
+            question="What's the loan purpose? (home, auto, personal, business, education)",
+            keywords=["home", "auto", "personal", "business", "education"],
+            extract_pattern=r"(home|auto|personal|business|education)"
+        ),
+        SlotDefinition(
+            name="comparison_amount",
+            question="What's the loan amount you need? (e.g., 5 lac, 10 lac, 50 lac)",
+            keywords=["lac", "lakh", "million", "amount"],
+            extract_pattern=r"(\d+)\s*(lac|lakh)"
+        ),
+        SlotDefinition(
+            name="comparison_repayment_period",
+            question="What repayment timeline? (1-2 years, 3-5 years, 5-10 years, or flexible)",
+            keywords=["year", "years", "flexible", "month"],
+            extract_pattern=r"(\d+.*year|flexible|month)"
+        ),
+    ],
+    rag_filters={"category": "loan"},
+    intro_message="Let me help you compare loan products.",
+    recommendation_prompt_template="",
 )

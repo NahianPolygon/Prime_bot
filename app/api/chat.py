@@ -79,7 +79,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         logger.info(f"📝 [HISTORY] Added assistant response to conversation history")
         
         logger.info(f"💾 [SAVE] Saving state to Redis for session: {request.session_id}")
-        logger.info(f"🔍 [SAVE] State.banking_type={result_state.banking_type}, State.gender={result_state.gender}, State.age={result_state.age}, State.occupation={result_state.occupation}, State.product_type_in_progress={result_state.product_type_in_progress}")
+        logger.info(f"🔍 [SAVE] State.banking_type={result_state.banking_type}, State.gender={result_state.gender}, State.age={result_state.age}, State.remittance_status={result_state.remittance_status}, State.occupation={result_state.occupation}, State.product_type_in_progress={result_state.product_type_in_progress}")
         await _save_state(redis, request.session_id, result_state)
         logger.info(f"✅ [SAVE] State saved successfully")
         
@@ -109,11 +109,15 @@ async def _load_state(redis, session_id: str) -> ConversationState:
             state_data = await redis.get(f"state:{session_id}")
             if state_data:
                 state_dict = json.loads(state_data)
-        except Exception:
+                logger.info(f"🔍 [LOAD] comparison_status={state_dict.get('comparison_status')}, comparison_banking_type={state_dict.get('comparison_banking_type')}, remittance_status={state_dict.get('remittance_status')}, product_type_in_progress={state_dict.get('product_type_in_progress')}")
+        except Exception as e:
+            logger.error(f"❌ [LOAD] Error loading state: {e}")
             pass
     
     if state_dict:
-        return ConversationState(**state_dict)
+        state = ConversationState(**state_dict)
+        logger.info(f"🔍 [LOAD] Loaded state: comparison_status={state.comparison_status}")
+        return state
     
     return ConversationState(
         session_id=session_id,
@@ -130,6 +134,8 @@ async def _save_state(redis, session_id: str, state: ConversationState) -> None:
                 "inquiry_confidence": state.inquiry_confidence,
                 "extracted_context": state.extracted_context,
                 "matched_products": state.matched_products,
+                "suggested_products": state.suggested_products,
+                "comparison_products": state.comparison_products,
                 "intent": state.intent,
                 "banking_type": state.banking_type,
                 "product_category": state.product_category,
@@ -140,6 +146,7 @@ async def _save_state(redis, session_id: str, state: ConversationState) -> None:
                 "account_type_preference": state.account_type_preference,
                 "age": state.age,
                 "gender": state.gender,
+                "remittance_status": state.remittance_status,
                 "occupation": state.occupation,
                 "health_benefits_interest": state.health_benefits_interest,
                 "locker_interest": state.locker_interest,
@@ -161,15 +168,29 @@ async def _save_state(redis, session_id: str, state: ConversationState) -> None:
                 "missing_slots": state.missing_slots,
                 "eligible_products": state.eligible_products,
                 "comparison_mode": state.comparison_mode,
+                "comparison_status": state.comparison_status,
+                "comparison_banking_type": state.comparison_banking_type,
+                "comparison_deposit_frequency": state.comparison_deposit_frequency,
+                "comparison_tenure_range": state.comparison_tenure_range,
+                "comparison_purpose": state.comparison_purpose,
+                "comparison_interest_priority": state.comparison_interest_priority,
+                "comparison_flexibility_priority": state.comparison_flexibility_priority,
+                "comparison_feature_priorities": state.comparison_feature_priorities,
+                "comparison_initial_budget": state.comparison_initial_budget,
+                "comparison_monthly_budget": state.comparison_monthly_budget,
+                "comparison_collected_slots": state.comparison_collected_slots,
+                "comparison_slot_to_collect": state.comparison_slot_to_collect,
                 "product_type_in_progress": state.product_type_in_progress,
                 "current_slot": state.current_slot,
                 "next_action": state.next_action,
                 "last_agent": state.last_agent
             }
+            logger.info(f"🔍 [SAVE] comparison_status={state.comparison_status}, comparison_banking_type={state.comparison_banking_type}, comparison_deposit_frequency={state.comparison_deposit_frequency}")
             await redis.set(
                 f"state:{session_id}",
                 json.dumps(state_data),
                 ex=86400
             )
-        except Exception:
+        except Exception as e:
+            logger.error(f"❌ [SAVE] Error saving state: {e}")
             pass

@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 import json
 import re
 from qdrant_client import QdrantClient
@@ -108,6 +108,10 @@ class RAGRetriever:
                 cleaned_content = self._clean_md_content(content)
                 chunks = self._chunk_content(cleaned_content, chunk_size=600, overlap=150)
                 
+                # Auto-extract return_rate and scheme_type from content
+                return_rate = self._extract_return_rate(content)
+                scheme_type = self._extract_scheme_type(content)
+                
                 for chunk_idx, chunk_text in enumerate(chunks):
                     if not chunk_text.strip():
                         continue
@@ -127,7 +131,9 @@ class RAGRetriever:
                             'tier': metadata.get('tier', ''),
                             'path': str(md_file),
                             'chunk_idx': chunk_idx,
-                            'chunk_text': chunk_text[:800]
+                            'chunk_text': chunk_text[:800],
+                            'return_rate': return_rate,
+                            'scheme_type': scheme_type
                         }
                     )
                     points.append(point)
@@ -217,6 +223,42 @@ class RAGRetriever:
                 chunks.append(chunk_text)
         
         return [c.strip() for c in chunks if c.strip()]
+    
+    def _extract_return_rate(self, content: str) -> Optional[str]:
+        """Extract interest/profit rate from MD content (e.g., '6%', '9%')"""
+        patterns = [
+            r'(\d+)%\s+(?:interest|profit|rate)',
+            r'(?:interest|profit|rate)[:\s]+(\d+)%',
+            r'\*\*(\d+)%',
+        ]
+        content_lower = content.lower()
+        
+        for pattern in patterns:
+            match = re.search(pattern, content_lower)
+            if match:
+                return f"{match.group(1)}%"
+        
+        return None
+    
+    def _extract_scheme_type(self, content: str) -> Optional[str]:
+        """Extract scheme type: lump_sum, monthly_fixed, or monthly_custom"""
+        content_lower = content.lower()
+        
+        # Check for custom goal-based schemes
+        if any(keyword in content_lower for keyword in ['custom', 'goal amount', 'you set', 'your target', 'laksma puron']):
+            if any(keyword in content_lower for keyword in ['monthly', 'installment', 'deposit']):
+                return 'monthly_custom'
+        
+        # Check for lump sum (fixed deposit type)
+        if any(keyword in content_lower for keyword in ['lump sum', 'fixed deposit', 'single deposit', 'upfront']):
+            return 'lump_sum'
+        
+        # Check for monthly fixed
+        if any(keyword in content_lower for keyword in ['fixed monthly', 'monthly installment', 'fixed amount', 'monthly payment']):
+            if 'custom' not in content_lower and 'goal amount' not in content_lower:
+                return 'monthly_fixed'
+        
+        return None
     
     def retrieve(self, query: str, top_k: int = 5, filters: Dict = None) -> List[Dict]:
         if not self.embedder or not self.client:

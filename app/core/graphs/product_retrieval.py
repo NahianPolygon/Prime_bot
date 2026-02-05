@@ -109,6 +109,10 @@ class ProductRetrievalGraph:
             if state.gender and state.gender.lower() in ["female", "woman", "lady"]:
                 if state.health_benefits_interest or state.locker_interest:
                     query = f"{query} women's health benefits locker"
+            # Add remittance keyword if receiving remittances
+            if state.remittance_status and state.remittance_status.lower() in ["yes", "true", "receiving", "remittance"]:
+                if "remittance" not in query.lower():
+                    query = f"{query} remittance"
         else:
             # Construct query from slot values
             query_parts = []
@@ -118,6 +122,8 @@ class ProductRetrievalGraph:
                 query_parts.append(f"for {state.occupation}")
             if state.gender and state.gender.lower() in ["female", "woman", "lady"]:
                 query_parts.append("women")
+            if state.remittance_status and state.remittance_status.lower() in ["yes", "true", "receiving", "remittance"]:
+                query_parts.append("remittance")
             query = " ".join(query_parts) or f"{self.config.display_name}"
         
         # Normalize banking_type for metadata matching
@@ -130,7 +136,7 @@ class ProductRetrievalGraph:
                 banking_type = "conventional"
         
         logger.info(f"📝 [PRODUCT_RETRIEVAL] Search query: {query}")
-        logger.info(f"🔍 [PRODUCT_RETRIEVAL] Filters: banking_type={banking_type}")
+        logger.info(f"🔍 [PRODUCT_RETRIEVAL] Filters: banking_type={banking_type}, remittance_status={state.remittance_status}")
         
         products = self.retriever.search_products(
             query=query,
@@ -139,6 +145,20 @@ class ProductRetrievalGraph:
         )
         
         logger.info(f"✅ [PRODUCT_RETRIEVAL] Found {len(products)} products")
+        
+        # For deposits: If customer is receiving remittances, prioritize Porijon account
+        if self.config.product_type == "deposits" and state.remittance_status:
+            if state.remittance_status.lower() in ["yes", "true", "receiving", "remittance"]:
+                logger.info(f"🎯 [PRODUCT_RETRIEVAL] Customer receiving remittances - searching for Porijon account")
+                porijon_products = self.retriever.search_products(
+                    query="porijon remittance nrb life insurance automatic",
+                    banking_type=banking_type,
+                    top_k=2
+                )
+                if porijon_products:
+                    logger.info(f"✅ [PRODUCT_RETRIEVAL] Found Porijon remittance account - prioritizing")
+                    # Merge: prioritize Porijon products at the top
+                    products = porijon_products + products
         
         # For deposits: If customer is 50+ with health/locker interests, add targeted 50+ account search
         if self.config.product_type == "deposits" and state.age and state.age >= 50:
@@ -166,14 +186,35 @@ class ProductRetrievalGraph:
                 "last_agent": "product_retrieval"
             }
         
-        products_text = "\n".join([
-            f"- {p.get('name')}: {p.get('knowledge_chunks', [''])[0][:100] if p.get('knowledge_chunks') else 'No details'}"
-            for p in state.matched_products[:3]
-        ])
+        # Build detailed product information
+        products_text_parts = []
+        for p in state.matched_products[:2]:
+            product_info = f"\n{p.get('name')} ({p.get('banking_type', 'Standard')}):"
+            
+            # Add all knowledge chunks (full details)
+            if p.get('knowledge_chunks'):
+                for chunk in p.get('knowledge_chunks', [])[:3]:  # Take top 3 chunks for each product
+                    chunk_text = chunk.strip()
+                    if chunk_text and len(chunk_text) > 20:  # Only add if meaningful
+                        product_info += f"\n{chunk_text}\n"
+            
+            if p.get('product_id'):
+                product_info += f"Product ID: {p.get('product_id')}\n"
+            
+            products_text_parts.append(product_info)
+        
+        products_text = "\n".join(products_text_parts)
+        logger.info(f"📋 [PRODUCT_RETRIEVAL] Built products_text:\n{products_text[:500]}")
         
         slot_values = {slot.name: getattr(state, slot.name, None) or "Not specified" 
                       for slot in self.config.slots}
         
+        logger.info(f"🔍 [PRODUCT_RETRIEVAL] Slot keys for template: {list(slot_values.keys())}")
+        if 'age' not in slot_values:
+            logger.warning(f"⚠️ [PRODUCT_RETRIEVAL] 'age' key missing from slots! Slots in config: {[s.name for s in self.config.slots]}")
+            # Fallback to prevent crash
+            slot_values['age'] = getattr(state, 'age', None) or "Not specified"
+
         prompt = self.config.recommendation_prompt_template.format(
             **slot_values,
             income=state.user_profile.income_yearly or "Not specified",
