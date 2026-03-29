@@ -1,0 +1,22 @@
+services:
+  primebot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: primebot-api
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./chroma_db:/app/chroma_db
+      - ./knowledge_base:/app/knowledge_base
+    environment:
+      - PYTHONUNBUFFERED=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - primebot-net
+
+networks:
+  primebot-net:
+    name: primebot-net

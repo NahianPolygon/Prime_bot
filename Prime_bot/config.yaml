@@ -1,0 +1,21 @@
+llm:
+  provider: ollama
+  model: qwen3:8b
+  base_url: http://host.docker.internal:11434
+
+embeddings:
+  model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+
+chroma:
+  persist_dir: /app/chroma_db
+
+server:
+  host: 0.0.0.0
+  port: 8000
+
+features:
+  - name: credit_card
+    banking_types: [conventional, islami]
+    intents:
+      - i_need_a_credit_card
+      - existing_cardholder

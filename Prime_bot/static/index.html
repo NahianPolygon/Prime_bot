@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prime Bank - Credit Card Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #fafafa;
+      --surface:      #ffffff;
+      --border:       #e8e8e8;
+      --border-light: #f0f0f0;
+      --text-primary: #111111;
+      --text-secondary: #666666;
+      --text-muted:   #999999;
+      --accent:       #1a4f9c;
+      --accent-light: #e8f0fb;
+      --accent-hover: #153e7a;
+      --green:        #1a7a4a;
+      --green-light:  #e8f5ee;
+      --user-bg:      #1a4f9c;
+      --user-text:    #ffffff;
+      --shadow-sm:    0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md:    0 4px 16px rgba(0,0,0,0.08);
+      --radius:       12px;
+      --radius-sm:    8px;
+      --font:         'DM Sans', sans-serif;
+      --font-mono:    'DM Mono', monospace;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 860px;
+      margin: 0 auto;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-logo {
+      width: 36px;
+      height: 36px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .header-logo svg { width: 20px; height: 20px; fill: white; }
+
+    .header-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .header-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse-dot 2s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    .status-text {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .btn-clear {
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-clear:hover {
+      background: var(--bg);
+      color: var(--text-primary);
+      border-color: #ccc;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      scroll-behavior: smooth;
+    }
+
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      padding: 48px 24px;
+      text-align: center;
+      gap: 24px;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .welcome-icon {
+      width: 64px;
+      height: 64px;
+      background: var(--accent-light);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .welcome-icon svg { width: 32px; height: 32px; fill: var(--accent); }
+
+    .welcome h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .welcome p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      max-width: 400px;
+      line-height: 1.6;
+      font-weight: 300;
+    }
+
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 8px;
+    }
+
+    .suggestion-chip {
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--accent);
+      background: var(--accent-light);
+      border: 1px solid rgba(26,79,156,0.15);
+      border-radius: 20px;
+      padding: 7px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .suggestion-chip:hover {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .message-row {
+      display: flex;
+      gap: 10px;
+      animation: fadeUp 0.25s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .message-row.user {
+      flex-direction: row-reverse;
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .avatar.bot {
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+
+    .avatar.user {
+      background: var(--user-bg);
+      color: white;
+    }
+
+    .bubble {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      line-height: 1.65;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .bubble.bot {
+      background: var(--surface);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-top-left-radius: 4px;
+      overflow-wrap: anywhere;
+    }
+
+    .bubble.user {
+      background: var(--user-bg);
+      color: var(--user-text);
+      border-top-right-radius: 4px;
+    }
+
+    .bubble.bot p     { margin-bottom: 8px; }
+    .bubble.bot p:last-child { margin-bottom: 0; }
+    .bubble.bot ul, .bubble.bot ol { padding-left: 20px; margin: 8px 0 12px; }
+    .bubble.bot li    { margin-bottom: 6px; }
+    .bubble.bot strong { font-weight: 600; }
+    .bubble.bot em    { font-style: italic; color: var(--text-secondary); }
+    .bubble.bot code  {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--bg);
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .bubble.bot table {
+      border-collapse: collapse;
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      table-layout: fixed;
+      margin: 8px 0;
+      font-size: 13px;
+    }
+    .bubble.bot th, .bubble.bot td {
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      text-align: left;
+      vertical-align: top;
+      word-break: break-word;
+      min-width: 140px;
+    }
+    .bubble.bot th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .bubble.bot h1,.bubble.bot h2,.bubble.bot h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 14px 0 8px;
+      letter-spacing: -0.01em;
+    }
+    .bubble.bot blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 12px;
+      color: var(--text-secondary);
+      margin: 8px 0;
+      font-style: italic;
+    }
+
+    .routing-badge {
+      font-size: 10.5px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      margin-top: 5px;
+      padding-left: 42px;
+      letter-spacing: 0.01em;
+    }
+
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 14px 16px;
+    }
+
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      animation: typing-bounce 1.2s infinite;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.30s; }
+
+    @keyframes typing-bounce {
+      0%, 60%, 100% { transform: translateY(0);   }
+      30%            { transform: translateY(-6px); }
+    }
+
+    .input-area {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .input-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    textarea {
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-primary);
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
+      resize: none;
+      outline: none;
+      min-height: 44px;
+      max-height: 140px;
+      overflow-y: auto;
+      transition: border-color 0.15s;
+      line-height: 1.5;
+    }
+
+    textarea::placeholder { color: var(--text-muted); }
+
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(26,79,156,0.08);
+    }
+
+    .send-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      background: var(--accent);
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+
+    .send-btn:hover:not(:disabled) { background: var(--accent-hover); }
+    .send-btn:disabled { background: var(--border); cursor: not-allowed; }
+    .send-btn svg { width: 18px; height: 18px; fill: white; }
+
+    .input-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    @media (max-width: 720px) {
+      .bubble {
+        max-width: 92%;
+      }
+
+      .bubble.bot table {
+        font-size: 12px;
+      }
+
+      .bubble.bot th, .bubble.bot td {
+        min-width: 120px;
+        padding: 6px 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+<div class="app" id="app">
+  <header class="header">
+    <div class="header-brand">
+      <div class="header-logo">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="header-title">Prime Bank Assistant</div>
+        <div class="header-subtitle">Credit Card Help & Guidance</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-text" id="statusText">Online</span>
+      <button class="btn-clear" onclick="clearConversation()">New chat</button>
+    </div>
+  </header>
+
+  <div class="messages" id="messages">
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>
+      </div>
+      <h2>How can I help you today?</h2>
+      <p>I can help you find the right Prime Bank credit card, check your eligibility, compare products, or assist with your existing card.</p>
+      <div class="suggestions">
+        <button class="suggestion-chip" onclick="sendSuggestion('What credit cards does Prime Bank offer?')">What cards do you offer?</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('I need a halal credit card')">Halal / Islamic card</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('Am I eligible for a credit card?')">Check my eligibility</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('Compare Visa Gold and Visa Platinum')">Compare cards</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('How do I apply for a credit card?')">How to apply</button>
+        <button class="suggestion-chip" onclick="sendSuggestion('I lost my card, what should I do?')">Lost card help</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-row">
+      <div class="input-wrap">
+        <textarea
+          id="inputBox"
+          placeholder="Ask about credit cards, eligibility, fees..."
+          rows="1"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+      </div>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Send (Enter)">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </button>
+    </div>
+    <div class="input-hint">Press <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Enter</kbd> to send - <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Shift+Enter</kbd> for new line</div>
+  </div>
+
+</div>
+
+<script>
+  let sessionId = null;
+  let isLoading = false;
+
+  const ROUTE_LABELS = {
+    product_advisor: "Product Advisor",
+    cardholder_service: "Cardholder Services",
+    comparator: "Comparator",
+    eligibility_advisor: "Eligibility Advisor",
+    catalog: "Catalog",
+    faq: "FAQ & Compliance",
+    faq_fallback: "General",
+  };
+
+  marked.setOptions({
+    breaks: true,
+    gfm: true,
+    sanitize: false,
+  });
+
+  const messagesEl = document.getElementById("messages");
+  const welcomeEl = document.getElementById("welcome");
+  const inputEl = document.getElementById("inputBox");
+  const sendBtnEl = document.getElementById("sendBtn");
+  const statusDot = document.getElementById("statusDot");
+  const statusText = document.getElementById("statusText");
+
+  function normalizeBotMarkdown(text) {
+    let t = (text || "").replace(/\r\n/g, "\n");
+
+    t = t.replace(/^\s*---+\s*$/gm, "");
+    t = t.replace(/\n{3,}/g, "\n\n");
+
+    t = t.replace(/\s+---\s+(#{1,6}\s)/g, "\n\n$1");
+    t = t.replace(/:\s*-\s+/g, ":\n- ");
+    t = t.replace(/([\.!?])\s*-\s+(\*\*)/g, "$1\n- $2");
+    t = t.replace(/\)\s*-\s+(\*\*)/g, ")\n- $1");
+
+    t = t.replace(/^(#{1,6}\s.*)$/gm, "\n$1");
+    t = t.replace(/\n{3,}/g, "\n\n");
+
+    return t.trim();
+  }
+
+  function autoResize(el) {
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 140) + "px";
+  }
+
+  function handleKey(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function sendSuggestion(text) {
+    inputEl.value = text;
+    autoResize(inputEl);
+    sendMessage();
+  }
+
+  async function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text || isLoading) return;
+
+    if (welcomeEl) welcomeEl.style.display = "none";
+
+    appendBubble("user", text, null);
+    inputEl.value = "";
+    inputEl.style.height = "auto";
+
+    const typingId = showTyping();
+    setLoading(true);
+
+    try {
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, session_id: sessionId }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      sessionId = data.session_id;
+
+      removeTyping(typingId);
+      appendBubble("bot", data.response, data.routing);
+    } catch (err) {
+      removeTyping(typingId);
+      appendBubble(
+        "bot",
+        "Sorry, I'm having trouble connecting right now. Please try again in a moment, or call **16218** for immediate assistance.",
+        null
+      );
+      setStatus("offline");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function appendBubble(role, text, routing) {
+    const row = document.createElement("div");
+    row.className = `message-row ${role}`;
+
+    const avatar = document.createElement("div");
+    avatar.className = `avatar ${role}`;
+    avatar.textContent = role === "user" ? "U" : "P";
+
+    const bubble = document.createElement("div");
+    bubble.className = `bubble ${role}`;
+
+    if (role === "bot") {
+      bubble.innerHTML = marked.parse(normalizeBotMarkdown(text));
+    } else {
+      bubble.textContent = text;
+    }
+
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+
+    if (routing && role === "bot") {
+      const badge = document.createElement("div");
+      badge.className = "routing-badge";
+      badge.textContent = ROUTE_LABELS[routing] || routing;
+      messagesEl.appendChild(badge);
+    }
+
+    scrollToBottom();
+  }
+
+  function showTyping() {
+    const row = document.createElement("div");
+    const id = "typing_" + Date.now();
+    row.id = id;
+    row.className = "message-row bot";
+    row.innerHTML = `
+      <div class="avatar bot">P</div>
+      <div class="bubble bot" style="padding:10px 16px;">
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>`;
+    messagesEl.appendChild(row);
+    scrollToBottom();
+    return id;
+  }
+
+  function removeTyping(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  function scrollToBottom() {
+    requestAnimationFrame(() => {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+  }
+
+  function setLoading(val) {
+    isLoading = val;
+    sendBtnEl.disabled = val;
+    inputEl.disabled = val;
+    if (!val) inputEl.focus();
+  }
+
+  function setStatus(state) {
+    if (state === "offline") {
+      statusDot.style.background = "#ef4444";
+      statusDot.style.animation = "none";
+      statusText.textContent = "Offline";
+    } else {
+      statusDot.style.background = "#22c55e";
+      statusDot.style.animation = "pulse-dot 2s infinite";
+      statusText.textContent = "Online";
+    }
+  }
+
+  async function clearConversation() {
+    if (sessionId) {
+      try {
+        await fetch("/clear", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+      } catch (_) {}
+    }
+    sessionId = null;
+
+    const rows = messagesEl.querySelectorAll(".message-row, .routing-badge");
+    rows.forEach((el) => el.remove());
+
+    if (welcomeEl) welcomeEl.style.display = "flex";
+    inputEl.focus();
+  }
+
+  window.addEventListener("load", () => inputEl.focus());
+</script>
+</body>
+</html>
