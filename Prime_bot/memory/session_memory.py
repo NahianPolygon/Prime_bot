@@ -1,6 +1,7 @@
 from datetime import datetime
 
 MAX_TURNS = 10
+MAX_MSG_CHARS = 300
 
 
 class SessionMemory:
@@ -10,11 +11,17 @@ class SessionMemory:
         self.history: list[dict] = []
         self.user_profile: dict = {}
 
+    def _truncate_for_history(self, text: str, max_chars: int = MAX_MSG_CHARS) -> str:
+        if len(text) <= max_chars:
+            return text
+        return text[:max_chars] + "... [truncated]"
+
     def add(self, user_msg: str, assistant_msg: str):
         self.history.append(
             {
                 "role": "user",
                 "content": user_msg,
+                "content_short": self._truncate_for_history(user_msg),
                 "ts": datetime.utcnow().isoformat(),
             }
         )
@@ -22,24 +29,31 @@ class SessionMemory:
             {
                 "role": "assistant",
                 "content": assistant_msg,
+                "content_short": self._truncate_for_history(assistant_msg),
                 "ts": datetime.utcnow().isoformat(),
             }
         )
         if len(self.history) > self.max_turns * 2:
-            self.history = self.history[-(self.max_turns * 2) :]
+            self.history = self.history[-(self.max_turns * 2):]
 
-    def get_history_str(self, max_chars: int = 3000) -> str:
+    def get_history_str(self, max_chars: int = 2000) -> str:
         lines = []
         for msg in self.history:
             role = "User" if msg["role"] == "user" else "Assistant"
-            lines.append(f"{role}: {msg['content']}")
+            lines.append(f"{role}: {msg['content_short']}")
         text = "\n".join(lines)
         if len(text) > max_chars:
             text = "...[earlier context truncated]...\n" + text[-max_chars:]
         return text
 
+    def get_last_assistant_response(self) -> str:
+        for msg in reversed(self.history):
+            if msg["role"] == "assistant":
+                return msg["content"]
+        return ""
+
     def get_messages_for_llm(self) -> list[dict]:
-        return [{"role": m["role"], "content": m["content"]} for m in self.history]
+        return [{"role": m["role"], "content": m["content_short"]} for m in self.history]
 
     def update_profile(self, key: str, value):
         self.user_profile[key] = value

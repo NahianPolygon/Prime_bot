@@ -3,26 +3,37 @@ from llm.ollama_client import chat
 from memory.session_memory import SessionMemory
 
 SYSTEM = """You are the Prime Bank Cardholder Services specialist.
-You help existing credit card holders with their queries.
+You help existing credit card holders using ONLY the knowledge base chunks provided.
 
-You handle:
-- Lost / stolen card -> always direct to 16218 IMMEDIATELY as first step
-- Card activation
-- Bill payment methods
-- Statement and balance queries
-- Reward points redemption
-- Credit limit increase requests
-- EMI conversion on transactions
-- PIN reset
-- Supplementary card requests
+You handle: lost/stolen card, card activation, bill payment, statements, balance queries, reward points, credit limit increase, EMI conversion, PIN reset, supplementary cards.
 
-Rules:
-- For ANY card blocking emergency, always put \"Call 16218 IMMEDIATELY\" as the FIRST line
-- Cite product_id when referencing specific card policies
-- NEVER invent policies not in the retrieved chunks
-- For anything outside the knowledge base, say: \"Please call 16218 or visit your nearest Prime Bank branch.\"
-- Be concise and action-oriented - cardholders need quick answers
+You MUST:
+- For ANY lost/stolen/block emergency, put "Call 16218 IMMEDIATELY" as the FIRST line
+- Use ONLY information from the provided chunks
+- Cite product_id when referencing card policies
+- Give clear step-by-step instructions when applicable
+- Be concise and action-oriented
+
+You MUST NOT:
+- Invent any policy, fee, process, or phone number not in the chunks
+- Give vague answers when chunks contain specific details
+
+If the query is not covered in chunks, say: "Please call 16218 or visit your nearest Prime Bank branch."
 """
+
+
+def _get_collections(banking: str) -> list[str]:
+    if banking == "both":
+        return [
+            "conventional_credit_existing_cardholder",
+            "islami_credit_existing_cardholder",
+            "conventional_credit_i_need_a_credit_card",
+            "islami_credit_i_need_a_credit_card",
+        ]
+    return [
+        f"{banking}_credit_existing_cardholder",
+        f"{banking}_credit_i_need_a_credit_card",
+    ]
 
 
 def run(
@@ -33,25 +44,29 @@ def run(
     banking = routing["banking_type"]
     search_q = routing.get("search_query", user_message)
 
-    collections = [
-        f"{banking}_credit_existing_cardholder",
-        f"{banking}_credit_i_need_a_credit_card",
-    ]
+    collections = _get_collections(banking)
     context = rag_search_multi(search_q, collections, top_k=5)
-    history = session.get_history_str()
 
-    prompt = f"""Conversation so far:
-{history}
+    if context.startswith("[NO RESULTS]"):
+        return "Please call **16218** or visit your nearest Prime Bank branch for assistance with your card."
 
-Cardholder's query: {user_message}
+    history = session.get_history_str(max_chars=800)
 
-Retrieved knowledge base:
+    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
 {context}
 
-Help the cardholder. If this is an emergency (lost/stolen card), put the helpline first."""
+---
+
+Conversation so far:
+{history}
+
+Cardholder query: {user_message}
+
+Answer using ONLY the chunks above. If this is a lost/stolen card emergency, put the helpline number first."""
 
     return chat(
         messages=[{"role": "user", "content": prompt}],
         system=SYSTEM,
         temperature=0.2,
+        max_tokens=1000,
     )

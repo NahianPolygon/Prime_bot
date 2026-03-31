@@ -16,145 +16,120 @@ ELIGIBILITY_FIELDS = {
 ELIGIBILITY_SYSTEM = """You are the Prime Bank Eligibility Advisor.
 You assess whether a user qualifies for Prime Bank credit cards.
 
-Rules:
-- Compare the user's profile against eligibility criteria in the retrieved knowledge base
-- For EACH card found in the chunks, give a clear verdict:
-  ✅ Likely Eligible | ❌ Likely Ineligible | ⚠️ Borderline
-- Explain the reason based on the specific criteria
-- If ineligible for one card, suggest alternatives they might qualify for
-- Be honest but encouraging
-- Cite product_id for every card you assess
-- NEVER invent eligibility criteria not in the retrieved chunks
+You MUST:
+- Compare the user's profile against eligibility criteria in the chunks
+- For EACH card in chunks give: ✅ Likely Eligible | ❌ Likely Ineligible | ⚠️ Borderline
+- Cite product_id for every card
+- If ineligible for one, suggest alternatives from the chunks
+
+You MUST NOT:
+- Invent eligibility criteria not in the chunks
 """
 
 FAQ_SYSTEM = """You are the Prime Bank FAQ & Compliance specialist.
-You answer questions about fees, charges, application process, required documents, and policies.
 
-Rules:
-- Cite product_id for any fee or policy you mention
-- Use bullet points for document lists and step-by-step processes
-- For missing information say: "Please contact Prime Bank at 16218 for the most current information."
-- NEVER invent fees, policies, or document requirements not in the retrieved chunks
+You MUST:
+- Answer using ONLY the knowledge base chunks provided
+- Cite product_id for any fee or policy
+- Use bullet points for document lists and steps
+
+You MUST NOT:
+- Invent fees, policies, or requirements not in the chunks
+
+If information is missing say: "Please contact Prime Bank at 16218 for the most current information."
+"""
+
+APPLY_SYSTEM = """You are the Prime Bank Application Guide.
+
+You MUST:
+- Explain the application process using ONLY the knowledge base chunks provided
+- List required documents from the chunks
+- Mention any fees or conditions from the chunks
+- Cite product_id for any specific card
+
+You MUST NOT:
+- Invent any steps, documents, or fees not in the chunks
+
+If information is missing say: "Please contact Prime Bank at 16218 for application details."
 """
 
 CATALOG_SYSTEM = """You are the Prime Bank Product Catalog assistant.
-You answer questions about how many credit cards Prime Bank offers, what types are available, etc.
 
-Rules:
-- Use ONLY the product list provided — do not guess or add unlisted products
-- Give exact counts when asked (conventional, Islamic, Visa, Mastercard, Gold, Platinum, etc.)
-- Present the full list clearly if asked
-- Be factual and precise
+You MUST:
+- Use ONLY the product list provided below to answer
+- Give exact counts when asked
+- Present cards grouped logically based on what the user asked
+- Include product_id, card network, tier, and banking type for each card
+- If asked about a specific category, filter and show only matching cards
+
+You MUST NOT:
+- Add any card not in the provided list
+- Guess or fabricate any product details
 """
+
+EXTRACT_SYSTEM = """You extract profile fields from user messages for a bank eligibility check.
+
+RULES:
+- Return ONLY a valid JSON object
+- Only include keys you can confidently extract
+- Valid keys and formats:
+  age: integer (e.g. 32)
+  employment_type: "salaried" or "self_employed" or "business_owner"
+  monthly_income: integer in BDT (convert "1 lakh" to 100000, "50k" to 50000)
+  employment_duration: string (e.g. "2 years", "6 months", "16 years")
+  has_etin: true or false
+- Return {} if nothing can be extracted
+
+EXAMPLES:
+User: "32" → currently asking age → {"age": 32}
+User: "salaried" → currently asking employment → {"employment_type": "salaried"}
+User: "1 lakh per month" → {"monthly_income": 100000}
+User: "50000" → currently asking income → {"monthly_income": 50000}
+User: "2 years" → {"employment_duration": "2 years"}
+User: "yes" → currently asking etin → {"has_etin": true}
+User: "no" → currently asking etin → {"has_etin": false}
+
+JSON only. No explanation."""
+
+
+def _get_collections(banking: str, suffix: str) -> list[str]:
+    if banking == "both":
+        return [
+            f"conventional_credit_{suffix}",
+            f"islami_credit_{suffix}",
+        ]
+    return [f"{banking}_credit_{suffix}"]
 
 
 def _extract_profile(message: str, session: SessionMemory):
-    """
-    Rule-based extraction of profile fields from short user answers.
-    Handles the common case (yes/no, a number, a word) reliably without
-    depending on the LLM returning valid JSON for simple one-word answers.
-    Falls back to LLM extraction for complex multi-field messages.
-    """
-    text    = message.strip().lower()
     profile = session.user_profile
+    missing = [f for f in ELIGIBILITY_FIELDS if f not in profile or not profile[f]]
 
-    
-    missing       = [f for f in ELIGIBILITY_FIELDS if f not in profile or not profile[f]]
-    current_field = missing[0] if missing else None
+    if not missing:
+        return
 
-    if not current_field:
-        return  
+    current_field = missing[0]
 
-    extracted = False
+    prompt = f"""Currently asking for: {current_field}
+Question shown to user: {ELIGIBILITY_FIELDS[current_field]}
+User replied: "{message}"
 
-    if current_field == "age":
-        nums = re.findall(r'\b(\d{1,3})\b', text)
-        for n in nums:
-            if 16 <= int(n) <= 90:
-                session.update_profile("age", int(n))
-                extracted = True
-                break
+Extract the value for {current_field} from the user's reply. Return JSON."""
 
-    elif current_field == "employment_type":
-        if any(w in text for w in ["salaried", "salary", "job", "employee", "employed", "service", "চাকরি"]):
-            session.update_profile("employment_type", "salaried")
-            extracted = True
-        elif any(w in text for w in ["self", "freelance", "freelancer"]):
-            session.update_profile("employment_type", "self_employed")
-            extracted = True
-        elif any(w in text for w in ["business", "owner", "entrepreneur", "ব্যবসা"]):
-            session.update_profile("employment_type", "business_owner")
-            extracted = True
-
-    elif current_field == "monthly_income":
-        clean  = text.replace(",", "")
-        lakh_m = re.search(r'(\d+\.?\d*)\s*lakh', clean)
-        k_m    = re.search(r'(\d+\.?\d*)\s*k\b', clean)
-        plain  = re.search(r'\b(\d{4,7})\b', clean)
-        if lakh_m:
-            session.update_profile("monthly_income", int(float(lakh_m.group(1)) * 100000))
-            extracted = True
-        elif k_m:
-            session.update_profile("monthly_income", int(float(k_m.group(1)) * 1000))
-            extracted = True
-        elif plain:
-            session.update_profile("monthly_income", int(plain.group(1)))
-            extracted = True
-
-    elif current_field == "employment_duration":
-        year_m  = re.search(r'(\d+)\s*year', text)
-        month_m = re.search(r'(\d+)\s*month', text)
-        if year_m or month_m:
-            parts = []
-            if year_m:  parts.append(f"{year_m.group(1)} year(s)")
-            if month_m: parts.append(f"{month_m.group(1)} month(s)")
-            session.update_profile("employment_duration", " ".join(parts))
-            extracted = True
-        elif any(w in text for w in ["just started", "new job", "recently", "less than 1"]):
-            session.update_profile("employment_duration", "less than 1 month")
-            extracted = True
-
-    elif current_field == "has_etin":
-        
-        yes_words = ["yes", "have", "got", "i do", "i have", "হ্যাঁ", "আছে", "han", "yeah", "yep", "sure", "correct"]
-        no_words  = ["no", "don't", "dont", "do not", "not have", "haven't", "নেই", "না", "nope", "nah"]
-        if any(w in text for w in yes_words):
-            session.update_profile("has_etin", True)
-            extracted = True
-        elif any(w in text for w in no_words):
-            session.update_profile("has_etin", False)
-            extracted = True
-
-    
-    if not extracted and len(text.split()) > 4:
-        _extract_profile_llm(message, session)
-
-
-def _extract_profile_llm(message: str, session: SessionMemory):
-    """LLM fallback for complex multi-field messages."""
-    prompt = f"""Extract personal financial profile information from this message.
-Message: "{message}"
-
-Return ONLY a JSON object with any of these keys found (omit keys not mentioned):
-- age (integer)
-- employment_type (one of: "salaried", "self_employed", "business_owner")
-- monthly_income (integer in BDT; convert: "1 lakh"=100000, "50k"=50000)
-- employment_duration (string, e.g. "2 years", "6 months")
-- has_etin (boolean true or false)
-
-Return {{}} if nothing relevant. Return valid JSON only, no explanation, no markdown."""
-
-    result = chat(messages=[{"role": "user", "content": prompt}], temperature=0.0)
+    result = chat(
+        messages=[{"role": "user", "content": prompt}],
+        system=EXTRACT_SYSTEM,
+        temperature=0.0,
+        max_tokens=300,
+    )
 
     try:
-        
         result = re.sub(r'```(?:json)?', '', result).strip()
-        match  = re.search(r'\{[^{}]*\}', result, re.DOTALL)
+        match = re.search(r'\{[^{}]*\}', result, re.DOTALL)
         if match:
             extracted = json.loads(match.group())
             for k, v in extracted.items():
                 if k in ELIGIBILITY_FIELDS and v is not None and str(v).strip():
-                    
                     if k not in session.user_profile or not session.user_profile[k]:
                         session.update_profile(k, v)
     except Exception:
@@ -162,22 +137,16 @@ Return {{}} if nothing relevant. Return valid JSON only, no explanation, no mark
 
 
 def _collect_profile(user_message: str, session: SessionMemory) -> tuple[str, bool]:
-    """
-    Conversationally collects eligibility profile fields one at a time.
-    Returns (response_text, profile_complete).
-    """
-    
     _extract_profile(user_message, session)
 
-    
     missing = [f for f in ELIGIBILITY_FIELDS if f not in session.user_profile or not str(session.user_profile[f]).strip()]
 
     if missing:
         next_field = missing[0]
-        question   = ELIGIBILITY_FIELDS[next_field]
-        done       = len(ELIGIBILITY_FIELDS) - len(missing)
-        total      = len(ELIGIBILITY_FIELDS)
-        response   = (
+        question = ELIGIBILITY_FIELDS[next_field]
+        done = len(ELIGIBILITY_FIELDS) - len(missing)
+        total = len(ELIGIBILITY_FIELDS)
+        response = (
             f"To check your eligibility, I need a few quick details "
             f"({done}/{total} collected so far).\n\n"
             f"{question}"
@@ -192,38 +161,35 @@ def run_eligibility(
     routing: dict,
     session: SessionMemory,
 ) -> tuple[str, bool]:
-    """
-    Runs the conversational eligibility flow.
-    Returns (response, is_assessment_complete).
-    """
     response, complete = _collect_profile(user_message, session)
 
     if not complete:
         return response, False
 
-    
-    banking  = routing["banking_type"]
-    collections = [
-        f"{banking}_credit_i_need_a_credit_card",
-        "conventional_credit_i_need_a_credit_card",
-        "islami_credit_i_need_a_credit_card",
-    ]
-    context     = rag_search_multi(
+    banking = routing["banking_type"]
+    collections = _get_collections(banking, "i_need_a_credit_card")
+    if banking != "both":
+        other = "islami" if banking == "conventional" else "conventional"
+        collections.append(f"{other}_credit_i_need_a_credit_card")
+
+    context = rag_search_multi(
         "eligibility requirements age income employment duration etin documents",
         collections,
         top_k=8,
     )
     profile_str = session.get_profile_str()
 
-    prompt = f"""User profile:
-{profile_str}
-
-Eligibility criteria from knowledge base:
+    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
 {context}
+
+---
+
+User profile:
+{profile_str}
 
 The user asked: {user_message}
 
-Assess eligibility for each Prime Bank credit card found in the chunks."""
+Assess eligibility for each Prime Bank credit card found in the chunks. Cite product_id."""
 
     response = chat(
         messages=[{"role": "user", "content": prompt}],
@@ -237,49 +203,87 @@ def run_catalog(
     user_message: str,
     session: SessionMemory,
 ) -> str:
-    """Answers catalog queries — how many cards, what types, etc."""
     all_products = list_all_products()
-    history      = session.get_history_str()
+    history = session.get_history_str(max_chars=1000)
 
-    if all_products:
-        conventional = [p for p in all_products if p["banking_type"] == "conventional"]
-        islami       = [p for p in all_products if p["banking_type"] == "islami"]
-        visa_cards   = [p for p in all_products if "visa" in (p.get("card_network") or p.get("product_name", "")).lower()]
-        mc_cards     = [p for p in all_products if "master" in (p.get("card_network") or p.get("product_name", "")).lower()]
+    if not all_products:
+        return "[NO RESULTS] No products found in catalog."
 
-        lines = []
-        for p in all_products:
-            parts = [p["product_name"] or p["product_id"]]
-            if p.get("card_network"): parts.append(f"({p['card_network']})")
-            if p.get("tier"):         parts.append(f"[{p['tier']}]")
-            if p.get("banking_type"): parts.append(f"- {p['banking_type']}")
-            lines.append("- " + " ".join(parts))
+    conventional = [p for p in all_products if p["banking_type"] == "conventional"]
+    islami = [p for p in all_products if p["banking_type"] == "islami"]
 
-        catalog_summary = f"""Total credit cards: {len(all_products)}
-Conventional banking: {len(conventional)}
-Islamic banking: {len(islami)}
-Visa network: {len(visa_cards)}
-Mastercard network: {len(mc_cards)}
+    lines = []
+    for p in all_products:
+        parts = [f"{p['product_name']} [{p['product_id']}]"]
+        if p.get("card_network"):
+            parts.append(f"Network: {p['card_network']}")
+        if p.get("tier"):
+            parts.append(f"Tier: {p['tier']}")
+        parts.append(f"Banking: {p['banking_type']}")
+        lines.append("- " + " | ".join(parts))
 
-Full product list:
-""" + "\n".join(lines)
-    else:
-        catalog_summary = rag_search_multi(user_message, ["all_products"], top_k=15)
+    catalog_summary = f"""COMPLETE PRODUCT LIST ({len(all_products)} credit cards total):
+Conventional: {len(conventional)} cards
+Islamic: {len(islami)} cards
 
-    prompt = f"""Conversation so far:
+{chr(10).join(lines)}"""
+
+    prompt = f"""PRODUCT CATALOG (use ONLY this list):
+{catalog_summary}
+
+---
+
+Conversation so far:
 {history}
 
 User asked: {user_message}
 
-Product catalog:
-{catalog_summary}
-
-Answer the user's catalog question accurately using the product list above."""
+Answer using ONLY the product list above. Show exact counts and card details as requested."""
 
     return chat(
         messages=[{"role": "user", "content": prompt}],
         system=CATALOG_SYSTEM,
         temperature=0.1,
+        max_tokens=1000,
+    )
+
+
+def run_apply(
+    user_message: str,
+    routing: dict,
+    session: SessionMemory,
+) -> str:
+    banking = routing["banking_type"]
+    search_q = routing.get("search_query", user_message)
+
+    collections = _get_collections(banking, "i_need_a_credit_card")
+    collections += _get_collections(banking, "existing_cardholder")
+    collections.append("all_products")
+    collections = list(dict.fromkeys(collections))
+
+    context = rag_search_multi(search_q, collections, top_k=6)
+
+    if context.startswith("[NO RESULTS]"):
+        return "[NO RESULTS]"
+
+    history = session.get_history_str(max_chars=1000)
+
+    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
+{context}
+
+---
+
+Conversation so far:
+{history}
+
+User question: {user_message}
+
+Explain the application process using ONLY the chunks above. Cite product_id for any specific card."""
+
+    return chat(
+        messages=[{"role": "user", "content": prompt}],
+        system=APPLY_SYSTEM,
+        temperature=0.2,
     )
 
 
@@ -288,27 +292,32 @@ def run_faq(
     routing: dict,
     session: SessionMemory,
 ) -> str:
-    """Answers FAQ, fees, T&C, application process questions."""
-    banking  = routing["banking_type"]
+    banking = routing["banking_type"]
     search_q = routing.get("search_query", user_message)
 
-    collections = [
-        f"{banking}_credit_i_need_a_credit_card",
-        f"{banking}_credit_existing_cardholder",
-        "all_products",
-    ]
-    context = rag_search_multi(search_q, collections, top_k=6)
-    history = session.get_history_str()
+    collections = _get_collections(banking, "i_need_a_credit_card")
+    collections += _get_collections(banking, "existing_cardholder")
+    collections.append("all_products")
+    collections = list(dict.fromkeys(collections))
 
-    prompt = f"""Conversation so far:
+    context = rag_search_multi(search_q, collections, top_k=6)
+
+    if context.startswith("[NO RESULTS]"):
+        return "[NO RESULTS]"
+
+    history = session.get_history_str(max_chars=1000)
+
+    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
+{context}
+
+---
+
+Conversation so far:
 {history}
 
 User question: {user_message}
 
-Retrieved knowledge base:
-{context}
-
-Answer the FAQ/policy question. Cite product_id for any fees or policies."""
+Answer using ONLY the chunks above. Cite product_id for any fees or policies."""
 
     return chat(
         messages=[{"role": "user", "content": prompt}],

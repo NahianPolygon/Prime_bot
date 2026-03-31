@@ -1,98 +1,103 @@
-import yaml
-import numpy as np
-from sentence_transformers import SentenceTransformer
+import json
+import re
+from llm.ollama_client import chat
 
-with open("config.yaml") as f:
-    cfg = yaml.safe_load(f)
 
-_model = SentenceTransformer(cfg["embeddings"]["model"])
+SYSTEM_ENTRY = """Classify this banking query into ONE category.
 
-INTENT_PROTOTYPES = {
-    "i_need_a_credit_card": (
-        "I want to apply for a new credit card, get card recommendations, "
-        "compare different cards, which card is best for me, "
-        "I am looking for a credit card, help me choose a card"
-    ),
-    "existing_cardholder": (
-        "I already have a credit card, help me with my existing card, "
-        "lost card, card stolen, block my card, activate card, "
-        "bill payment, statement, outstanding balance, reward points redemption, "
-        "increase credit limit on my existing card"
-    ),
-    "eligibility_check": (
-        "am I eligible, can I apply, do I qualify, what are the requirements, "
-        "what income do I need, what documents are needed, who can apply, "
-        "age requirement, employment requirement, can I get a card"
-    ),
-    "comparison": (
-        "compare cards, difference between, which is better, "
-        "versus, vs, contrast, side by side comparison of cards"
-    ),
-    "catalog_query": (
-        "how many cards, list all cards, what cards does prime bank have, "
-        "show me all products, types of cards available, "
-        "how many visa cards, how many mastercard, how many islamic cards, "
-        "what are the available credit cards"
-    ),
-    "faq_compliance": (
-        "fees, charges, annual fee, interest rate, late payment, "
-        "terms and conditions, how to apply, application process, "
-        "documents required, what is the process"
-    ),
+Categories:
+- new_card: wants a credit card, thinking about getting one, wants to know about cards, wants recommendations
+- existing_card: already has a card, needs help with lost/stolen/billing/rewards/PIN/activation/statements
+
+Respond ONLY with JSON: {"category": "new_card" or "existing_card"}"""
+
+
+SYSTEM_NEW_CARD = """The user is interested in getting a new credit card. Classify their specific need.
+
+Categories:
+- discover: browsing, exploring options, wants to see available cards, no specific card in mind, stating banking preference, stating use case
+- compare: explicitly wants to compare two or more specific named cards
+- eligibility: wants to check if they qualify for a specific card, asking about requirements
+- apply: wants to know how to apply for a specific card, application process, documents needed
+- details: wants detailed information about one specific card
+
+Respond ONLY with JSON: {"sub_intent": "<category>"}"""
+
+
+SYSTEM_BANKING = """What banking type is the user asking about?
+
+Types:
+- conventional: standard banking, visa, mastercard, JCB, gold, platinum, world
+- islami: islamic, shariah, halal, hasanah, riba-free, interest-free islamic
+- both: unclear or asking about both
+
+Respond ONLY with JSON: {"banking_type": "<type>"}"""
+
+
+VALID_ENTRY = {"new_card", "existing_card"}
+VALID_SUB = {"discover", "compare", "eligibility", "apply", "details"}
+VALID_BANKING = {"conventional", "islami", "both"}
+
+INTENT_MAP = {
+    "discover": "i_need_a_credit_card",
+    "compare": "comparison",
+    "eligibility": "eligibility_check",
+    "apply": "how_to_apply",
+    "details": "product_details",
 }
 
-BANKING_PROTOTYPES = {
-    "conventional": (
-        "regular bank, standard banking, conventional, normal interest-based, "
-        "visa gold, visa platinum, mastercard, standard credit card"
-    ),
-    "islami": (
-        "Islamic bank, halal, shariah, riba-free, ujrah, hasanah, "
-        "Islamic finance, interest free, Muslim banking, sharia compliant"
-    ),
-}
 
-_intent_embs = {k: _model.encode(v) for k, v in INTENT_PROTOTYPES.items()}
-_banking_embs = {k: _model.encode(v) for k, v in BANKING_PROTOTYPES.items()}
+def _parse_json(text: str) -> dict:
+    cleaned = re.sub(r'```(?:json)?', '', text).strip()
+    match = re.search(r'\{[^{}]*\}', cleaned, re.DOTALL)
+    if match:
+        return json.loads(match.group())
+    return {}
+
+
+def _llm_classify(message: str, system: str) -> dict:
+    result = chat(
+        messages=[{"role": "user", "content": message}],
+        system=system,
+        temperature=0.0,
+        max_tokens=300,
+    )
+    return _parse_json(result)
 
 
 def classify(user_message: str) -> dict:
-    q = _model.encode(user_message)
+    entry = _llm_classify(user_message, SYSTEM_ENTRY)
+    category = entry.get("category", "new_card")
+    if category not in VALID_ENTRY:
+        category = "new_card"
 
-    intent_scores = {
-        k: float(np.dot(q, v) / (np.linalg.norm(q) * np.linalg.norm(v) + 1e-9))
-        for k, v in _intent_embs.items()
-    }
-    banking_scores = {
-        k: float(np.dot(q, v) / (np.linalg.norm(q) * np.linalg.norm(v) + 1e-9))
-        for k, v in _banking_embs.items()
-    }
+    if category == "existing_card":
+        banking = _llm_classify(user_message, SYSTEM_BANKING)
+        banking_type = banking.get("banking_type", "both")
+        if banking_type not in VALID_BANKING:
+            banking_type = "both"
+        return {
+            "intent": "existing_cardholder",
+            "banking_type": banking_type,
+            "intent_score": 0.90,
+            "banking_score": 0.90,
+            "all_intent_scores": {},
+        }
 
-    best_intent = max(intent_scores, key=intent_scores.__getitem__)
-    best_banking = max(banking_scores, key=banking_scores.__getitem__)
+    sub = _llm_classify(user_message, SYSTEM_NEW_CARD)
+    sub_intent = sub.get("sub_intent", "discover")
+    if sub_intent not in VALID_SUB:
+        sub_intent = "discover"
+
+    banking = _llm_classify(user_message, SYSTEM_BANKING)
+    banking_type = banking.get("banking_type", "both")
+    if banking_type not in VALID_BANKING:
+        banking_type = "both"
 
     return {
-        "intent": best_intent,
-        "banking_type": best_banking,
-        "intent_score": intent_scores[best_intent],
-        "banking_score": banking_scores[best_banking],
-        "all_intent_scores": intent_scores,
+        "intent": INTENT_MAP[sub_intent],
+        "banking_type": banking_type,
+        "intent_score": 0.90,
+        "banking_score": 0.90,
+        "all_intent_scores": {},
     }
-
-
-if __name__ == "__main__":
-    tests = [
-        "I want to apply for a halal credit card",
-        "I lost my card, please block it",
-        "compare Visa Gold and Hasanah Gold",
-        "how many Islamic credit cards do you have?",
-        "am I eligible for a platinum card?",
-        "what is the annual fee for Visa Gold?",
-    ]
-    for t in tests:
-        r = classify(t)
-        print(f"\nQ: {t}")
-        print(
-            f"   intent={r['intent']} ({r['intent_score']:.2f})  "
-            f"banking={r['banking_type']} ({r['banking_score']:.2f})"
-        )

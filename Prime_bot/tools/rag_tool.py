@@ -12,6 +12,8 @@ with open("config.yaml") as f:
 _model = SentenceTransformer(cfg["embeddings"]["model"])
 _client = chromadb.PersistentClient(path=cfg["chroma"]["persist_dir"])
 
+_SERVICE_PATTERNS = {"_services_", "cardholder_services", "conv_services", "islami_services"}
+
 
 class RAGInput(BaseModel):
     query: str = Field(..., description="The user's question to search for")
@@ -23,12 +25,23 @@ class RAGInput(BaseModel):
     )
 
 
+def _is_service_doc(meta: dict) -> bool:
+    pid = (meta.get("product_id") or "").lower()
+    pname = (meta.get("product_name") or "").lower()
+    for pattern in _SERVICE_PATTERNS:
+        if pattern in pid or pattern in pname:
+            return True
+    if "cardholder" in pname and "service" in pname:
+        return True
+    return False
+
+
 def rag_search(
     query: str,
     collection: str,
     top_k: int = 5,
     banking_type_filter: Optional[str] = None,
-) -> str:
+) -> list[dict]:
     count_before = 0
     try:
         col = _client.get_or_create_collection(
@@ -38,7 +51,7 @@ def rag_search(
         count_before = col.count()
     except Exception as e:
         log_event("rag_error", collection=collection, stage="open_collection", error=str(e))
-        return f"[RAG ERROR] Could not access collection '{collection}': {e}"
+        return []
 
     embedding = _model.encode(query).tolist()
 
@@ -57,7 +70,7 @@ def rag_search(
         results = col.query(**kwargs)
     except Exception as e:
         log_event("rag_error", collection=collection, stage="query", error=str(e))
-        return f"[RAG ERROR] Query failed on collection '{collection}': {e}"
+        return []
 
     if not results["documents"] or not results["documents"][0]:
         log_event(
@@ -67,10 +80,11 @@ def rag_search(
             corpus_count=count_before,
             returned=0,
         )
-        return "[NO RESULTS] No relevant information found in the knowledge base."
+        return []
 
     chunks = results["documents"][0]
     metas = results["metadatas"][0]
+    distances = results.get("distances", [[]])[0]
     log_event(
         "rag_query",
         collection=collection,
@@ -79,8 +93,8 @@ def rag_search(
         returned=len(chunks),
     )
 
-    output = []
-    for chunk, meta in zip(chunks, metas):
+    items = []
+    for i, (chunk, meta) in enumerate(zip(chunks, metas)):
         product_id = meta.get("product_id", "")
         product_name = meta.get("product_name", "")
         banking_type = meta.get("banking_type", "")
@@ -88,9 +102,26 @@ def rag_search(
         header = f"[{source_label}]"
         if banking_type:
             header += f" ({banking_type})"
-        output.append(f"{header}\n{chunk}")
+        dist = distances[i] if i < len(distances) else 1.0
+        items.append({
+            "text": f"{header}\n{chunk}",
+            "distance": dist,
+            "product_id": product_id,
+            "collection": collection,
+        })
 
-    return "\n\n---\n\n".join(output)
+    return items
+
+
+def _deduplicate(items: list[dict]) -> list[dict]:
+    seen = set()
+    deduped = []
+    for item in items:
+        text_key = item["text"][:200]
+        if text_key not in seen:
+            seen.add(text_key)
+            deduped.append(item)
+    return deduped
 
 
 def rag_search_multi(
@@ -98,23 +129,56 @@ def rag_search_multi(
     collections: list[str],
     top_k: int = 5,
     banking_type_filter: Optional[str] = None,
+    max_context_chars: int = 6000,
 ) -> str:
-    all_results = []
+    all_items = []
     hit_collections = 0
+
     for col_name in collections:
-        result = rag_search(query, col_name, top_k, banking_type_filter)
-        if not result.startswith("[NO RESULTS]") and not result.startswith("[RAG ERROR]"):
+        items = rag_search(query, col_name, top_k, banking_type_filter)
+        if items:
             hit_collections += 1
-            all_results.append(f"=== From {col_name} ===\n{result}")
+            all_items.extend(items)
+
     log_event(
         "rag_multi",
         requested_collections=len(collections),
         hit_collections=hit_collections,
         top_k=top_k,
+        total_chunks=len(all_items),
     )
-    if not all_results:
+
+    if not all_items:
         return "[NO RESULTS] No relevant information found across all collections."
-    return "\n\n".join(all_results)
+
+    all_items = _deduplicate(all_items)
+    all_items.sort(key=lambda x: x["distance"])
+
+    output = []
+    char_count = 0
+    for item in all_items:
+        entry = item["text"]
+        if char_count + len(entry) > max_context_chars:
+            break
+        output.append(entry)
+        char_count += len(entry)
+
+    if not output:
+        output.append(all_items[0]["text"])
+
+    return "\n\n---\n\n".join(output)
+
+
+def rag_search_single(
+    query: str,
+    collection: str,
+    top_k: int = 5,
+    banking_type_filter: Optional[str] = None,
+) -> str:
+    items = rag_search(query, collection, top_k, banking_type_filter)
+    if not items:
+        return "[NO RESULTS] No relevant information found in the knowledge base."
+    return "\n\n---\n\n".join(item["text"] for item in items)
 
 
 class RAGTool(BaseTool):
@@ -133,7 +197,7 @@ class RAGTool(BaseTool):
         top_k: int = 5,
         banking_type_filter: Optional[str] = None,
     ) -> str:
-        return rag_search(
+        return rag_search_single(
             query=query,
             collection=collection,
             top_k=top_k,
@@ -141,7 +205,10 @@ class RAGTool(BaseTool):
         )
 
 
-def list_all_products(banking_type_filter: Optional[str] = None) -> list[dict]:
+def list_all_products(
+    banking_type_filter: Optional[str] = None,
+    exclude_services: bool = True,
+) -> list[dict]:
     try:
         col = _client.get_collection("all_products")
     except Exception:
@@ -160,16 +227,20 @@ def list_all_products(banking_type_filter: Optional[str] = None) -> list[dict]:
     products = []
     for meta in results.get("metadatas", []):
         pid = meta.get("product_id") or meta.get("product_name")
-        if pid and pid not in seen_ids:
-            seen_ids.add(pid)
-            products.append(
-                {
-                    "product_id": meta.get("product_id", ""),
-                    "product_name": meta.get("product_name", ""),
-                    "banking_type": meta.get("banking_type", ""),
-                    "card_network": meta.get("card_network", ""),
-                    "tier": meta.get("tier", ""),
-                    "category": meta.get("category", ""),
-                }
-            )
+        cat = meta.get("category", "")
+        if not pid or pid in seen_ids or cat != "credit_card":
+            continue
+        if exclude_services and _is_service_doc(meta):
+            continue
+        seen_ids.add(pid)
+        products.append(
+            {
+                "product_id": meta.get("product_id", ""),
+                "product_name": meta.get("product_name", ""),
+                "banking_type": meta.get("banking_type", ""),
+                "card_network": meta.get("card_network", ""),
+                "tier": meta.get("tier", ""),
+                "category": cat,
+            }
+        )
     return products

@@ -1,14 +1,16 @@
 import yaml
 import httpx
 import time
+import re
 from logging_utils import log_event
 
 with open("config.yaml") as f:
     cfg = yaml.safe_load(f)
 
-
 OLLAMA_BASE_URL = cfg["llm"].get("base_url", "http://localhost:11434")
 OLLAMA_MODEL = cfg["llm"]["model"]
+
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
 def chat(
@@ -31,21 +33,23 @@ def chat(
     if system:
         payload["messages"].append({"role": "system", "content": system})
 
-    payload["messages"].extend(messages)
+    for msg in messages:
+        payload["messages"].append({"role": msg["role"], "content": msg["content"]})
 
     try:
-        with httpx.Client(timeout=120.0) as client:
+        with httpx.Client(timeout=180.0) as client:
             resp = client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
             resp.raise_for_status()
             data = resp.json()
-            msg = data.get("message", {})
-            content = msg.get("content", "").strip()
+            raw = data.get("message", {}).get("content", "").strip()
+            content = _THINK_RE.sub("", raw).strip()
             log_event(
                 "llm_call",
                 model=OLLAMA_MODEL,
                 base_url=OLLAMA_BASE_URL,
                 temperature=temperature,
                 prompt_messages=len(payload["messages"]),
+                raw_chars=len(raw),
                 response_chars=len(content),
                 latency_ms=round((time.perf_counter() - started) * 1000, 2),
             )
