@@ -91,6 +91,29 @@ User: "no" → currently asking etin → {"has_etin": false}
 
 JSON only. No explanation."""
 
+BULK_EXTRACT_SYSTEM = """You extract ALL profile fields you can find from the user's message for a bank eligibility check.
+
+RULES:
+- Return ONLY a valid JSON object
+- Extract ALL fields you can find in the message
+- Valid keys and formats:
+  age: integer (e.g. 32)
+  employment_type: "salaried" or "self_employed" or "business_owner"
+  monthly_income: integer in BDT (convert "1 lakh" to 100000, "50k" to 50000, "200k" to 200000)
+  employment_duration: string (e.g. "2 years", "6 months", "16 years")
+  has_etin: true or false
+- Return {} if nothing can be extracted
+- If user mentions a job title like "software engineer", "doctor", "banker" → employment_type is "salaried"
+- If user mentions "business", "shop", "freelance" → employment_type is "self_employed"
+
+EXAMPLES:
+User: "I am 33 years old, earn 200k per month and a software engineer and been working for 8 years" → {"age": 33, "monthly_income": 200000, "employment_type": "salaried", "employment_duration": "8 years"}
+User: "25, salaried, 1 lakh income, 3 years experience, have etin" → {"age": 25, "employment_type": "salaried", "monthly_income": 100000, "employment_duration": "3 years", "has_etin": true}
+User: "am i eligible for visa gold?" → {}
+User: "I'm 30 and earn 80k" → {"age": 30, "monthly_income": 80000}
+
+JSON only. No explanation."""
+
 
 def _get_collections(banking: str, suffix: str) -> list[str]:
     if banking == "both":
@@ -99,6 +122,32 @@ def _get_collections(banking: str, suffix: str) -> list[str]:
             f"islami_credit_{suffix}",
         ]
     return [f"{banking}_credit_{suffix}"]
+
+
+def _bulk_extract_profile(message: str, session: SessionMemory):
+    prompt = f"""Extract ALL eligibility profile fields from this message:
+
+"{message}"
+
+Return JSON with all fields you can find."""
+
+    result = chat(
+        messages=[{"role": "user", "content": prompt}],
+        system=BULK_EXTRACT_SYSTEM,
+        temperature=0.0,
+        max_tokens=300,
+    )
+
+    try:
+        result = re.sub(r'```(?:json)?', '', result).strip()
+        match = re.search(r'\{[^{}]*\}', result, re.DOTALL)
+        if match:
+            extracted = json.loads(match.group())
+            for k, v in extracted.items():
+                if k in ELIGIBILITY_FIELDS and v is not None and str(v).strip():
+                    session.update_profile(k, v)
+    except Exception:
+        pass
 
 
 def _extract_profile(message: str, session: SessionMemory):
@@ -156,11 +205,22 @@ def _collect_profile(user_message: str, session: SessionMemory) -> tuple[str, bo
     return "", True
 
 
+def clear_eligibility_fields(session: SessionMemory):
+    for field in ELIGIBILITY_FIELDS:
+        if field in session.user_profile:
+            session.user_profile[field] = ""
+
+
 def run_eligibility(
     user_message: str,
     routing: dict,
     session: SessionMemory,
+    is_new_check: bool = False,
 ) -> tuple[str, bool]:
+    if is_new_check:
+        clear_eligibility_fields(session)
+        _bulk_extract_profile(user_message, session)
+
     response, complete = _collect_profile(user_message, session)
 
     if not complete:
@@ -173,7 +233,11 @@ def run_eligibility(
         collections.append(f"{other}_credit_i_need_a_credit_card")
 
     target = session.user_profile.get("eligibility_target", "")
-    search_query = target if target else "eligibility requirements age income employment duration etin documents"
+    eligibility_terms = "eligibility requirements age income employment duration etin documents"
+    if target:
+        search_query = f"{target} {eligibility_terms}"
+    else:
+        search_query = eligibility_terms
 
     context = rag_search_multi(
         search_query,

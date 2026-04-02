@@ -261,7 +261,7 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
             _eligibility_sessions.discard(session_id)
         else:
             log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="eligibility")
-            response, done = compliance_faq.run_eligibility(user_message, {"banking_type": "both"}, session)
+            response, done = compliance_faq.run_eligibility(user_message, {"banking_type": "both"}, session, is_new_check=False)
             if not done:
                 clean = _guardrails(response)
                 session.add(user_message, clean)
@@ -347,7 +347,7 @@ def _handle_intent(
     elif intent == "eligibility_check":
         log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="eligibility")
         session.update_profile("eligibility_target", user_message)
-        response, done = compliance_faq.run_eligibility(user_message, routing, session)
+        response, done = compliance_faq.run_eligibility(user_message, routing, session, is_new_check=True)
         if not done:
             _eligibility_sessions.add(session_id)
             clean = _guardrails(response)
