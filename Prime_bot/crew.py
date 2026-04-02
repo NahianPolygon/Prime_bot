@@ -67,6 +67,8 @@ Respond ONLY with JSON: {"banking_type": "<type>"}"""
     if banking_type and banking_type in VALID_BANKING and banking_type != "both":
         return banking_type
     return None
+
+
 def _build_filtered_card_response(banking_type: str) -> str:
     all_products = list_all_products()
     cards = [
@@ -344,6 +346,7 @@ def _handle_intent(
 
     elif intent == "eligibility_check":
         log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="eligibility")
+        session.update_profile("eligibility_target", user_message)
         response, done = compliance_faq.run_eligibility(user_message, routing, session)
         if not done:
             _eligibility_sessions.add(session_id)

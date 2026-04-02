@@ -18,9 +18,9 @@ You assess whether a user qualifies for Prime Bank credit cards.
 
 You MUST:
 - Compare the user's profile against eligibility criteria in the chunks
-- For EACH card in chunks give: ✅ Likely Eligible | ❌ Likely Ineligible | ⚠️ Borderline
+- For EACH card assessed give: ✅ Likely Eligible | ❌ Likely Ineligible | ⚠️ Borderline
 - Cite product_id for every card
-- If ineligible for one, suggest alternatives from the chunks
+- If ineligible, suggest alternatives from the chunks
 
 You MUST NOT:
 - Invent eligibility criteria not in the chunks
@@ -172,12 +172,21 @@ def run_eligibility(
         other = "islami" if banking == "conventional" else "conventional"
         collections.append(f"{other}_credit_i_need_a_credit_card")
 
+    target = session.user_profile.get("eligibility_target", "")
+    search_query = target if target else "eligibility requirements age income employment duration etin documents"
+
     context = rag_search_multi(
-        "eligibility requirements age income employment duration etin documents",
+        search_query,
         collections,
         top_k=8,
     )
     profile_str = session.get_profile_str()
+
+    if target:
+        focus = f"""The user specifically asked about: "{target}"
+Focus your assessment on that card ONLY. If it is found in the chunks, assess eligibility for that card only. If not found, say so and suggest the closest alternatives."""
+    else:
+        focus = "Assess eligibility for each Prime Bank credit card found in the chunks."
 
     prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
 {context}
@@ -187,9 +196,9 @@ def run_eligibility(
 User profile:
 {profile_str}
 
-The user asked: {user_message}
+{focus}
 
-Assess eligibility for each Prime Bank credit card found in the chunks. Cite product_id."""
+Cite product_id."""
 
     response = chat(
         messages=[{"role": "user", "content": prompt}],
