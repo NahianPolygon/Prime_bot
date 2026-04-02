@@ -157,12 +157,13 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
     session_id = session.session_id
     in_eligibility = session_id in _eligibility_sessions
     in_discovery = session_id in _discovery_sessions
+    history = session.get_history_str(max_chars=500)
 
     if in_discovery:
         state = _discovery_sessions.get(session_id, {"step": 0, "retries": 0})
         step = state.get("step", 0)
 
-        classifier_output = classify(user_message)
+        classifier_output = classify(user_message, history)
         log_event(
             "classifier_result",
             request_id=request_id,
@@ -245,7 +246,7 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
             return clean
 
     if in_eligibility:
-        classifier_output = classify(user_message)
+        classifier_output = classify(user_message, history)
         log_event(
             "classifier_result",
             request_id=request_id,
@@ -280,7 +281,7 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
             )
             return clean
 
-    classifier_output = classify(user_message)
+    classifier_output = classify(user_message, history)
     log_event(
         "classifier_result",
         request_id=request_id,

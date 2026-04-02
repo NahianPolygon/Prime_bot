@@ -65,14 +65,22 @@ def _llm_classify(message: str, system: str) -> dict:
     return _parse_json(result)
 
 
-def classify(user_message: str) -> dict:
-    entry = _llm_classify(user_message, SYSTEM_ENTRY)
+def classify(user_message: str, history: str = "") -> dict:
+    if history:
+        context_msg = f"""Recent conversation:
+{history}
+
+Current message: {user_message}"""
+    else:
+        context_msg = user_message
+
+    entry = _llm_classify(context_msg, SYSTEM_ENTRY)
     category = entry.get("category", "new_card")
     if category not in VALID_ENTRY:
         category = "new_card"
 
     if category == "existing_card":
-        banking = _llm_classify(user_message, SYSTEM_BANKING)
+        banking = _llm_classify(context_msg, SYSTEM_BANKING)
         banking_type = banking.get("banking_type", "both")
         if banking_type not in VALID_BANKING:
             banking_type = "both"
@@ -84,12 +92,12 @@ def classify(user_message: str) -> dict:
             "all_intent_scores": {},
         }
 
-    sub = _llm_classify(user_message, SYSTEM_NEW_CARD)
+    sub = _llm_classify(context_msg, SYSTEM_NEW_CARD)
     sub_intent = sub.get("sub_intent", "discover")
     if sub_intent not in VALID_SUB:
         sub_intent = "discover"
 
-    banking = _llm_classify(user_message, SYSTEM_BANKING)
+    banking = _llm_classify(context_msg, SYSTEM_BANKING)
     banking_type = banking.get("banking_type", "both")
     if banking_type not in VALID_BANKING:
         banking_type = "both"
