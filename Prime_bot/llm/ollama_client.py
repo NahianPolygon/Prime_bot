@@ -18,6 +18,7 @@ def chat(
     system: str | None = None,
     temperature: float = 0.2,
     max_tokens: int = 1200,
+    think: bool = False,
 ) -> str:
     started = time.perf_counter()
     payload = {
@@ -29,6 +30,12 @@ def chat(
             "num_predict": max_tokens,
         },
     }
+
+    if not think:
+        if system:
+            system = system.rstrip() + "\n\n/no_think"
+        else:
+            system = "/no_think"
 
     if system:
         payload["messages"].append({"role": "system", "content": system})
@@ -43,6 +50,8 @@ def chat(
             data = resp.json()
             raw = data.get("message", {}).get("content", "").strip()
             content = _THINK_RE.sub("", raw).strip()
+            if not content and raw:
+                content = raw
             log_event(
                 "llm_call",
                 model=OLLAMA_MODEL,
