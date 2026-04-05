@@ -19,7 +19,6 @@ You assess whether a user qualifies for Prime Bank credit cards.
 You MUST:
 - Compare the user's profile against eligibility criteria in the chunks
 - For EACH card assessed give: ✅ Likely Eligible | ❌ Likely Ineligible | ⚠️ Borderline
-- Cite product_id for every card
 - If ineligible, suggest alternatives from the chunks
 
 You MUST NOT:
@@ -30,7 +29,6 @@ FAQ_SYSTEM = """You are the Prime Bank FAQ & Compliance specialist.
 
 You MUST:
 - Answer using ONLY the knowledge base chunks provided
-- Cite product_id for any fee or policy
 - Use bullet points for document lists and steps
 
 You MUST NOT:
@@ -45,7 +43,7 @@ You MUST:
 - Explain the application process using ONLY the knowledge base chunks provided
 - List required documents from the chunks
 - Mention any fees or conditions from the chunks
-- Cite product_id for any specific card
+
 
 You MUST NOT:
 - Invent any steps, documents, or fees not in the chunks
@@ -59,7 +57,7 @@ You MUST:
 - Use ONLY the product list provided below to answer
 - Give exact counts when asked
 - Present cards grouped logically based on what the user asked
-- Include product_id, card network, tier, and banking type for each card
+- Include card name, card network, tier, and banking type for each card
 - If asked about a specific category, filter and show only matching cards
 
 You MUST NOT:
@@ -262,7 +260,7 @@ User profile:
 
 {focus}
 
-Cite product_id."""
+"""
 
     response = chat(
         messages=[{"role": "user", "content": prompt}],
@@ -351,7 +349,7 @@ Conversation so far:
 
 User question: {user_message}
 
-Explain the application process using ONLY the chunks above. Cite product_id for any specific card."""
+Explain the application process using ONLY the chunks above. Do not display any product_id for any specific card."""
 
     return chat(
         messages=[{"role": "user", "content": prompt}],
@@ -390,7 +388,7 @@ Conversation so far:
 
 User question: {user_message}
 
-Answer using ONLY the chunks above. Cite product_id for any fees or policies."""
+Answer using ONLY the chunks above. Do not display any product_id for any specific card."""
 
     return chat(
         messages=[{"role": "user", "content": prompt}],
