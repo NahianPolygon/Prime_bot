@@ -39,7 +39,7 @@ env/
 .settings/
 
 # Database files
-chroma_db/
+Prime_bot/chroma_db/
 *.db
 *.sqlite3
 

@@ -218,11 +218,8 @@
 
   marked.setOptions({ breaks: true, gfm: true });
 
-  function fixMarkdown(raw) {
+    function fixMarkdown(raw) {
     let t = (raw || "").replace(/\r\n/g, "\n");
-
-    t = t.replace(/^\s*-{3,}\s*$/gm, "");
-    t = t.replace(/^\s*={3,}\s*$/gm, "");
 
     let lines = t.split("\n");
     let result = [];
@@ -248,6 +245,9 @@
         if (inTable) {
           result.push("");
           inTable = false;
+        }
+        if (/^-{3,}$/.test(trimmed) || /^={3,}$/.test(trimmed)) {
+          continue;
         }
         result.push(line);
       }
@@ -278,7 +278,6 @@
 
     return t.trim();
   }
-
   function renderBotBubble(bubble, rawText) {
     const md   = fixMarkdown(rawText);
     const html = marked.parse(md);

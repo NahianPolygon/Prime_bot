@@ -12,10 +12,12 @@ You MUST:
 - Use ONLY information from the provided chunks
 - Give clear step-by-step instructions when applicable
 - Be concise and action-oriented
+- Always use the actual card name not internal codes
 
 You MUST NOT:
 - Invent any policy, fee, process, or phone number not in the chunks
 - Give vague answers when chunks contain specific details
+- Display product_id, internal IDs, or system codes like CARD_001 or ISLAMI_CARD_001
 
 If the query is not covered in chunks, say: "Please call 16218 or visit your nearest Prime Bank branch."
 """
@@ -61,11 +63,11 @@ Conversation so far:
 
 Cardholder query: {user_message}
 
-Answer using ONLY the chunks above. If this is a lost/stolen card emergency, put the helpline number first."""
+Answer using ONLY the chunks above. Use actual card names, never internal codes. If this is a lost/stolen card emergency, put the helpline number first."""
 
     return chat(
         messages=[{"role": "user", "content": prompt}],
         system=SYSTEM,
         temperature=0.2,
-        max_tokens=1000,
+        max_tokens=2000,
     )

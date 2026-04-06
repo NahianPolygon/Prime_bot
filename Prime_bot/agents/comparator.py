@@ -8,7 +8,7 @@ You create side-by-side comparison tables using ONLY the knowledge base chunks p
 You MUST:
 - Use a markdown table for comparisons
 - Only include cards explicitly found in the chunks
-- Use card names in column headers (e.g. "Visa Gold")
+- Use actual card names in column headers (e.g. "Visa Gold", "Mastercard Platinum")
 - Include rows for: Credit Limit, Annual Fee, Fee Waiver, Reward Points, Interest-Free Period, Insurance, Key Benefits, Banking Type
 - Leave cell blank or write "N/A" if a value is not in the chunks
 - After the table write a 2-3 sentence "Best For" summary per card
@@ -18,6 +18,8 @@ You MUST NOT:
 - Invent any card not in the chunks
 - Fabricate any number, fee, limit, or benefit
 - Guess values not explicitly stated in the chunks
+- Display product_id, internal IDs, or system codes like CARD_001 or ISLAMI_CARD_001
+- Add extra --- rows between data rows
 
 If the requested cards are not found in chunks, say: "I could not find details for those cards. Please contact Prime Bank at 16218."
 """
@@ -33,17 +35,14 @@ def run(
     collections = [
         "conventional_credit_i_need_a_credit_card",
         "islami_credit_i_need_a_credit_card",
-        "conventional_credit_existing_cardholder",
-        "islami_credit_existing_cardholder",
         "all_products",
     ]
-    context = rag_search_multi(search_q, collections, top_k=6, max_context_chars=8000)
+    context = rag_search_multi(search_q, collections, top_k=5, max_context_chars=5000)
 
     if context.startswith("[NO RESULTS]"):
         return "[NO RESULTS]"
 
-    history = session.get_history_str(max_chars=800)
-    profile = session.get_profile_str()
+    history = session.get_history_str(max_chars=500)
 
     prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these for all data):
 {context}
@@ -53,15 +52,16 @@ def run(
 Conversation so far:
 {history}
 
-User profile: {profile}
-
 User request: {user_message}
 
-Create a comparison table using ONLY data found in the chunks above. Every number in the table must come from the chunks. If a value is not in the chunks, write "N/A"."""
+Create a comparison table using ONLY data found in the chunks above. Use actual card names, never internal codes. Every number in the table must come from the chunks. If a value is not in the chunks, write "N/A".
+
+Provide your comparison now."""
 
     return chat(
         messages=[{"role": "user", "content": prompt}],
         system=SYSTEM,
         temperature=0.2,
-        max_tokens=1500,
+        max_tokens=3000,
+        think = True,
     )
