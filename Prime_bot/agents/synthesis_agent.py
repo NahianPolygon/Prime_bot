@@ -8,7 +8,7 @@ Rules:
 2. Use bullet points only for lists of 3+ items.
 3. Bold only: product names, key amounts, critical actions like **Call 16218**.
 4. Output comparison tables as clean markdown tables with blank lines before and after.
-5. Remove any product_id, internal IDs, or system codes. Never show these to the user.
+5. Remove any product_id, internal IDs, or system codes like CARD_001, ISLAMI_CARD_002. Replace them with the actual card name from context or remove entirely.
 6. Be concise. Do not repeat facts.
 7. End with one helpful follow-up sentence.
 8. Respond in the same language the user wrote in.
@@ -22,22 +22,28 @@ FALLBACK = (
     "Please contact Prime Bank at **16218** or visit any branch for assistance."
 )
 
-_CITATION_RE = re.compile(r'\[?(?:CARD_|ISLAMI_CARD_)\d+\?')
+_CITATION_RE = re.compile(r'\$?(?:CARD_|ISLAMI_CARD_)\d+\$?')
 _TABLE_RE = re.compile(r'\|.+\|')
 _PRODUCT_ID_RE = re.compile(r'\(?product_id[:\s]*[A-Z_0-9]+\)?', re.IGNORECASE)
+_INTERNAL_CODE_RE = re.compile(r'\b(?:ISLAMI_CARD|CARD)_\d+\b')
 
 
 def _strip_product_ids(text: str) -> str:
     text = _PRODUCT_ID_RE.sub('', text)
     text = _CITATION_RE.sub('', text)
-    text = re.sub(r'\[s*\]','',text)
+    text = _INTERNAL_CODE_RE.sub('', text)
+    text = re.sub(r'\$\s*\$', '', text)
+    text = re.sub(r'\|\s*\|', '| N/A |', text)
     text = re.sub(r'  +', ' ', text)
     return text.strip()
 
 
+def _has_internal_codes(text: str) -> bool:
+    return bool(_INTERNAL_CODE_RE.search(text)) or bool(_PRODUCT_ID_RE.search(text))
+
+
 def _draft_is_clean(draft: str) -> bool:
-    has_ids = bool(_CITATION_RE.search(draft)) or bool(_PRODUCT_ID_RE.search(draft))
-    if has_ids:
+    if _has_internal_codes(draft):
         return False
     has_table = bool(_TABLE_RE.search(draft))
     reasonable_length = 80 < len(draft) < 3000
@@ -69,7 +75,7 @@ def run(draft: str, user_message: str) -> str:
 Draft to reformat:
 {draft}
 
-Reformat this draft. Do not add any new information. Remove any product_id or internal codes."""
+Reformat this draft. Do not add any new information. Remove any product_id or internal codes like CARD_001 or ISLAMI_CARD_002. Replace them with the actual card name from context or remove the reference entirely."""
 
     result = chat(
         messages=[{"role": "user", "content": prompt}],

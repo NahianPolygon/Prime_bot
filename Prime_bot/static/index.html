@@ -219,65 +219,138 @@
   marked.setOptions({ breaks: true, gfm: true });
 
     function fixMarkdown(raw) {
-    let t = (raw || "").replace(/\r\n/g, "\n");
+  let t = (raw || "").replace(/\r\n/g, "\n");
 
-    let lines = t.split("\n");
-    let result = [];
-    let inTable = false;
+  t = repairTable(t);
 
-    for (let i = 0; i < lines.length; i++) {
-      let line = lines[i];
-      let trimmed = line.trim();
-      let isPipeLine = trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 2;
-      let isSepLine = /^\|[\s\-:|]+\|$/.test(trimmed);
+  let lines = t.split("\n");
+  let result = [];
+  let inTable = false;
+  let headerSepSeen = false;
 
-      if (isPipeLine || isSepLine) {
-        if (!inTable) {
-          if (result.length > 0 && result[result.length - 1].trim() !== "") {
-            result.push("");
-          }
-          inTable = true;
-        }
-        result.push(trimmed);
-      } else if (inTable && trimmed === "") {
-        continue;
-      } else {
-        if (inTable) {
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    let trimmed = line.trim();
+    let isPipeLine = trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 2;
+    let isSepLine = /^\|[\s\-:|]+\|$/.test(trimmed);
+
+    if (isPipeLine || isSepLine) {
+      if (!inTable) {
+        if (result.length > 0 && result[result.length - 1].trim() !== "") {
           result.push("");
-          inTable = false;
         }
-        if (/^-{3,}$/.test(trimmed) || /^={3,}$/.test(trimmed)) {
-          continue;
+        inTable = true;
+        headerSepSeen = false;
+      }
+
+      if (isSepLine) {
+        if (!headerSepSeen) {
+          headerSepSeen = true;
+          result.push(trimmed);
         }
-        result.push(line);
+      } else {
+        result.push(trimmed);
+      }
+
+    } else if (inTable && trimmed === "") {
+      continue;
+    } else {
+      if (inTable) {
+        result.push("");
+        inTable = false;
+        headerSepSeen = false;
+      }
+      if (/^-{3,}$/.test(trimmed) || /^={3,}$/.test(trimmed)) {
+        continue;
+      }
+      result.push(line);
+    }
+  }
+
+  t = result.join("\n");
+
+  t = t.replace(
+    /((?:\|[^\n]+\|\n)(?!\s*\|[\s\-:|]+\|))/g,
+    function (match) {
+      let headerLine = match.trimEnd().replace(/\n$/, "");
+      let cols = (headerLine.match(/\|/g) || []).length - 1;
+      if (cols < 1) cols = 1;
+      let sep = "|" + " --- |".repeat(cols);
+      return headerLine + "\n" + sep + "\n";
+    }
+  );
+
+  t = t.replace(/\n{3,}/g, "\n\n");
+  t = t.replace(/([^\n])\n(#{1,3}\s)/g, "\$1\n\n\$2");
+  return t.trim();
+}
+
+function repairTable(text) {
+  let lines = text.split("\n");
+  let result = [];
+
+  for (let li = 0; li < lines.length; li++) {
+    let stripped = lines[li].trim();
+
+    if (!(stripped.startsWith("|") && stripped.endsWith("|"))) {
+      result.push(lines[li]);
+      continue;
+    }
+
+    let rawCells = stripped.split("|").slice(1, -1);
+
+    let sepIndices = [];
+    for (let i = 0; i < rawCells.length; i++) {
+      if (/^[\s\-:]+$/.test(rawCells[i]) && rawCells[i].trim().length >= 3) {
+        sepIndices.push(i);
       }
     }
 
-    t = result.join("\n");
+    if (sepIndices.length < 2) {
+      result.push(lines[li]);
+      continue;
+    }
 
-    t = t.replace(
-      /((?:\|[^\n]+\|\n)(?!\s*\|[\s\-:|]+\|))/g,
-      function(match) {
-        let headerLine = match.trimEnd();
-        if (headerLine.endsWith("\n")) headerLine = headerLine.slice(0, -1);
-        let cols = (headerLine.match(/\|/g) || []).length - 1;
-        if (cols < 1) cols = 1;
-        let sep = "|" + " --- |".repeat(cols);
-        return headerLine + "\n" + sep + "\n";
+    let bestStart = sepIndices[0];
+    let bestLen = 1;
+    let currStart = sepIndices[0];
+    let currLen = 1;
+
+    for (let i = 1; i < sepIndices.length; i++) {
+      if (sepIndices[i] === sepIndices[i - 1] + 1) {
+        currLen++;
+      } else {
+        if (currLen > bestLen) {
+          bestStart = currStart;
+          bestLen = currLen;
+        }
+        currStart = sepIndices[i];
+        currLen = 1;
       }
-    );
+    }
+    if (currLen > bestLen) {
+      bestStart = currStart;
+      bestLen = currLen;
+    }
 
-    t = t.replace(/(\|[^\n]+\|\n\|[\s\-:|]+\|\n)([\s\S]*?)(\n\n|\n?$)/g,
-      function(match) {
-        return match.replace(/^\s*\n/gm, "");
+    let colCount = bestLen;
+
+    if (colCount < 2 || rawCells.length <= colCount) {
+      result.push(lines[li]);
+      continue;
+    }
+
+    for (let i = 0; i < rawCells.length; i += colCount) {
+      let chunk = rawCells.slice(i, i + colCount);
+      while (chunk.length < colCount) {
+        chunk.push(" N/A ");
       }
-    );
-
-    t = t.replace(/\n{3,}/g, "\n\n");
-    t = t.replace(/([^\n])\n(#{1,3}\s)/g, "\$1\n\n\$2");
-
-    return t.trim();
+      result.push("|" + chunk.join("|") + "|");
+    }
   }
+
+  return result.join("\n");
+}
   function renderBotBubble(bubble, rawText) {
     const md   = fixMarkdown(rawText);
     const html = marked.parse(md);

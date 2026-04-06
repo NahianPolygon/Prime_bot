@@ -1,6 +1,7 @@
 from tools.rag_tool import rag_search_multi
 from llm.ollama_client import chat
 from memory.session_memory import SessionMemory
+import re
 
 SYSTEM = """You are the Prime Bank Credit Card Product Advisor.
 You recommend credit cards using ONLY the knowledge base chunks provided below.
@@ -42,6 +43,13 @@ If the card is not found in chunks, say: "Please contact Prime Bank at 16218 for
 """
 
 
+def _clean_context(context: str) -> str:
+    context = re.sub(r'product_id:\s*\S+', '', context)
+    context = re.sub(r'\b(?:CARD|ISLAMI_CARD)_\d+\b', '', context)
+    context = re.sub(r'\n\s*\n\s*\n', '\n\n', context)
+    return context.strip()
+
+
 def _get_collections(banking: str) -> list[str]:
     if banking == "both":
         return [
@@ -69,6 +77,8 @@ def run(
 
     if context.startswith("[NO RESULTS]"):
         return "[NO RESULTS]"
+
+    context = _clean_context(context)
 
     history = session.get_history_str(max_chars=1000)
 
@@ -108,6 +118,8 @@ def run_details(
 
     if context.startswith("[NO RESULTS]"):
         return "[NO RESULTS]"
+
+    context = _clean_context(context)
 
     history = session.get_history_str(max_chars=1000)
 

@@ -340,6 +340,16 @@ def _handle_intent(
     if intent == "comparison":
         log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="comparator")
         draft = comparator.run(user_message, routing, session)
+        clean = _guardrails(draft)
+        session.add(user_message, clean)
+        log_event(
+            "pipeline_complete",
+            request_id=request_id,
+            session_id=session_id,
+            intent=intent,
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+        )
+        return clean
 
     elif intent == "catalog_query":
         log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="catalog")

@@ -98,7 +98,7 @@ def rag_search(
         product_id = meta.get("product_id", "")
         product_name = meta.get("product_name", "")
         banking_type = meta.get("banking_type", "")
-        source_label = product_id or product_name or meta.get("source", "unknown")
+        source_label = product_name or product_id or meta.get("source", "unknown")
         header = f"[{source_label}]"
         if banking_type:
             header += f" ({banking_type})"

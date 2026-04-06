@@ -10,6 +10,7 @@ class SessionMemory:
         self.max_turns = max_turns
         self.history: list[dict] = []
         self.user_profile: dict = {}
+        self.last_intent: str | None = None
 
     def _truncate_for_history(self, text: str, max_chars: int = MAX_MSG_CHARS) -> str:
         if len(text) <= max_chars:
@@ -35,6 +36,12 @@ class SessionMemory:
         )
         if len(self.history) > self.max_turns * 2:
             self.history = self.history[-(self.max_turns * 2):]
+
+    def set_last_intent(self, intent: str):
+        self.last_intent = intent
+
+    def get_last_intent(self) -> str | None:
+        return self.last_intent
 
     def get_history_str(self, max_chars: int = 2000) -> str:
         lines = []
@@ -70,6 +77,7 @@ class SessionMemory:
     def clear(self):
         self.history = []
         self.user_profile = {}
+        self.last_intent = None
 
 
 _sessions: dict[str, SessionMemory] = {}

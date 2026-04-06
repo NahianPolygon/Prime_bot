@@ -5,6 +5,13 @@ from llm.ollama_client import chat
 from memory.session_memory import SessionMemory
 
 
+def _clean_context(context: str) -> str:
+    context = re.sub(r'product_id:\s*\S+', '', context)
+    context = re.sub(r'\b(?:CARD|ISLAMI_CARD)_\d+\b', '', context)
+    context = re.sub(r'\n\s*\n\s*\n', '\n\n', context)
+    return context.strip()
+
+
 ELIGIBILITY_FIELDS = {
     "age":                 "What is your **age**?",
     "employment_type":     "What is your employment status? (**salaried**, **self-employed**, or **business owner**?)",
@@ -332,6 +339,8 @@ def run_eligibility(
     if context.startswith("[NO RESULTS]"):
         return "I couldn't find eligibility criteria in my knowledge base. Please contact Prime Bank at **16218** for eligibility information.", True
 
+    context = _clean_context(context)
+
     profile_str = session.get_profile_str()
 
     if target:
@@ -432,6 +441,8 @@ def run_apply(
     if context.startswith("[NO RESULTS]"):
         return "[NO RESULTS]"
 
+    context = _clean_context(context)
+
     history = session.get_history_str(max_chars=1000)
 
     prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
@@ -453,6 +464,7 @@ Explain the application process using ONLY the chunks above. Do not display any 
         max_tokens=2000,
     )
 
+
 def run_faq(
     user_message: str,
     routing: dict,
@@ -470,6 +482,8 @@ def run_faq(
 
     if context.startswith("[NO RESULTS]"):
         return "[NO RESULTS]"
+
+    context = _clean_context(context)
 
     history = session.get_history_str(max_chars=1000)
 
