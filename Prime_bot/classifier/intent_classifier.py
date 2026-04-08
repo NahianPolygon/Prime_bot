@@ -15,7 +15,8 @@ Respond ONLY with JSON: {"category": "new_card" or "existing_card"}"""
 SYSTEM_NEW_CARD = """The user is interested in getting a new credit card. Classify their specific need.
 
 Categories:
-- discover: browsing, exploring options, wants to see available cards, no specific card in mind, stating banking preference, stating use case
+- catalog: wants to see ALL available cards, asks "what cards do you offer", "list all cards", "show me your cards", "which cards does prime bank have"
+- discover: has a specific need or preference, wants recommendations based on use case, income, or lifestyle
 - compare: explicitly wants to compare two or more specific named cards
 - eligibility: wants to check if they qualify for a specific card, asking about requirements
 - apply: wants to know how to apply for a specific card, application process, documents needed
@@ -35,10 +36,11 @@ Respond ONLY with JSON: {"banking_type": "<type>"}"""
 
 
 VALID_ENTRY = {"new_card", "existing_card"}
-VALID_SUB = {"discover", "compare", "eligibility", "apply", "details"}
+VALID_SUB = {"catalog", "discover", "compare", "eligibility", "apply", "details"}
 VALID_BANKING = {"conventional", "islami", "both"}
 
 INTENT_MAP = {
+    "catalog": "catalog_query",
     "discover": "i_need_a_credit_card",
     "compare": "comparison",
     "eligibility": "eligibility_check",

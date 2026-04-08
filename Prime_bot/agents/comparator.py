@@ -68,9 +68,23 @@ def _clean_context(context: str) -> str:
 
 def _parse_json_response(text: str) -> dict:
     cleaned = re.sub(r'```(?:json)?', '', text).strip()
+
     match = re.search(r'\{[\s\S]*\}', cleaned)
     if match:
-        return json.loads(match.group())
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+
+    match = re.search(r'$$[\s\S]*$$', cleaned)
+    if match:
+        try:
+            arr = json.loads(match.group())
+            if isinstance(arr, list) and len(arr) > 0:
+                return {"cards": arr, "best_for": []}
+        except json.JSONDecodeError:
+            pass
+
     return {}
 
 
