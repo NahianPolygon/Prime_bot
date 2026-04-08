@@ -149,12 +149,19 @@ def run(
         "islami_credit_i_need_a_credit_card",
         "all_products",
     ]
-    context = rag_search_multi(search_q, collections, top_k=5, max_context_chars=5000)
 
-    if context.startswith("[NO RESULTS]"):
+    topic_context = rag_search_multi(search_q, collections, top_k=5, max_context_chars=3000)
+
+    if topic_context.startswith("[NO RESULTS]"):
         return "[NO RESULTS]"
 
-    context = _clean_context(context)
+    spec_query = "credit limit annual fee reward points interest-free period insurance fee waiver"
+    spec_context = rag_search_multi(spec_query, collections, top_k=5, max_context_chars=3000)
+
+    if spec_context.startswith("[NO RESULTS]"):
+        context = _clean_context(topic_context)
+    else:
+        context = _clean_context(topic_context + "\n\n---\n\n" + spec_context)
 
     history = session.get_history_str(max_chars=500)
 
