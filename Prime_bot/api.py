@@ -2,10 +2,11 @@ import os
 import uuid
 import yaml
 import time
+import json
 import threading
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from logging_utils import log_event
 
@@ -13,7 +14,7 @@ with open("config.yaml") as f:
     _cfg = yaml.safe_load(f)
 
 from memory.session_memory import get_session, clear_session
-from crew import build_crew
+from crew import build_crew, build_crew_stream
 
 app = FastAPI(title="Prime Bank Credit Card Assistant", version="1.0.0")
 
@@ -78,6 +79,40 @@ async def chat_endpoint(req: ChatRequest):
         response_chars=len(response),
     )
     return ChatResponse(response=response, session_id=session_id)
+
+
+@app.post("/chat/stream")
+async def chat_stream_endpoint(req: ChatRequest):
+    if not req.message or not req.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+
+    request_id = str(uuid.uuid4())
+    session_id = req.session_id or str(uuid.uuid4())
+    session = get_session(session_id)
+    log_event(
+        "chat_stream_request",
+        request_id=request_id,
+        session_id=session_id,
+        message_chars=len(req.message.strip()),
+    )
+
+    def event_generator():
+        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
+
+        for token in build_crew_stream(req.message.strip(), session, request_id=request_id):
+            yield f"data: {json.dumps({'token': token})}\n\n"
+
+        yield f"data: {json.dumps({'done': True})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/clear")

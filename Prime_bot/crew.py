@@ -4,6 +4,7 @@ from tools.rag_tool import list_all_products
 import re
 import json
 import time
+from typing import Generator
 import agents.product_advisor as product_advisor
 import agents.cardholder_svc as cardholder_svc
 import agents.comparator as comparator
@@ -317,6 +318,70 @@ def _needs_filter_extraction(user_message: str, banking_type: str) -> bool:
     )
 
 
+def _get_draft(
+    user_message: str,
+    classifier_output: dict,
+    session: SessionMemory,
+    request_id: str | None,
+) -> tuple[str | None, str | None]:
+    session_id = session.session_id
+    intent = classifier_output["intent"]
+    banking_type = classifier_output["banking_type"]
+
+    routing = {
+        "intent": intent,
+        "banking_type": banking_type,
+        "collection": f"{banking_type}_credit_i_need_a_credit_card" if banking_type != "both" else "all_products",
+        "search_query": user_message,
+    }
+
+    log_event(
+        "route_selected",
+        request_id=request_id,
+        session_id=session_id,
+        intent=intent,
+        banking_type=banking_type,
+    )
+
+    if intent == "comparison":
+        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="comparator")
+        draft = comparator.run(user_message, routing, session)
+        return draft, "no_synth"
+
+    elif intent == "catalog_query":
+        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="catalog")
+        return compliance_faq.run_catalog(user_message, session), None
+
+    elif intent == "eligibility_check":
+        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="eligibility")
+        session.update_profile("eligibility_target", user_message)
+        response, done = compliance_faq.run_eligibility(user_message, routing, session, is_new_check=True)
+        if not done:
+            _eligibility_sessions.add(session_id)
+            return response, "no_synth"
+        return response, None
+
+    elif intent == "existing_cardholder":
+        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="cardholder_service")
+        return cardholder_svc.run(user_message, routing, session), None
+
+    elif intent == "i_need_a_credit_card":
+        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="product_advisor")
+        return product_advisor.run(user_message, routing, session), None
+
+    elif intent == "how_to_apply":
+        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="how_to_apply")
+        return compliance_faq.run_apply(user_message, routing, session), None
+
+    elif intent == "product_details":
+        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="product_details")
+        return product_advisor.run_details(user_message, routing, session), None
+
+    else:
+        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="faq_compliance")
+        return compliance_faq.run_faq(user_message, routing, session), None
+
+
 def build_crew(user_message: str, session: SessionMemory, request_id: str | None = None) -> str:
     started = time.perf_counter()
     session_id = session.session_id
@@ -542,26 +607,10 @@ def _handle_intent(
 ) -> str:
     session_id = session.session_id
     intent = classifier_output["intent"]
-    banking_type = classifier_output["banking_type"]
 
-    routing = {
-        "intent": intent,
-        "banking_type": banking_type,
-        "collection": f"{banking_type}_credit_i_need_a_credit_card" if banking_type != "both" else "all_products",
-        "search_query": user_message,
-    }
+    draft, mode = _get_draft(user_message, classifier_output, session, request_id)
 
-    log_event(
-        "route_selected",
-        request_id=request_id,
-        session_id=session_id,
-        intent=intent,
-        banking_type=banking_type,
-    )
-
-    if intent == "comparison":
-        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="comparator")
-        draft = comparator.run(user_message, routing, session)
+    if mode == "no_synth":
         clean = _guardrails(draft)
         session.add(user_message, clean)
         log_event(
@@ -572,41 +621,6 @@ def _handle_intent(
             latency_ms=round((time.perf_counter() - started) * 1000, 2),
         )
         return clean
-
-    elif intent == "catalog_query":
-        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="catalog")
-        draft = compliance_faq.run_catalog(user_message, session)
-
-    elif intent == "eligibility_check":
-        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="eligibility")
-        session.update_profile("eligibility_target", user_message)
-        response, done = compliance_faq.run_eligibility(user_message, routing, session, is_new_check=True)
-        if not done:
-            _eligibility_sessions.add(session_id)
-            clean = _guardrails(response)
-            session.add(user_message, clean)
-            return clean
-        draft = response
-
-    elif intent == "existing_cardholder":
-        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="cardholder_service")
-        draft = cardholder_svc.run(user_message, routing, session)
-
-    elif intent == "i_need_a_credit_card":
-        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="product_advisor")
-        draft = product_advisor.run(user_message, routing, session)
-
-    elif intent == "how_to_apply":
-        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="how_to_apply")
-        draft = compliance_faq.run_apply(user_message, routing, session)
-
-    elif intent == "product_details":
-        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="product_details")
-        draft = product_advisor.run_details(user_message, routing, session)
-
-    else:
-        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="faq_compliance")
-        draft = compliance_faq.run_faq(user_message, routing, session)
 
     final_response = synthesis_agent.run(draft, user_message)
     clean = _guardrails(final_response)
@@ -619,3 +633,280 @@ def _handle_intent(
         latency_ms=round((time.perf_counter() - started) * 1000, 2),
     )
     return clean
+
+
+def build_crew_stream(
+    user_message: str,
+    session: SessionMemory,
+    request_id: str | None = None,
+) -> Generator[str, None, None]:
+    started = time.perf_counter()
+    session_id = session.session_id
+    in_eligibility = session_id in _eligibility_sessions
+    in_discovery = session_id in _discovery_sessions
+    history = session.get_history_str(max_chars=500)
+
+    if in_discovery:
+        result = _handle_discovery_stream(user_message, session, request_id, started)
+        if result is not None:
+            yield result
+            return
+
+    if in_eligibility:
+        result = _handle_eligibility_nonstream(user_message, session, request_id, started)
+        if result is not None:
+            yield result
+            return
+
+    classifier_output = classify(user_message, history)
+    log_event(
+        "classifier_result",
+        request_id=request_id,
+        session_id=session_id,
+        intent=classifier_output.get("intent"),
+        banking_type=classifier_output.get("banking_type"),
+        intent_score=round(classifier_output.get("intent_score", 0.0), 4),
+        banking_score=round(classifier_output.get("banking_score", 0.0), 4),
+    )
+
+    intent = classifier_output["intent"]
+
+    if intent in ("i_need_a_credit_card", "catalog_query") and len(session.history) == 0:
+        result = _handle_first_message_discovery(user_message, classifier_output, session, request_id, started)
+        if result is not None:
+            yield result
+            return
+
+    draft, mode = _get_draft(user_message, classifier_output, session, request_id)
+
+    if mode == "no_synth":
+        clean = _guardrails(draft)
+        session.add(user_message, clean)
+        log_event(
+            "pipeline_complete",
+            request_id=request_id,
+            session_id=session_id,
+            intent=intent,
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+        )
+        yield clean
+        return
+
+    collected = []
+    for token in synthesis_agent.run_stream(draft, user_message):
+        collected.append(token)
+        yield token
+
+    full_response = "".join(collected)
+    clean = _guardrails(full_response)
+    session.add(user_message, clean)
+    log_event(
+        "pipeline_complete_stream",
+        request_id=request_id,
+        session_id=session_id,
+        intent=intent,
+        response_chars=len(clean),
+        latency_ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+
+
+def _handle_discovery_stream(
+    user_message: str,
+    session: SessionMemory,
+    request_id: str | None,
+    started: float,
+) -> str | None:
+    session_id = session.session_id
+    state = _discovery_sessions.get(session_id, {"step": 0, "retries": 0})
+    step = state.get("step", 0)
+    history = session.get_history_str(max_chars=500)
+
+    classifier_output = classify(user_message, history)
+    log_event(
+        "classifier_result",
+        request_id=request_id,
+        session_id=session_id,
+        intent=classifier_output.get("intent"),
+        banking_type=classifier_output.get("banking_type"),
+        intent_score=round(classifier_output.get("intent_score", 0.0), 4),
+        banking_score=round(classifier_output.get("banking_score", 0.0), 4),
+    )
+
+    breakout_intents = {"comparison", "eligibility_check", "existing_cardholder", "how_to_apply", "product_details"}
+    if classifier_output["intent"] in breakout_intents:
+        _discovery_sessions.pop(session_id, None)
+        return None
+
+    if step == 0:
+        banking_pref = _detect_banking_preference(user_message)
+
+        if banking_pref:
+            session.update_profile("banking_preference", banking_pref)
+
+            original_filters = state.get("filters", {})
+            original_filters["banking_type"] = banking_pref
+            merged_response = _build_dynamic_card_response(original_filters)
+
+            if merged_response:
+                state["banking_type"] = banking_pref
+                state["step"] = 1
+                state["retries"] = 0
+                state["filters"] = original_filters
+                _discovery_sessions[session_id] = state
+
+                clean = _guardrails(merged_response)
+                session.add(user_message, clean)
+                return clean
+            else:
+                response = _build_filtered_card_response(banking_pref)
+                state["banking_type"] = banking_pref
+                state["step"] = 1
+                state["retries"] = 0
+                _discovery_sessions[session_id] = state
+
+                clean = _guardrails(response)
+                session.add(user_message, clean)
+                return clean
+        else:
+            state["retries"] = state.get("retries", 0) + 1
+            if state["retries"] >= MAX_DISCOVERY_RETRIES:
+                _discovery_sessions.pop(session_id, None)
+                return None
+            else:
+                _discovery_sessions[session_id] = state
+                response = (
+                    "Could you please specify — would you prefer "
+                    "**conventional** or **Islamic (Shariah-compliant)** banking?"
+                )
+                session.add(user_message, response)
+                return response
+
+    elif step == 1:
+        banking_type = state.get("banking_type", "both")
+        _discovery_sessions.pop(session_id, None)
+
+        routing = {
+            "intent": "i_need_a_credit_card",
+            "banking_type": banking_type,
+            "collection": f"{banking_type}_credit_i_need_a_credit_card",
+            "search_query": user_message,
+        }
+
+        draft = product_advisor.run(user_message, routing, session)
+        final_response = synthesis_agent.run(draft, user_message)
+        clean = _guardrails(final_response)
+        session.add(user_message, clean)
+        return clean
+
+    return None
+
+
+def _handle_eligibility_nonstream(
+    user_message: str,
+    session: SessionMemory,
+    request_id: str | None,
+    started: float,
+) -> str | None:
+    session_id = session.session_id
+    history = session.get_history_str(max_chars=500)
+
+    classifier_output = classify(user_message, history)
+    log_event(
+        "classifier_result",
+        request_id=request_id,
+        session_id=session_id,
+        intent=classifier_output.get("intent"),
+        banking_type=classifier_output.get("banking_type"),
+        intent_score=round(classifier_output.get("intent_score", 0.0), 4),
+        banking_score=round(classifier_output.get("banking_score", 0.0), 4),
+    )
+
+    text = user_message.strip().lower()
+    if text in ("skip", "cancel", "stop", "exit", "nevermind", "never mind"):
+        _eligibility_sessions.discard(session_id)
+        return None
+
+    log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="eligibility")
+    response, done = compliance_faq.run_eligibility(user_message, {"banking_type": "both"}, session, is_new_check=False)
+    if not done:
+        clean = _guardrails(response)
+        session.add(user_message, clean)
+        return clean
+
+    _eligibility_sessions.discard(session_id)
+    draft = response
+    final_response = synthesis_agent.run(draft, user_message)
+    clean = _guardrails(final_response)
+    session.add(user_message, clean)
+    log_event(
+        "pipeline_complete",
+        request_id=request_id,
+        session_id=session_id,
+        intent="eligibility_check",
+        latency_ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+    return clean
+
+
+def _handle_first_message_discovery(
+    user_message: str,
+    classifier_output: dict,
+    session: SessionMemory,
+    request_id: str | None,
+    started: float,
+) -> str | None:
+    session_id = session.session_id
+    banking_type = classifier_output["banking_type"]
+
+    if _needs_filter_extraction(user_message, banking_type):
+        filters = _detect_card_filters(user_message)
+    else:
+        filters = {}
+
+    if "banking_type" not in filters and banking_type in ("conventional", "islami"):
+        filters["banking_type"] = banking_type
+
+    if filters:
+        response = _build_dynamic_card_response(filters)
+        if response:
+            bt = filters.get("banking_type", banking_type)
+            if bt in ("conventional", "islami"):
+                session.update_profile("banking_preference", bt)
+                _discovery_sessions[session_id] = {
+                    "step": 1,
+                    "banking_type": bt,
+                    "filters": filters,
+                    "retries": 0,
+                }
+            else:
+                _discovery_sessions[session_id] = {
+                    "step": 0,
+                    "filters": filters,
+                    "retries": 0,
+                }
+
+            clean = _guardrails(response)
+            session.add(user_message, clean)
+            log_event(
+                "discovery_response",
+                request_id=request_id,
+                session_id=session_id,
+                filters=str(filters),
+                latency_ms=round((time.perf_counter() - started) * 1000, 2),
+            )
+            return clean
+
+    discovery_response = _build_all_cards_response()
+    if discovery_response:
+        _discovery_sessions[session_id] = {"step": 0, "filters": {}, "retries": 0}
+        clean = _guardrails(discovery_response)
+        session.add(user_message, clean)
+        log_event(
+            "discovery_response",
+            request_id=request_id,
+            session_id=session_id,
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+        )
+        return clean
+
+    return None

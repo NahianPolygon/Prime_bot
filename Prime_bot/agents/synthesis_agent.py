@@ -1,5 +1,6 @@
 import re
-from llm.ollama_client import chat
+from typing import Generator
+from llm.ollama_client import chat, chat_stream
 
 SYSTEM = """You are the Prime Bank Response Synthesizer. You clean up and reformat a draft answer.
 
@@ -54,6 +55,15 @@ def _draft_is_clean(draft: str) -> bool:
     return False
 
 
+def _build_prompt(draft: str, user_message: str) -> str:
+    return f"""User question: "{user_message}"
+
+Draft to reformat:
+{draft}
+
+Reformat this draft. Do not add any new information. Remove any product_id or internal codes like CARD_001 or ISLAMI_CARD_002. Replace them with the actual card name from context or remove the reference entirely."""
+
+
 def run(draft: str, user_message: str) -> str:
     if not draft or len(draft.strip()) < 15:
         return FALLBACK
@@ -70,12 +80,7 @@ def run(draft: str, user_message: str) -> str:
     if _draft_is_clean(draft):
         return draft
 
-    prompt = f"""User question: "{user_message}"
-
-Draft to reformat:
-{draft}
-
-Reformat this draft. Do not add any new information. Remove any product_id or internal codes like CARD_001 or ISLAMI_CARD_002. Replace them with the actual card name from context or remove the reference entirely."""
+    prompt = _build_prompt(draft, user_message)
 
     result = chat(
         messages=[{"role": "user", "content": prompt}],
@@ -93,3 +98,34 @@ Reformat this draft. Do not add any new information. Remove any product_id or in
         return draft
 
     return result
+
+
+def run_stream(draft: str, user_message: str) -> Generator[str, None, None]:
+    if not draft or len(draft.strip()) < 15:
+        yield FALLBACK
+        return
+
+    for phrase in GUARDRAIL_PHRASES:
+        if phrase in draft:
+            yield FALLBACK
+            return
+
+    draft = _strip_product_ids(draft)
+
+    if not draft or len(draft.strip()) < 15:
+        yield FALLBACK
+        return
+
+    if _draft_is_clean(draft):
+        yield draft
+        return
+
+    prompt = _build_prompt(draft, user_message)
+
+    for token in chat_stream(
+        messages=[{"role": "user", "content": prompt}],
+        system=SYSTEM,
+        temperature=0.1,
+        max_tokens=1500,
+    ):
+        yield token
