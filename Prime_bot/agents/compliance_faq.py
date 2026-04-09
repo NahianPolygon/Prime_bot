@@ -25,12 +25,14 @@ You assess whether a user qualifies for Prime Bank credit cards.
 
 You MUST:
 - Compare the user's profile against eligibility criteria in the chunks
+- Use the pre-computed annual_income from the profile — do NOT calculate it yourself
 - For EACH card assessed give: ✅ Likely Eligible | ❌ Likely Ineligible | ⚠️ Borderline
 - Always use the actual card name (e.g. "Visa Gold", "Mastercard Platinum") not internal codes
 - If ineligible, suggest alternatives from the chunks using their actual card names
 
 You MUST NOT:
 - Invent eligibility criteria not in the chunks
+- Calculate or estimate annual income yourself — use only the annual_income provided in the profile
 - Display product_id, internal IDs, or system codes like CARD_001 or ISLAMI_CARD_001
 """
 
@@ -295,6 +297,28 @@ def clear_eligibility_fields(session: SessionMemory):
             session.user_profile[field] = ""
 
 
+def _enrich_profile_str(session: SessionMemory) -> str:
+    profile = session.user_profile
+    if not profile:
+        return "No user profile information collected yet."
+
+    lines = []
+    for k, v in profile.items():
+        lines.append(f"- {k}: {v}")
+
+    monthly = profile.get("monthly_income")
+    if monthly:
+        try:
+            monthly_int = int(monthly)
+            annual = monthly_int * 12
+            annual_lakh = annual / 100000
+            lines.append(f"- annual_income: {annual} BDT ({annual_lakh:.1f} lakh)")
+        except (ValueError, TypeError):
+            pass
+
+    return "Known about user:\n" + "\n".join(lines)
+
+
 def run_eligibility(
     user_message: str,
     routing: dict,
@@ -341,7 +365,7 @@ def run_eligibility(
 
     context = _clean_context(context)
 
-    profile_str = session.get_profile_str()
+    profile_str = _enrich_profile_str(session)
 
     if target:
         focus = f"""The user specifically asked about: "{target}"
@@ -359,7 +383,7 @@ User profile:
 
 {focus}
 
-Provide your eligibility assessment now."""
+Provide your eligibility assessment now. Use the annual_income value from the profile directly — do not calculate it yourself."""
 
     response = chat(
         messages=[{"role": "user", "content": prompt}],
