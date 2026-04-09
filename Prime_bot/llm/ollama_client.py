@@ -9,6 +9,7 @@ with open("config.yaml") as f:
 
 OLLAMA_BASE_URL = cfg["llm"].get("base_url", "http://localhost:11434")
 OLLAMA_MODEL = cfg["llm"]["model"]
+OLLAMA_KEEP_ALIVE = cfg["llm"].get("keep_alive", "5m")
 
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
@@ -24,6 +25,7 @@ def chat(
     payload = {
         "model": OLLAMA_MODEL,
         "stream": False,
+        "keep_alive": OLLAMA_KEEP_ALIVE,
         "messages": [],
         "options": {
             "temperature": temperature,

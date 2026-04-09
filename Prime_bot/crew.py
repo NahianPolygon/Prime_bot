@@ -2,6 +2,7 @@ from classifier.intent_classifier import classify
 from memory.session_memory import SessionMemory
 from tools.rag_tool import list_all_products
 import re
+import json
 import time
 import agents.product_advisor as product_advisor
 import agents.cardholder_svc as cardholder_svc
@@ -20,6 +21,34 @@ _discovery_sessions: dict[str, dict] = {}
 SERVICE_ID_PATTERNS = {"_services_", "cardholder_services", "conv_services", "islami_services"}
 
 MAX_DISCOVERY_RETRIES = 3
+
+FILTER_EXTRACT_SYSTEM = """You extract credit card filters from a user's message.
+
+Return ONLY a JSON object with these optional keys:
+- banking_type: "conventional" or "islami" (if user mentions islamic, shariah, halal, hasanah, conventional, regular, standard)
+- network: "visa" or "mastercard" or "jcb" (if user mentions a specific card network)
+- tier: "gold" or "platinum" or "world" (if user mentions a specific card tier/level)
+
+Rules:
+- Only include keys where the user clearly expressed a preference
+- "halal", "shariah", "islamic" means banking_type is "islami"
+- "regular", "standard", "conventional" means banking_type is "conventional"
+- "premium", "high-end", "top-tier" means tier is "world"
+- "mid-range", "mid-tier" means tier is "platinum"
+- "basic", "entry", "starter", "beginner" means tier is "gold"
+- Return {} if no specific filter can be determined
+
+Examples:
+"I need a halal credit card" -> {"banking_type": "islami"}
+"Show me all Visa cards" -> {"network": "visa"}
+"What platinum cards do you have" -> {"tier": "platinum"}
+"Show me Islamic gold cards" -> {"banking_type": "islami", "tier": "gold"}
+"I want a premium Mastercard" -> {"network": "mastercard", "tier": "world"}
+"Show me entry level cards" -> {"tier": "gold"}
+"I need a credit card" -> {}
+"What cards do you offer" -> {}
+
+JSON only. No explanation."""
 
 
 def _guardrails(response: str) -> str:
@@ -69,6 +98,121 @@ Respond ONLY with JSON: {"banking_type": "<type>"}"""
     return None
 
 
+def _detect_card_filters(user_message: str) -> dict:
+    from llm.ollama_client import chat as llm_chat
+
+    result = llm_chat(
+        messages=[{"role": "user", "content": user_message}],
+        system=FILTER_EXTRACT_SYSTEM,
+        temperature=0.0,
+        max_tokens=200,
+    )
+
+    try:
+        cleaned = re.sub(r'```(?:json)?', '', result).strip()
+        match = re.search(r'\{[^{}]*\}', cleaned, re.DOTALL)
+        if match:
+            parsed = json.loads(match.group())
+            valid = {}
+            if parsed.get("banking_type") in ("conventional", "islami"):
+                valid["banking_type"] = parsed["banking_type"]
+            if parsed.get("network") in ("visa", "mastercard", "jcb"):
+                valid["network"] = parsed["network"]
+            if parsed.get("tier") in ("gold", "platinum", "world"):
+                valid["tier"] = parsed["tier"]
+            return valid
+    except Exception:
+        pass
+
+    return {}
+
+
+def _build_dynamic_card_response(filters: dict) -> str | None:
+    all_products = list_all_products()
+    if not all_products:
+        return None
+
+    cards = [p for p in all_products if not _is_service_product(p)]
+
+    filter_labels = []
+
+    if "banking_type" in filters:
+        cards = [p for p in cards if p["banking_type"] == filters["banking_type"]]
+        label = "Conventional" if filters["banking_type"] == "conventional" else "Islamic (Shariah-compliant)"
+        filter_labels.append(label)
+
+    if "network" in filters:
+        cards = [p for p in cards if (p.get("card_network") or "").lower() == filters["network"]]
+        filter_labels.append(filters["network"].capitalize())
+
+    if "tier" in filters:
+        cards = [p for p in cards if (p.get("tier") or "").lower() == filters["tier"]]
+        filter_labels.append(filters["tier"].capitalize())
+
+    if not cards:
+        filter_desc = " ".join(filter_labels) if filter_labels else ""
+        return (
+            f"I couldn't find any {filter_desc} cards in my catalog. "
+            "Please contact Prime Bank at **16218** for assistance."
+        )
+
+    filter_desc = " ".join(filter_labels) if filter_labels else ""
+    has_banking = "banking_type" in filters
+
+    conventional = [p for p in cards if p["banking_type"] == "conventional"]
+    islami = [p for p in cards if p["banking_type"] == "islami"]
+
+    lines = [f"Here are Prime Bank's **{filter_desc}** credit cards ({len(cards)} found):\n"]
+
+    if conventional:
+        if not has_banking:
+            lines.append("**Conventional Banking:**")
+        for p in conventional:
+            name = p["product_name"]
+            parts = [f"  - **{name}**"]
+            if p.get("card_network") and "network" not in filters:
+                parts.append(f"({p['card_network']})")
+            if p.get("tier") and "tier" not in filters:
+                parts.append(f"— {p['tier'].capitalize()}")
+            lines.append(" ".join(parts))
+
+    if islami:
+        if not has_banking:
+            lines.append("\n**Islamic (Shariah-compliant) Banking:**")
+        for p in islami:
+            name = p["product_name"]
+            parts = [f"  - **{name}**"]
+            if p.get("card_network") and "network" not in filters:
+                parts.append(f"({p['card_network']})")
+            if p.get("tier") and "tier" not in filters:
+                parts.append(f"— {p['tier'].capitalize()}")
+            lines.append(" ".join(parts))
+
+    lines.append("")
+
+    if has_banking:
+        if len(cards) <= 3:
+            lines.append(
+                "Would you like to see details about any of these cards, "
+                "compare them, or check your eligibility?"
+            )
+        else:
+            lines.append(
+                "What will be the primary use case for your card — **travel**, **dining**, "
+                "**shopping**, **rewards**, or **premium lifestyle**?"
+            )
+    elif len(conventional) > 0 and len(islami) > 0:
+        lines.append(
+            "Would you prefer **conventional** or **Islamic (Shariah-compliant)** banking?"
+        )
+    else:
+        lines.append(
+            "Would you like details about any of these cards, or shall I recommend one based on your needs?"
+        )
+
+    return "\n".join(lines)
+
+
 def _build_filtered_card_response(banking_type: str) -> str:
     all_products = list_all_products()
     cards = [
@@ -101,10 +245,16 @@ def _build_filtered_card_response(banking_type: str) -> str:
             lines.append(f"  - **{name}**{network}")
         lines.append("")
 
-    lines.append(
-        "What will be the primary use case for your card — **travel**, **dining**, "
-        "**shopping**, **rewards**, or **premium lifestyle**?"
-    )
+    if len(cards) <= 3:
+        lines.append(
+            "Would you like to see details about any of these cards, "
+            "compare them, or check your eligibility?"
+        )
+    else:
+        lines.append(
+            "What will be the primary use case for your card — **travel**, **dining**, "
+            "**shopping**, **rewards**, or **premium lifestyle**?"
+        )
     return "\n".join(lines)
 
 
@@ -152,6 +302,21 @@ def _build_all_cards_response() -> str | None:
     )
 
 
+def _needs_filter_extraction(user_message: str, banking_type: str) -> bool:
+    if banking_type in ("conventional", "islami"):
+        return True
+    msg_lower = user_message.lower()
+    return any(
+        term in msg_lower
+        for term in (
+            "visa", "mastercard", "jcb", "gold", "platinum", "world",
+            "premium", "entry", "basic", "starter", "top-tier", "high-end",
+            "mid-range", "mid-tier", "halal", "islamic", "shariah", "hasanah",
+            "conventional", "regular", "standard",
+        )
+    )
+
+
 def build_crew(user_message: str, session: SessionMemory, request_id: str | None = None) -> str:
     started = time.perf_counter()
     session_id = session.session_id
@@ -184,23 +349,40 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
 
             if banking_pref:
                 session.update_profile("banking_preference", banking_pref)
-                state["banking_type"] = banking_pref
-                state["step"] = 1
-                state["retries"] = 0
-                _discovery_sessions[session_id] = state
 
-                response = _build_filtered_card_response(banking_pref)
-                clean = _guardrails(response)
-                session.add(user_message, clean)
-                log_event(
-                    "discovery_step",
-                    request_id=request_id,
-                    session_id=session_id,
-                    step=1,
-                    banking_type=banking_pref,
-                    latency_ms=round((time.perf_counter() - started) * 1000, 2),
-                )
-                return clean
+                original_filters = state.get("filters", {})
+                original_filters["banking_type"] = banking_pref
+                merged_response = _build_dynamic_card_response(original_filters)
+
+                if merged_response:
+                    state["banking_type"] = banking_pref
+                    state["step"] = 1
+                    state["retries"] = 0
+                    state["filters"] = original_filters
+                    _discovery_sessions[session_id] = state
+
+                    clean = _guardrails(merged_response)
+                    session.add(user_message, clean)
+                    log_event(
+                        "discovery_step",
+                        request_id=request_id,
+                        session_id=session_id,
+                        step=1,
+                        banking_type=banking_pref,
+                        filters=str(original_filters),
+                        latency_ms=round((time.perf_counter() - started) * 1000, 2),
+                    )
+                    return clean
+                else:
+                    response = _build_filtered_card_response(banking_pref)
+                    state["banking_type"] = banking_pref
+                    state["step"] = 1
+                    state["retries"] = 0
+                    _discovery_sessions[session_id] = state
+
+                    clean = _guardrails(response)
+                    session.add(user_message, clean)
+                    return clean
             else:
                 state["retries"] = state.get("retries", 0) + 1
                 if state["retries"] >= MAX_DISCOVERY_RETRIES:
@@ -294,10 +476,50 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
 
     intent = classifier_output["intent"]
 
-    if intent == "i_need_a_credit_card" and len(session.history) == 0:
+    if intent in ("i_need_a_credit_card", "catalog_query") and len(session.history) == 0:
+        banking_type = classifier_output["banking_type"]
+
+        if _needs_filter_extraction(user_message, banking_type):
+            filters = _detect_card_filters(user_message)
+        else:
+            filters = {}
+
+        if "banking_type" not in filters and banking_type in ("conventional", "islami"):
+            filters["banking_type"] = banking_type
+
+        if filters:
+            response = _build_dynamic_card_response(filters)
+            if response:
+                bt = filters.get("banking_type", banking_type)
+                if bt in ("conventional", "islami"):
+                    session.update_profile("banking_preference", bt)
+                    _discovery_sessions[session_id] = {
+                        "step": 1,
+                        "banking_type": bt,
+                        "filters": filters,
+                        "retries": 0,
+                    }
+                else:
+                    _discovery_sessions[session_id] = {
+                        "step": 0,
+                        "filters": filters,
+                        "retries": 0,
+                    }
+
+                clean = _guardrails(response)
+                session.add(user_message, clean)
+                log_event(
+                    "discovery_response",
+                    request_id=request_id,
+                    session_id=session_id,
+                    filters=str(filters),
+                    latency_ms=round((time.perf_counter() - started) * 1000, 2),
+                )
+                return clean
+
         discovery_response = _build_all_cards_response()
         if discovery_response:
-            _discovery_sessions[session_id] = {"step": 0, "retries": 0}
+            _discovery_sessions[session_id] = {"step": 0, "filters": {}, "retries": 0}
             clean = _guardrails(discovery_response)
             session.add(user_message, clean)
             log_event(

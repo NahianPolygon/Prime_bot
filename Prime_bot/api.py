@@ -1,6 +1,8 @@
 import os
 import uuid
 import yaml
+import time
+import threading
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -16,6 +18,22 @@ from crew import build_crew
 app = FastAPI(title="Prime Bank Credit Card Assistant", version="1.0.0")
 
 
+def _warmup_model() -> None:
+    try:
+        from llm.ollama_client import chat as llm_chat
+        started = time.perf_counter()
+        llm_chat(
+            messages=[{"role": "user", "content": "warmup"}],
+            system="Reply with OK.",
+            temperature=0.0,
+            max_tokens=1,
+            think=False,
+        )
+        log_event("llm_warmup_complete", latency_ms=round((time.perf_counter() - started) * 1000, 2))
+    except Exception as e:
+        log_event("llm_warmup_error", level="error", error=str(e))
+
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
@@ -28,6 +46,14 @@ class ChatResponse(BaseModel):
 
 class ClearRequest(BaseModel):
     session_id: str
+
+
+@app.on_event("startup")
+async def startup_event():
+    if _cfg.get("llm", {}).get("warmup_on_start", True):
+        thread = threading.Thread(target=_warmup_model, daemon=True)
+        thread.start()
+        log_event("llm_warmup_started")
 
 
 @app.post("/chat", response_model=ChatResponse)
