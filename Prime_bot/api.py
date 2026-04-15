@@ -4,9 +4,9 @@ import yaml
 import time
 import json
 import threading
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from logging_utils import log_event
 
@@ -14,7 +14,7 @@ with open("config.yaml") as f:
     _cfg = yaml.safe_load(f)
 
 from memory.session_memory import get_session, clear_session
-from crew import build_crew, build_crew_stream
+from crew import build_crew_stream
 
 app = FastAPI(title="Prime Bank Credit Card Assistant", version="1.0.0")
 
@@ -35,16 +35,6 @@ def _warmup_model() -> None:
         log_event("llm_warmup_error", level="error", error=str(e))
 
 
-class ChatRequest(BaseModel):
-    message: str
-    session_id: str | None = None
-
-
-class ChatResponse(BaseModel):
-    response: str
-    session_id: str
-
-
 class ClearRequest(BaseModel):
     session_id: str
 
@@ -57,69 +47,67 @@ async def startup_event():
         log_event("llm_warmup_started")
 
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(req: ChatRequest):
-    if not req.message or not req.message.strip():
-        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+@app.websocket("/ws/chat")
+async def websocket_chat(websocket: WebSocket):
+    await websocket.accept()
+    session_id: str | None = None
+    log_event("ws_connected")
 
-    request_id = str(uuid.uuid4())
-    session_id = req.session_id or str(uuid.uuid4())
-    session = get_session(session_id)
-    log_event(
-        "chat_request",
-        request_id=request_id,
-        session_id=session_id,
-        message_chars=len(req.message.strip()),
-    )
-    response = build_crew(req.message.strip(), session, request_id=request_id)
-    log_event(
-        "chat_response",
-        request_id=request_id,
-        session_id=session_id,
-        response_chars=len(response),
-    )
-    return ChatResponse(response=response, session_id=session_id)
+    try:
+        while True:
+            raw = await websocket.receive_text()
 
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({"type": "error", "message": "Invalid JSON"}))
+                continue
 
-@app.post("/chat/stream")
-async def chat_stream_endpoint(req: ChatRequest):
-    if not req.message or not req.message.strip():
-        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+            msg_type = data.get("type")
 
-    request_id = str(uuid.uuid4())
-    session_id = req.session_id or str(uuid.uuid4())
-    session = get_session(session_id)
-    log_event(
-        "chat_stream_request",
-        request_id=request_id,
-        session_id=session_id,
-        message_chars=len(req.message.strip()),
-    )
+            if msg_type == "ping":
+                await websocket.send_text(json.dumps({"type": "pong"}))
+                continue
 
-    def event_generator():
-        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
+            if msg_type == "clear":
+                sid = data.get("session_id") or session_id
+                if sid:
+                    clear_session(sid)
+                    log_event("session_cleared", session_id=sid)
+                session_id = None
+                await websocket.send_text(json.dumps({"type": "cleared"}))
+                continue
 
-        for token in build_crew_stream(req.message.strip(), session, request_id=request_id):
-            yield f"data: {json.dumps({'token': token})}\n\n"
+            if msg_type != "message":
+                await websocket.send_text(json.dumps({"type": "error", "message": f"Unknown type: {msg_type}"}))
+                continue
 
-        yield f"data: {json.dumps({'done': True})}\n\n"
+            message = (data.get("message") or "").strip()
+            if not message:
+                await websocket.send_text(json.dumps({"type": "error", "message": "Message cannot be empty."}))
+                continue
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+            if not session_id:
+                session_id = data.get("session_id") or str(uuid.uuid4())
 
+            session = get_session(session_id)
+            request_id = str(uuid.uuid4())
 
-@app.post("/clear")
-async def clear_endpoint(req: ClearRequest):
-    clear_session(req.session_id)
-    log_event("session_cleared", session_id=req.session_id)
-    return {"status": "ok"}
+            log_event("ws_chat_request", request_id=request_id, session_id=session_id, message_chars=len(message))
+            await websocket.send_text(json.dumps({"type": "session_id", "session_id": session_id}))
+
+            try:
+                for token in build_crew_stream(message, session, request_id=request_id):
+                    await websocket.send_text(json.dumps({"type": "token", "token": token}))
+                await websocket.send_text(json.dumps({"type": "done"}))
+                log_event("ws_chat_complete", request_id=request_id, session_id=session_id)
+
+            except Exception as e:
+                log_event("ws_stream_error", request_id=request_id, session_id=session_id, error=str(e))
+                await websocket.send_text(json.dumps({"type": "error", "message": "Stream error. Please try again."}))
+
+    except WebSocketDisconnect:
+        log_event("ws_disconnected", session_id=session_id)
 
 
 @app.get("/health")

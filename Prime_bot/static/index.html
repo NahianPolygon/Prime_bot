@@ -93,37 +93,10 @@
     .bubble.bot code, .bubble-text code { font-family: var(--font-mono); font-size: 12px; background: var(--bg); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); }
     .bubble.bot blockquote, .bubble-text blockquote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--text-secondary); margin: 8px 0; font-style: italic; }
 
-    .table-wrapper {
-      width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .table-wrapper table {
-      border-collapse: collapse;
-      width: max-content;
-      min-width: 100%;
-      font-size: 13px;
-      margin: 0;
-      background: white;
-    }
-    .table-wrapper th {
-      background: #f0f5ff;
-      font-weight: 600;
-      white-space: nowrap;
-      padding: 9px 14px;
-      border: 1px solid var(--border);
-      color: var(--accent);
-    }
-    .table-wrapper td {
-      padding: 8px 14px;
-      border: 1px solid var(--border);
-      vertical-align: top;
-      min-width: 110px;
-      max-width: 260px;
-      word-break: break-word;
-    }
+    .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .table-wrapper table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 13px; margin: 0; background: white; }
+    .table-wrapper th { background: #f0f5ff; font-weight: 600; white-space: nowrap; padding: 9px 14px; border: 1px solid var(--border); color: var(--accent); }
+    .table-wrapper td { padding: 8px 14px; border: 1px solid var(--border); vertical-align: top; min-width: 110px; max-width: 260px; word-break: break-word; }
     .table-wrapper tbody tr:nth-child(even) { background: #f7f9ff; }
     .table-wrapper tbody tr:hover { background: #eef3fd; }
 
@@ -167,7 +140,7 @@
     </div>
     <div class="header-actions">
       <div class="status-dot" id="statusDot"></div>
-      <span class="status-text" id="statusText">Online</span>
+      <span class="status-text" id="statusText">Connecting...</span>
       <button class="btn-clear" onclick="clearConversation()">New chat</button>
     </div>
   </header>
@@ -196,7 +169,7 @@
         <textarea id="inputBox" placeholder="Ask about credit cards, eligibility, fees..." rows="1"
           onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
       </div>
-      <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
         <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       </button>
     </div>
@@ -208,18 +181,179 @@
 </div>
 
 <script>
-  let sessionId = null;
-  let isLoading = false;
-  let streamController = null;
-
-  const messagesEl = document.getElementById("messages");
-  const welcomeEl  = document.getElementById("welcome");
-  const inputEl    = document.getElementById("inputBox");
-  const sendBtnEl  = document.getElementById("sendBtn");
-  const statusDot  = document.getElementById("statusDot");
-  const statusText = document.getElementById("statusText");
-
   marked.setOptions({ breaks: true, gfm: true });
+
+  const messagesEl  = document.getElementById("messages");
+  const welcomeEl   = document.getElementById("welcome");
+  const inputEl     = document.getElementById("inputBox");
+  const sendBtnEl   = document.getElementById("sendBtn");
+  const statusDot   = document.getElementById("statusDot");
+  const statusText  = document.getElementById("statusText");
+
+  let sessionId       = null;
+  let isLoading       = false;
+  let ws              = null;
+  let wsReady         = false;
+  let reconnectDelay  = 1000;
+  let reconnectTimer  = null;
+  let pingInterval    = null;
+  let activeBubble    = null;
+  let activeThinkId   = null;
+  let fullText        = "";
+
+  function wsUrl() {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    return `${proto}://${location.host}/ws/chat`;
+  }
+
+  function connect() {
+    if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
+
+    setStatus("connecting");
+    ws = new WebSocket(wsUrl());
+
+    ws.onopen = () => {
+      wsReady = true;
+      reconnectDelay = 1000;
+      setStatus("online");
+      setInputEnabled(true);
+      inputEl.focus();
+      pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+      }, 25000);
+    };
+
+    ws.onmessage = (evt) => {
+      let data;
+      try { data = JSON.parse(evt.data); } catch { return; }
+      handleServerMessage(data);
+    };
+
+    ws.onclose = () => {
+      wsReady = false;
+      clearInterval(pingInterval);
+      setStatus("offline");
+      setInputEnabled(false);
+      if (isLoading) finishLoading();
+      reconnectTimer = setTimeout(() => {
+        reconnectDelay = Math.min(reconnectDelay * 2, 16000);
+        connect();
+      }, reconnectDelay);
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
+  }
+
+  function handleServerMessage(data) {
+    switch (data.type) {
+      case "session_id":
+        sessionId = data.session_id;
+        break;
+
+      case "token":
+        if (!activeBubble) {
+          if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
+          const created = createBotBubble();
+          activeBubble = created.bubble;
+          fullText = "";
+        }
+        fullText += data.token;
+        renderBotBubble(activeBubble, fullText);
+        scrollToBottom();
+        break;
+
+      case "done":
+        activeBubble = null;
+        fullText = "";
+        finishLoading();
+        break;
+
+      case "cleared":
+        sessionId = null;
+        break;
+
+      case "error":
+        if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
+        activeBubble = null;
+        fullText = "";
+        appendBubble("bot", "Sorry, something went wrong. Please try again or call **16218**.");
+        finishLoading();
+        break;
+
+      case "pong":
+        break;
+    }
+  }
+
+  function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text || isLoading || !wsReady) return;
+
+    if (welcomeEl) welcomeEl.style.display = "none";
+    appendBubble("user", text);
+    inputEl.value = "";
+    inputEl.style.height = "auto";
+
+    activeThinkId = showThinking();
+    startLoading();
+
+    ws.send(JSON.stringify({ type: "message", message: text, session_id: sessionId }));
+  }
+
+  function sendSuggestion(text) {
+    inputEl.value = text;
+    autoResize(inputEl);
+    sendMessage();
+  }
+
+  function startLoading() {
+    isLoading = true;
+    sendBtnEl.disabled = true;
+    inputEl.disabled = true;
+  }
+
+  function finishLoading() {
+    isLoading = false;
+    if (wsReady) {
+      sendBtnEl.disabled = false;
+      inputEl.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  function setInputEnabled(enabled) {
+    if (!isLoading) {
+      sendBtnEl.disabled = !enabled;
+      inputEl.disabled = !enabled;
+    }
+  }
+
+  function setStatus(s) {
+    const map = {
+      online:     { color: "#22c55e", anim: "pulse-dot 2s infinite", label: "Online" },
+      offline:    { color: "#ef4444", anim: "none",                  label: "Reconnecting..." },
+      connecting: { color: "#f59e0b", anim: "pulse-dot 1s infinite", label: "Connecting..." },
+    };
+    const cfg = map[s] || map.offline;
+    statusDot.style.background  = cfg.color;
+    statusDot.style.animation   = cfg.anim;
+    statusText.textContent      = cfg.label;
+  }
+
+  function clearConversation() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "clear", session_id: sessionId }));
+    }
+    sessionId = null;
+    activeBubble = null;
+    fullText = "";
+    if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
+    messagesEl.querySelectorAll(".message-row").forEach(el => el.remove());
+    if (welcomeEl) welcomeEl.style.display = "flex";
+    if (!isLoading) finishLoading();
+  }
 
   function fixMarkdown(raw) {
     let t = (raw || "").replace(/\r\n/g, "\n");
@@ -236,18 +370,12 @@
 
       if (isPipeLine || isSepLine) {
         if (!inTable) {
-          if (result.length > 0 && result[result.length - 1].trim() !== "") {
-            result.push("");
-          }
+          if (result.length > 0 && result[result.length - 1].trim() !== "") result.push("");
           inTable = true;
           headerSepSeen = false;
         }
-
         if (isSepLine) {
-          if (!headerSepSeen) {
-            headerSepSeen = true;
-            result.push(trimmed);
-          }
+          if (!headerSepSeen) { headerSepSeen = true; result.push(trimmed); }
         } else {
           if (inTable && !headerSepSeen) {
             let nextLine = (i + 1 < lines.length) ? lines[i + 1].trim() : "";
@@ -256,8 +384,7 @@
               result.push(trimmed);
               let cols = (trimmed.match(/\|/g) || []).length - 1;
               if (cols < 1) cols = 1;
-              let sep = "|" + " --- |".repeat(cols);
-              result.push(sep);
+              result.push("|" + " --- |".repeat(cols));
               headerSepSeen = true;
               continue;
             }
@@ -267,21 +394,15 @@
       } else if (inTable && trimmed === "") {
         continue;
       } else {
-        if (inTable) {
-          result.push("");
-          inTable = false;
-          headerSepSeen = false;
-        }
-        if (/^-{3,}$/.test(trimmed) || /^={3,}$/.test(trimmed)) {
-          continue;
-        }
+        if (inTable) { result.push(""); inTable = false; headerSepSeen = false; }
+        if (/^-{3,}$/.test(trimmed) || /^={3,}$/.test(trimmed)) continue;
         result.push(line);
       }
     }
 
     t = result.join("\n");
     t = t.replace(/\n{3,}/g, "\n\n");
-    t = t.replace(/([^\n])\n(#{1,3}\s)/g, "\$1\n\n\$2");
+    t = t.replace(/([^\n])\n(#{1,3}\s)/g, "$1\n\n$2");
     return t.trim();
   }
 
@@ -305,54 +426,41 @@
     const table  = html.slice(tStart, tEnd).trim();
     const after  = html.slice(tEnd).trim();
 
-    if (before) {
-      const d = document.createElement("div");
-      d.className = "bubble-text";
-      d.innerHTML = before;
-      bubble.appendChild(d);
-    }
-
-    const wrapper = document.createElement("div");
-    wrapper.className = "table-wrapper";
-    wrapper.innerHTML = table;
-    bubble.appendChild(wrapper);
-
-    if (after) {
-      const d = document.createElement("div");
-      d.className = "bubble-footer";
-      d.innerHTML = after;
-      bubble.appendChild(d);
-    }
+    if (before) { const d = document.createElement("div"); d.className = "bubble-text"; d.innerHTML = before; bubble.appendChild(d); }
+    const wrapper = document.createElement("div"); wrapper.className = "table-wrapper"; wrapper.innerHTML = table; bubble.appendChild(wrapper);
+    if (after)  { const d = document.createElement("div"); d.className = "bubble-footer"; d.innerHTML = after; bubble.appendChild(d); }
   }
 
-  function autoResize(el) {
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 140) + "px";
+  function createBotBubble() {
+    const row    = document.createElement("div"); row.className = "message-row bot";
+    const avatar = document.createElement("div"); avatar.className = "avatar bot"; avatar.textContent = "P";
+    const bubble = document.createElement("div"); bubble.className = "bubble bot";
+    row.appendChild(avatar); row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    scrollToBottom();
+    return { row, bubble };
   }
 
-  function handleKey(e) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  }
-
-  function sendSuggestion(text) {
-    inputEl.value = text;
-    autoResize(inputEl);
-    sendMessage();
+  function appendBubble(role, text) {
+    const row    = document.createElement("div"); row.className = `message-row ${role}`;
+    const avatar = document.createElement("div"); avatar.className = `avatar ${role}`; avatar.textContent = role === "user" ? "U" : "P";
+    const bubble = document.createElement("div"); bubble.className = `bubble ${role}`;
+    if (role === "bot") renderBotBubble(bubble, text); else bubble.textContent = text;
+    row.appendChild(avatar); row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    scrollToBottom();
   }
 
   function showThinking() {
-    const id = "think_" + Date.now();
+    const id  = "think_" + Date.now();
     const row = document.createElement("div");
-    row.id = id;
-    row.className = "message-row bot";
+    row.id = id; row.className = "message-row bot";
     row.innerHTML = `<div class="avatar bot">P</div>
       <div class="bubble bot" style="padding:0;">
         <div class="thinking-indicator">
           <span class="thinking-text">Thinking</span>
           <div class="thinking-dots">
-            <div class="thinking-dot"></div>
-            <div class="thinking-dot"></div>
-            <div class="thinking-dot"></div>
+            <div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div>
           </div>
         </div>
       </div>`;
@@ -366,195 +474,20 @@
     if (el) el.remove();
   }
 
-  function simulateTypewriter(bubble, fullText, callback) {
-    let index = 0;
-    const speed = 50;
-    let buffer = "";
-
-    function typeNext() {
-      if (index >= fullText.length) {
-        renderBotBubble(bubble, fullText);
-        if (callback) callback();
-        return;
-      }
-
-      const chunkSize = Math.min(3 + Math.floor(Math.random() * 5), fullText.length - index);
-      buffer += fullText.substring(index, index + chunkSize);
-      index += chunkSize;
-
-      renderBotBubble(bubble, buffer);
-      scrollToBottom();
-      setTimeout(typeNext, speed);
-    }
-
-    typeNext();
+  function autoResize(el) {
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 140) + "px";
   }
 
-  function createBotBubble() {
-    const row = document.createElement("div");
-    row.className = "message-row bot";
-
-    const avatar = document.createElement("div");
-    avatar.className = "avatar bot";
-    avatar.textContent = "P";
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble bot";
-
-    row.appendChild(avatar);
-    row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    scrollToBottom();
-
-    return { row, bubble };
+  function handleKey(e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   }
 
-  function appendBubble(role, text) {
-    const row = document.createElement("div");
-    row.className = `message-row ${role}`;
-
-    const avatar = document.createElement("div");
-    avatar.className = `avatar ${role}`;
-    avatar.textContent = role === "user" ? "U" : "P";
-
-    const bubble = document.createElement("div");
-    bubble.className = `bubble ${role}`;
-
-    if (role === "bot") {
-      renderBotBubble(bubble, text);
-    } else {
-      bubble.textContent = text;
-    }
-
-    row.appendChild(avatar);
-    row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    scrollToBottom();
+  function scrollToBottom() {
+    requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; });
   }
 
-  async function sendMessage() {
-    const text = inputEl.value.trim();
-    if (!text || isLoading) return;
-
-    if (welcomeEl) welcomeEl.style.display = "none";
-    appendBubble("user", text);
-    inputEl.value = "";
-    inputEl.style.height = "auto";
-
-    const thinkingId = showThinking();
-    setLoading(true);
-
-    try {
-      streamController = new AbortController();
-
-      const res = await fetch("/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, session_id: sessionId }),
-        signal: streamController.signal,
-      });
-
-      if (!res.ok) throw new Error(res.status);
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullText = "";
-      let tokenCount = 0;
-      let firstTokenReceived = false;
-      let botBubble = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
-          if (!jsonStr) continue;
-
-          try {
-            const data = JSON.parse(jsonStr);
-
-            if (data.session_id) {
-              sessionId = data.session_id;
-              continue;
-            }
-
-            if (data.done) {
-              continue;
-            }
-
-            if (data.token !== undefined) {
-              if (!firstTokenReceived) {
-                firstTokenReceived = true;
-                removeThinking(thinkingId);
-                const created = createBotBubble();
-                botBubble = created.bubble;
-              }
-
-              fullText += data.token;
-              tokenCount++;
-
-              renderBotBubble(botBubble, fullText);
-              scrollToBottom();
-            }
-          } catch (e) {}
-        }
-      }
-
-      if (!firstTokenReceived) {
-        removeThinking(thinkingId);
-        appendBubble("bot", "Sorry, I'm having trouble connecting. Please try again or call **16218**.");
-      } else if (tokenCount === 1 && fullText.length > 15) {
-        botBubble.innerHTML = "";
-        simulateTypewriter(botBubble, fullText, null);
-      }
-
-    } catch (err) {
-      if (err.name === "AbortError") return;
-      removeThinking(thinkingId);
-      appendBubble("bot", "Sorry, I'm having trouble connecting. Please try again or call **16218**.");
-      setStatus("offline");
-    } finally {
-      streamController = null;
-      setLoading(false);
-    }
-  }
-
-  function scrollToBottom() { requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }); }
-
-  function setLoading(val) {
-    isLoading = sendBtnEl.disabled = inputEl.disabled = val;
-    if (!val) inputEl.focus();
-  }
-
-  function setStatus(s) {
-    statusDot.style.background = s === "offline" ? "#ef4444" : "#22c55e";
-    statusDot.style.animation  = s === "offline" ? "none" : "pulse-dot 2s infinite";
-    statusText.textContent     = s === "offline" ? "Offline" : "Online";
-  }
-
-  async function clearConversation() {
-    if (streamController) {
-      streamController.abort();
-      streamController = null;
-    }
-    if (sessionId) {
-      try { await fetch("/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: sessionId }) }); } catch (_) {}
-    }
-    sessionId = null;
-    messagesEl.querySelectorAll(".message-row").forEach(el => el.remove());
-    if (welcomeEl) welcomeEl.style.display = "flex";
-    setLoading(false);
-    inputEl.focus();
-  }
-
-  window.addEventListener("load", () => inputEl.focus());
+  connect();
 </script>
 </body>
 </html>
