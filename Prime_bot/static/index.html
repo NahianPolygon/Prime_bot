@@ -29,6 +29,9 @@
       --radius-sm:      8px;
       --font:           'DM Sans', sans-serif;
       --font-mono:      'DM Mono', monospace;
+      --success:        #22c55e;
+      --error:          #ef4444;
+      --warning:        #f59e0b;
     }
 
     html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text-primary); -webkit-font-smoothing: antialiased; }
@@ -120,8 +123,44 @@
     .send-btn svg { width: 18px; height: 18px; fill: white; }
     .input-hint { font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center; }
 
+    .elig-form { width: 100%; }
+    .elig-form-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .elig-form-icon { width: 36px; height: 36px; background: var(--accent-light); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .elig-form-icon svg { width: 18px; height: 18px; fill: var(--accent); }
+    .elig-form-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .elig-form-target { font-size: 12px; color: var(--accent); font-weight: 500; }
+    .elig-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .elig-field { display: flex; flex-direction: column; gap: 4px; }
+    .elig-field.full-width { grid-column: 1 / -1; }
+    .elig-field label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+    .elig-field label .req { color: var(--error); }
+    .elig-field input[type="number"],
+    .elig-field select { font-family: var(--font); font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-primary); outline: none; transition: border-color 0.15s; width: 100%; }
+    .elig-field input[type="number"]:focus,
+    .elig-field select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(26,79,156,0.08); }
+    .elig-field input[type="number"]::placeholder { color: var(--text-muted); }
+    .elig-field input.field-error,
+    .elig-field select.field-error { border-color: var(--error); }
+    .elig-checkbox-row { display: flex; align-items: center; gap: 8px; padding: 10px 0 4px; grid-column: 1 / -1; }
+    .elig-checkbox-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+    .elig-checkbox-row label { font-size: 13px; color: var(--text-primary); cursor: pointer; user-select: none; }
+    .elig-form-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .elig-btn { font-family: var(--font); font-size: 13px; font-weight: 500; padding: 9px 20px; border-radius: 8px; cursor: pointer; transition: all 0.15s; border: none; }
+    .elig-btn-submit { background: var(--accent); color: white; flex: 1; }
+    .elig-btn-submit:hover:not(:disabled) { background: var(--accent-hover); }
+    .elig-btn-submit:disabled { background: var(--border); cursor: not-allowed; }
+    .elig-btn-cancel { background: none; color: var(--text-secondary); border: 1px solid var(--border); }
+    .elig-btn-cancel:hover { background: var(--bg); color: var(--text-primary); }
+    .elig-form-errors { margin-top: 8px; }
+    .elig-form-errors p { font-size: 12px; color: var(--error); margin: 2px 0; }
+    .elig-form-submitted { opacity: 0.6; pointer-events: none; }
+
+    .elig-bubble { max-width: 420px; padding: 16px !important; }
+
     @media (max-width: 720px) {
       .bubble { max-width: 94%; }
+      .elig-bubble { max-width: 94%; }
+      .elig-form-grid { grid-template-columns: 1fr; }
       .table-wrapper td, .table-wrapper th { font-size: 12px; padding: 6px 10px; min-width: 80px; }
     }
   </style>
@@ -200,6 +239,7 @@
   let activeBubble    = null;
   let activeThinkId   = null;
   let fullText        = "";
+  let activeFormId    = null;
 
   function wsUrl() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -252,6 +292,14 @@
         sessionId = data.session_id;
         break;
 
+      case "show_eligibility_form":
+        if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
+        activeBubble = null;
+        fullText = "";
+        renderEligibilityForm(data.schema);
+        finishLoading();
+        break;
+
       case "token":
         if (!activeBubble) {
           if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
@@ -284,6 +332,172 @@
 
       case "pong":
         break;
+    }
+  }
+
+  function renderEligibilityForm(schema) {
+    const formId = "elig_" + Date.now();
+    activeFormId = formId;
+
+    const row = document.createElement("div");
+    row.className = "message-row bot";
+    row.id = formId + "_row";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar bot";
+    avatar.textContent = "P";
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble bot elig-bubble";
+
+    const targetCard = schema.target_card || "";
+    const fields = schema.fields || {};
+
+    let targetHtml = "";
+    if (targetCard) {
+      targetHtml = `<div class="elig-form-target">Checking eligibility for: <strong>${targetCard}</strong></div>`;
+    }
+
+    let fieldsHtml = "";
+    const fieldKeys = Object.keys(fields);
+
+    for (const key of fieldKeys) {
+      const f = fields[key];
+      const reqMark = f.required ? '<span class="req">*</span>' : "";
+
+      if (f.type === "number") {
+        fieldsHtml += `
+          <div class="elig-field">
+            <label for="${formId}_${key}">${f.label} ${reqMark}</label>
+            <input type="number" id="${formId}_${key}" data-key="${key}"
+              placeholder="${f.placeholder || ""}"
+              ${f.min !== undefined ? 'min="' + f.min + '"' : ""}
+              ${f.max !== undefined ? 'max="' + f.max + '"' : ""} />
+          </div>`;
+      } else if (f.type === "select") {
+        let opts = '<option value="" disabled selected>Select...</option>';
+        for (const o of (f.options || [])) {
+          opts += `<option value="${o.value}">${o.label}</option>`;
+        }
+        fieldsHtml += `
+          <div class="elig-field">
+            <label for="${formId}_${key}">${f.label} ${reqMark}</label>
+            <select id="${formId}_${key}" data-key="${key}">${opts}</select>
+          </div>`;
+      } else if (f.type === "checkbox") {
+        fieldsHtml += `
+          <div class="elig-checkbox-row">
+            <input type="checkbox" id="${formId}_${key}" data-key="${key}" />
+            <label for="${formId}_${key}">${f.label}</label>
+          </div>`;
+      }
+    }
+
+    bubble.innerHTML = `
+      <div class="elig-form" id="${formId}">
+        <div class="elig-form-header">
+          <div class="elig-form-icon">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+          </div>
+          <div>
+            <div class="elig-form-title">Eligibility Check</div>
+            ${targetHtml}
+          </div>
+        </div>
+        <div class="elig-form-grid">
+          ${fieldsHtml}
+        </div>
+        <div class="elig-form-errors" id="${formId}_errors"></div>
+        <div class="elig-form-actions">
+          <button class="elig-btn elig-btn-cancel" onclick="cancelEligForm('${formId}')">Cancel</button>
+          <button class="elig-btn elig-btn-submit" id="${formId}_submit" onclick="submitEligForm('${formId}', '${targetCard}')">Check Eligibility</button>
+        </div>
+      </div>`;
+
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    scrollToBottom();
+  }
+
+  function submitEligForm(formId, targetCard) {
+    const formEl = document.getElementById(formId);
+    if (!formEl) return;
+
+    const errorsEl = document.getElementById(formId + "_errors");
+    errorsEl.innerHTML = "";
+
+    const inputs = formEl.querySelectorAll("input[data-key], select[data-key]");
+    const formData = {};
+    const errors = [];
+
+    inputs.forEach(el => {
+      const key = el.dataset.key;
+      if (el.type === "checkbox") {
+        formData[key] = el.checked;
+      } else if (el.type === "number") {
+        formData[key] = el.value.trim() !== "" ? Number(el.value) : null;
+      } else {
+        formData[key] = el.value;
+      }
+    });
+
+    if (!formData.age || formData.age < 18 || formData.age > 70) {
+      errors.push("Age must be between 18 and 70.");
+      markFieldError(formId, "age");
+    }
+    if (!formData.employment_type) {
+      errors.push("Please select an employment status.");
+      markFieldError(formId, "employment_type");
+    }
+    if (!formData.monthly_income || formData.monthly_income <= 0) {
+      errors.push("Please enter a valid monthly income.");
+      markFieldError(formId, "monthly_income");
+    }
+    if (formData.employment_duration_years === null || formData.employment_duration_years === "" || formData.employment_duration_years === undefined) {
+      errors.push("Please select employment duration (years).");
+      markFieldError(formId, "employment_duration_years");
+    }
+
+    if (errors.length > 0) {
+      errorsEl.innerHTML = errors.map(e => `<p>${e}</p>`).join("");
+      scrollToBottom();
+      return;
+    }
+
+    if (targetCard) {
+      formData.target_card = targetCard;
+    }
+
+    formEl.classList.add("elig-form-submitted");
+    const submitBtn = document.getElementById(formId + "_submit");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Checking...";
+    }
+
+    activeThinkId = showThinking();
+    startLoading();
+
+    ws.send(JSON.stringify({
+      type: "eligibility_form_submit",
+      form_data: formData,
+      session_id: sessionId,
+    }));
+  }
+
+  function cancelEligForm(formId) {
+    const row = document.getElementById(formId + "_row");
+    if (row) row.remove();
+    activeFormId = null;
+  }
+
+  function markFieldError(formId, key) {
+    const el = document.getElementById(formId + "_" + key);
+    if (el) el.classList.add("field-error");
+    if (el) {
+      el.addEventListener("input", () => el.classList.remove("field-error"), { once: true });
+      el.addEventListener("change", () => el.classList.remove("field-error"), { once: true });
     }
   }
 
@@ -349,6 +563,7 @@
     sessionId = null;
     activeBubble = null;
     fullText = "";
+    activeFormId = null;
     if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
     messagesEl.querySelectorAll(".message-row").forEach(el => el.remove());
     if (welcomeEl) welcomeEl.style.display = "flex";
@@ -402,7 +617,7 @@
 
     t = result.join("\n");
     t = t.replace(/\n{3,}/g, "\n\n");
-    t = t.replace(/([^\n])\n(#{1,3}\s)/g, "$1\n\n$2");
+    t = t.replace(/([^\n])\n(#{1,3}\s)/g, "\$1\n\n\$2");
     return t.trim();
   }
 

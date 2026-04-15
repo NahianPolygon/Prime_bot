@@ -14,7 +14,8 @@ with open("config.yaml") as f:
     _cfg = yaml.safe_load(f)
 
 from memory.session_memory import get_session, clear_session
-from crew import build_crew_stream
+from crew import build_crew_stream, handle_eligibility_form
+from agents.compliance_faq import extract_target_card, get_eligibility_form_schema
 
 app = FastAPI(title="Prime Bank Credit Card Assistant", version="1.0.0")
 
@@ -78,6 +79,48 @@ async def websocket_chat(websocket: WebSocket):
                 await websocket.send_text(json.dumps({"type": "cleared"}))
                 continue
 
+            if msg_type == "eligibility_form_submit":
+                if not session_id:
+                    session_id = data.get("session_id") or str(uuid.uuid4())
+
+                session = get_session(session_id)
+                request_id = str(uuid.uuid4())
+                form_data = data.get("form_data", {})
+
+                log_event(
+                    "ws_eligibility_form",
+                    request_id=request_id,
+                    session_id=session_id,
+                    target_card=form_data.get("target_card", ""),
+                )
+
+                await websocket.send_text(json.dumps({
+                    "type": "session_id",
+                    "session_id": session_id,
+                }))
+
+                try:
+                    result = handle_eligibility_form(form_data, session, request_id=request_id)
+                    await websocket.send_text(json.dumps({"type": "token", "token": result}))
+                    await websocket.send_text(json.dumps({"type": "done"}))
+                    log_event(
+                        "ws_eligibility_complete",
+                        request_id=request_id,
+                        session_id=session_id,
+                    )
+                except Exception as e:
+                    log_event(
+                        "ws_eligibility_error",
+                        request_id=request_id,
+                        session_id=session_id,
+                        error=str(e),
+                    )
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "message": "Eligibility check failed. Please try again.",
+                    }))
+                continue
+
             if msg_type != "message":
                 await websocket.send_text(json.dumps({"type": "error", "message": f"Unknown type: {msg_type}"}))
                 continue
@@ -98,7 +141,20 @@ async def websocket_chat(websocket: WebSocket):
 
             try:
                 for token in build_crew_stream(message, session, request_id=request_id):
+                    if token.startswith('{"__form_signal__"'):
+                        try:
+                            signal = json.loads(token)
+                            if signal.get("__form_signal__"):
+                                await websocket.send_text(json.dumps({
+                                    "type": "show_eligibility_form",
+                                    "schema": signal["schema"],
+                                }))
+                                continue
+                        except json.JSONDecodeError:
+                            pass
+
                     await websocket.send_text(json.dumps({"type": "token", "token": token}))
+
                 await websocket.send_text(json.dumps({"type": "done"}))
                 log_event("ws_chat_complete", request_id=request_id, session_id=session_id)
 

@@ -16,8 +16,20 @@ from logging_utils import log_event
 with open("config.yaml") as f:
     cfg = yaml.safe_load(f)
 
-_eligibility_sessions: set[str] = set()
 _discovery_sessions: dict[str, dict] = {}
+
+
+EXPLICIT_ISLAMI_KEYWORDS = {"halal", "islamic", "shariah", "sharia", "hasanah", "hasannah", "hasnah"}
+EXPLICIT_CONVENTIONAL_KEYWORDS = {"conventional", "regular", "standard"}
+
+
+def _explicit_banking_from_message(user_message: str) -> str | None:
+    msg = user_message.lower()
+    if any(kw in msg for kw in EXPLICIT_ISLAMI_KEYWORDS):
+        return "islami"
+    if any(kw in msg for kw in EXPLICIT_CONVENTIONAL_KEYWORDS):
+        return "conventional"
+    return None
 
 SERVICE_ID_PATTERNS = {"_services_", "cardholder_services", "conv_services", "islami_services"}
 
@@ -318,6 +330,29 @@ def _needs_filter_extraction(user_message: str, banking_type: str) -> bool:
     )
 
 
+def _build_eligibility_form_signal(user_message: str, session: SessionMemory) -> str:
+    history = session.get_history_str(max_chars=500)
+    target = compliance_faq.extract_target_card(user_message, history)
+    schema = compliance_faq.get_eligibility_form_schema(target)
+    intro = f"Please fill out the form below to check your eligibility{' for **' + target + '**' if target else ''}."
+    session.add(user_message, intro)
+    return json.dumps({"__form_signal__": True, "type": "show_eligibility_form", "schema": schema})
+
+
+def _form_data_summary(form_data: dict) -> str:
+    parts = []
+    if form_data.get("target_card"):
+        parts.append(f"Card: {form_data['target_card']}")
+    parts.append(f"Age: {form_data.get('age', 'N/A')}")
+    parts.append(f"Employment: {form_data.get('employment_type', 'N/A')}")
+    parts.append(f"Income: {form_data.get('monthly_income', 'N/A')} BDT/month")
+    years = form_data.get("employment_duration_years", 0)
+    months = form_data.get("employment_duration_months", 0)
+    parts.append(f"Experience: {years}y {months}m")
+    parts.append(f"E-TIN: {'Yes' if form_data.get('has_etin') else 'No'}")
+    return "Eligibility check — " + ", ".join(parts)
+
+
 def _get_draft(
     user_message: str,
     classifier_output: dict,
@@ -353,13 +388,7 @@ def _get_draft(
         return compliance_faq.run_catalog(user_message, session), None
 
     elif intent == "eligibility_check":
-        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="eligibility")
-        session.update_profile("eligibility_target", user_message)
-        response, done = compliance_faq.run_eligibility(user_message, routing, session, is_new_check=True)
-        if not done:
-            _eligibility_sessions.add(session_id)
-            return response, "no_synth"
-        return response, None
+        return "Please use the eligibility form to check your qualification.", "no_synth"
 
     elif intent == "existing_cardholder":
         log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="cardholder_service")
@@ -382,10 +411,46 @@ def _get_draft(
         return compliance_faq.run_faq(user_message, routing, session), None
 
 
+def _handle_intent(
+    user_message: str,
+    classifier_output: dict,
+    session: SessionMemory,
+    request_id: str | None,
+    started: float,
+) -> str:
+    session_id = session.session_id
+    intent = classifier_output["intent"]
+
+    draft, mode = _get_draft(user_message, classifier_output, session, request_id)
+
+    if mode == "no_synth":
+        clean = _guardrails(draft)
+        session.add(user_message, clean)
+        log_event(
+            "pipeline_complete",
+            request_id=request_id,
+            session_id=session_id,
+            intent=intent,
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+        )
+        return clean
+
+    final_response = synthesis_agent.run(draft, user_message)
+    clean = _guardrails(final_response)
+    session.add(user_message, clean)
+    log_event(
+        "pipeline_complete",
+        request_id=request_id,
+        session_id=session_id,
+        intent=intent,
+        latency_ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+    return clean
+
+
 def build_crew(user_message: str, session: SessionMemory, request_id: str | None = None) -> str:
     started = time.perf_counter()
     session_id = session.session_id
-    in_eligibility = session_id in _eligibility_sessions
     in_discovery = session_id in _discovery_sessions
     history = session.get_history_str(max_chars=500)
 
@@ -407,6 +472,11 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
         breakout_intents = {"comparison", "eligibility_check", "existing_cardholder", "how_to_apply", "product_details"}
         if classifier_output["intent"] in breakout_intents:
             _discovery_sessions.pop(session_id, None)
+            if classifier_output["intent"] == "eligibility_check":
+                target = compliance_faq.extract_target_card(user_message, history)
+                response = f"Please complete the eligibility form to check your qualification{' for ' + target if target else ''}."
+                session.add(user_message, response)
+                return response
             return _handle_intent(user_message, classifier_output, session, request_id, started)
 
         if step == 0:
@@ -492,42 +562,6 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
             )
             return clean
 
-    if in_eligibility:
-        classifier_output = classify(user_message, history)
-        log_event(
-            "classifier_result",
-            request_id=request_id,
-            session_id=session_id,
-            intent=classifier_output.get("intent"),
-            banking_type=classifier_output.get("banking_type"),
-            intent_score=round(classifier_output.get("intent_score", 0.0), 4),
-            banking_score=round(classifier_output.get("banking_score", 0.0), 4),
-        )
-
-        text = user_message.strip().lower()
-        if text in ("skip", "cancel", "stop", "exit", "nevermind", "never mind"):
-            _eligibility_sessions.discard(session_id)
-        else:
-            log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="eligibility")
-            response, done = compliance_faq.run_eligibility(user_message, {"banking_type": "both"}, session, is_new_check=False)
-            if not done:
-                clean = _guardrails(response)
-                session.add(user_message, clean)
-                return clean
-            _eligibility_sessions.discard(session_id)
-            draft = response
-            final_response = synthesis_agent.run(draft, user_message)
-            clean = _guardrails(final_response)
-            session.add(user_message, clean)
-            log_event(
-                "pipeline_complete",
-                request_id=request_id,
-                session_id=session_id,
-                intent="eligibility_check",
-                latency_ms=round((time.perf_counter() - started) * 1000, 2),
-            )
-            return clean
-
     classifier_output = classify(user_message, history)
     log_event(
         "classifier_result",
@@ -541,6 +575,12 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
 
     intent = classifier_output["intent"]
 
+    if intent == "eligibility_check":
+        target = compliance_faq.extract_target_card(user_message, history)
+        response = f"Please complete the eligibility form to check your qualification{' for ' + target if target else ''}."
+        session.add(user_message, response)
+        return response
+
     if intent in ("i_need_a_credit_card", "catalog_query") and len(session.history) == 0:
         banking_type = classifier_output["banking_type"]
 
@@ -549,13 +589,10 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
         else:
             filters = {}
 
-        if "banking_type" not in filters and banking_type in ("conventional", "islami"):
-            filters["banking_type"] = banking_type
-
         if filters:
             response = _build_dynamic_card_response(filters)
             if response:
-                bt = filters.get("banking_type", banking_type)
+                bt = filters.get("banking_type", "both")
                 if bt in ("conventional", "islami"):
                     session.update_profile("banking_preference", bt)
                     _discovery_sessions[session_id] = {
@@ -598,40 +635,50 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
     return _handle_intent(user_message, classifier_output, session, request_id, started)
 
 
-def _handle_intent(
-    user_message: str,
-    classifier_output: dict,
+def handle_eligibility_form(
+    form_data: dict,
     session: SessionMemory,
-    request_id: str | None,
-    started: float,
+    request_id: str | None = None,
 ) -> str:
+    started = time.perf_counter()
     session_id = session.session_id
-    intent = classifier_output["intent"]
 
-    draft, mode = _get_draft(user_message, classifier_output, session, request_id)
-
-    if mode == "no_synth":
-        clean = _guardrails(draft)
-        session.add(user_message, clean)
-        log_event(
-            "pipeline_complete",
-            request_id=request_id,
-            session_id=session_id,
-            intent=intent,
-            latency_ms=round((time.perf_counter() - started) * 1000, 2),
-        )
-        return clean
-
-    final_response = synthesis_agent.run(draft, user_message)
-    clean = _guardrails(final_response)
-    session.add(user_message, clean)
     log_event(
-        "pipeline_complete",
+        "eligibility_form_received",
         request_id=request_id,
         session_id=session_id,
-        intent=intent,
+        target_card=form_data.get("target_card", ""),
+    )
+
+    errors = compliance_faq.validate_eligibility_form(form_data)
+    if errors:
+        log_event(
+            "eligibility_form_validation_failed",
+            request_id=request_id,
+            session_id=session_id,
+            errors=errors,
+        )
+        return "**Please fix the following:**\n\n" + "\n".join(f"- {e}" for e in errors)
+
+    user_summary = _form_data_summary(form_data)
+    session.add(user_summary, "")
+
+    draft = compliance_faq.run_eligibility(form_data, session)
+    final_response = synthesis_agent.run(draft, user_summary)
+    clean = _guardrails(final_response)
+
+    session.history[-1]["content"] = clean
+    session.history[-1]["content_short"] = session._truncate_for_history(clean)
+
+    log_event(
+        "eligibility_form_complete",
+        request_id=request_id,
+        session_id=session_id,
+        target_card=form_data.get("target_card", ""),
+        response_chars=len(clean),
         latency_ms=round((time.perf_counter() - started) * 1000, 2),
     )
+
     return clean
 
 
@@ -642,20 +689,16 @@ def build_crew_stream(
 ) -> Generator[str, None, None]:
     started = time.perf_counter()
     session_id = session.session_id
-    in_eligibility = session_id in _eligibility_sessions
     in_discovery = session_id in _discovery_sessions
     history = session.get_history_str(max_chars=500)
 
     if in_discovery:
         result = _handle_discovery_stream(user_message, session, request_id, started)
         if result is not None:
-            yield result
-            return
-
-    if in_eligibility:
-        result = _handle_eligibility_nonstream(user_message, session, request_id, started)
-        if result is not None:
-            yield result
+            if result.startswith('{"__form_signal__"'):
+                yield result
+            else:
+                yield result
             return
 
     classifier_output = classify(user_message, history)
@@ -670,6 +713,10 @@ def build_crew_stream(
     )
 
     intent = classifier_output["intent"]
+
+    if intent == "eligibility_check":
+        yield _build_eligibility_form_signal(user_message, session)
+        return
 
     if intent in ("i_need_a_credit_card", "catalog_query") and len(session.history) == 0:
         result = _handle_first_message_discovery(user_message, classifier_output, session, request_id, started)
@@ -735,6 +782,8 @@ def _handle_discovery_stream(
     breakout_intents = {"comparison", "eligibility_check", "existing_cardholder", "how_to_apply", "product_details"}
     if classifier_output["intent"] in breakout_intents:
         _discovery_sessions.pop(session_id, None)
+        if classifier_output["intent"] == "eligibility_check":
+            return _build_eligibility_form_signal(user_message, session)
         return None
 
     if step == 0:
@@ -801,53 +850,6 @@ def _handle_discovery_stream(
     return None
 
 
-def _handle_eligibility_nonstream(
-    user_message: str,
-    session: SessionMemory,
-    request_id: str | None,
-    started: float,
-) -> str | None:
-    session_id = session.session_id
-    history = session.get_history_str(max_chars=500)
-
-    classifier_output = classify(user_message, history)
-    log_event(
-        "classifier_result",
-        request_id=request_id,
-        session_id=session_id,
-        intent=classifier_output.get("intent"),
-        banking_type=classifier_output.get("banking_type"),
-        intent_score=round(classifier_output.get("intent_score", 0.0), 4),
-        banking_score=round(classifier_output.get("banking_score", 0.0), 4),
-    )
-
-    text = user_message.strip().lower()
-    if text in ("skip", "cancel", "stop", "exit", "nevermind", "never mind"):
-        _eligibility_sessions.discard(session_id)
-        return None
-
-    log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="eligibility")
-    response, done = compliance_faq.run_eligibility(user_message, {"banking_type": "both"}, session, is_new_check=False)
-    if not done:
-        clean = _guardrails(response)
-        session.add(user_message, clean)
-        return clean
-
-    _eligibility_sessions.discard(session_id)
-    draft = response
-    final_response = synthesis_agent.run(draft, user_message)
-    clean = _guardrails(final_response)
-    session.add(user_message, clean)
-    log_event(
-        "pipeline_complete",
-        request_id=request_id,
-        session_id=session_id,
-        intent="eligibility_check",
-        latency_ms=round((time.perf_counter() - started) * 1000, 2),
-    )
-    return clean
-
-
 def _handle_first_message_discovery(
     user_message: str,
     classifier_output: dict,
@@ -863,13 +865,15 @@ def _handle_first_message_discovery(
     else:
         filters = {}
 
-    if "banking_type" not in filters and banking_type in ("conventional", "islami"):
-        filters["banking_type"] = banking_type
+    if not filters:
+        explicit_bt = _explicit_banking_from_message(user_message)
+        if explicit_bt:
+            filters = {"banking_type": explicit_bt}
 
     if filters:
         response = _build_dynamic_card_response(filters)
         if response:
-            bt = filters.get("banking_type", banking_type)
+            bt = filters.get("banking_type", "both")
             if bt in ("conventional", "islami"):
                 session.update_profile("banking_preference", bt)
                 _discovery_sessions[session_id] = {

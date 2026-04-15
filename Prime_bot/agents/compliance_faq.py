@@ -1,8 +1,10 @@
 import json
 import re
-from tools.rag_tool import rag_search_multi, list_all_products
+import numpy as np
+from tools.rag_tool import rag_search_multi, list_all_products, _model as _embed_model
 from llm.ollama_client import chat
 from memory.session_memory import SessionMemory
+from logging_utils import log_event
 
 
 def _clean_context(context: str) -> str:
@@ -12,13 +14,64 @@ def _clean_context(context: str) -> str:
     return context.strip()
 
 
-ELIGIBILITY_FIELDS = {
-    "age":                 "What is your **age**?",
-    "employment_type":     "What is your employment status? (**salaried**, **self-employed**, or **business owner**?)",
-    "monthly_income":      "What is your approximate **monthly income** in BDT? (e.g. 50,000 or 1 lakh)",
-    "employment_duration": "How long have you been employed / running your business? (e.g. '2 years', '8 months')",
-    "has_etin":            "Do you have a valid **E-TIN** (Tax Identification Number)? (yes / no)",
+def _safe_int(value, default=0):
+    if value is None or str(value).strip() == "":
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
+ELIGIBILITY_SCHEMA = {
+    "age": {
+        "label": "Age",
+        "type": "number",
+        "placeholder": "e.g. 30",
+        "min": 18,
+        "max": 70,
+        "required": True,
+    },
+    "employment_type": {
+        "label": "Employment Status",
+        "type": "select",
+        "options": [
+            {"value": "salaried", "label": "Salaried"},
+            {"value": "self_employed", "label": "Self-Employed"},
+            {"value": "business_owner", "label": "Business Owner"},
+        ],
+        "required": True,
+    },
+    "monthly_income": {
+        "label": "Monthly Income (BDT)",
+        "type": "number",
+        "placeholder": "e.g. 50000",
+        "min": 0,
+        "required": True,
+    },
+    "employment_duration_years": {
+        "label": "Employment Duration (Years)",
+        "type": "select",
+        "options": [{"value": i, "label": str(i)} for i in range(0, 41)],
+        "required": True,
+    },
+    "employment_duration_months": {
+        "label": "Employment Duration (Months)",
+        "type": "select",
+        "options": [{"value": i, "label": str(i)} for i in range(0, 12)],
+        "required": False,
+    },
+    "has_etin": {
+        "label": "Do you have a valid E-TIN?",
+        "type": "checkbox",
+        "required": False,
+    },
 }
+
+EMBED_CONFIDENT_THRESHOLD = 0.55
+EMBED_CONFIDENT_MARGIN = 0.03
+EMBED_CANDIDATE_THRESHOLD = 0.45
+EMBED_TOP_N = 3
 
 ELIGIBILITY_SYSTEM = """You are the Prime Bank Eligibility Advisor.
 You assess whether a user qualifies for Prime Bank credit cards.
@@ -29,11 +82,14 @@ You MUST:
 - For EACH card assessed give: ✅ Likely Eligible | ❌ Likely Ineligible | ⚠️ Borderline
 - Always use the actual card name (e.g. "Visa Gold", "Mastercard Platinum") not internal codes
 - If ineligible, suggest alternatives from the chunks using their actual card names
+- Provide detailed reasoning for each assessment covering: age, income, employment duration, E-TIN
+- Your response must be comprehensive and cover all relevant criteria from the chunks
 
 You MUST NOT:
 - Invent eligibility criteria not in the chunks
 - Calculate or estimate annual income yourself — use only the annual_income provided in the profile
 - Display product_id, internal IDs, or system codes like CARD_001 or ISLAMI_CARD_001
+- Give extremely brief responses — always explain your reasoning
 """
 
 FAQ_SYSTEM = """You are the Prime Bank FAQ & Compliance specialist.
@@ -78,227 +134,244 @@ You MUST NOT:
 - Display product_id, internal IDs, or system codes to the user
 """
 
-EXTRACT_SYSTEM = """You extract profile fields from user messages for a bank eligibility check.
 
-RULES:
-- Return ONLY a valid JSON object
-- Only include keys you can confidently extract
-- Valid keys and formats:
-  age: integer (e.g. 32)
-  employment_type: "salaried" or "self_employed" or "business_owner"
-  monthly_income: integer in BDT (convert "1 lakh" to 100000, "50k" to 50000, "10 lakhs" to 1000000)
-  employment_duration: string (e.g. "2 years", "6 months", "16 years", "20 years")
-  has_etin: true or false
-- Return {} if nothing can be extracted
-- Handle natural language: "obviously i have" for etin means true, "nope" means false
-- Handle approximate durations: "almost 20 years" means "20 years", "about 3 years" means "3 years"
-- Handle typos: "8 tears" means "8 years"
-- "business owner", "own business", "entrepreneur" means employment_type is "business_owner"
-- "self employed", "freelance", "content creator" means employment_type is "self_employed"
-- Any job title like "engineer", "doctor", "teacher" means employment_type is "salaried"
+def _embedding_match_card(text: str) -> tuple[str, list[tuple[str, float]]]:
+    products = list_all_products()
+    valid_products = [p for p in products if p.get("product_name")]
 
-EXAMPLES:
-User: "32" -> currently asking age -> {"age": 32}
-User: "my age is 66" -> {"age": 66}
-User: "salaried" -> currently asking employment -> {"employment_type": "salaried"}
-User: "I am a business owner" -> {"employment_type": "business_owner"}
-User: "self employed" -> {"employment_type": "self_employed"}
-User: "1 lakh per month" -> {"monthly_income": 100000}
-User: "i earn 10 lakhs per month" -> {"monthly_income": 1000000}
-User: "50000" -> currently asking income -> {"monthly_income": 50000}
-User: "2 years" -> {"employment_duration": "2 years"}
-User: "for almost 20 years" -> {"employment_duration": "20 years"}
-User: "8 tears 3 months" -> {"employment_duration": "8 years 3 months"}
-User: "i think for 8 years and 3 months" -> {"employment_duration": "8 years 3 months"}
-User: "yes" -> currently asking etin -> {"has_etin": true}
-User: "obviously i have" -> currently asking etin -> {"has_etin": true}
-User: "nope" -> currently asking etin -> {"has_etin": false}
-User: "no" -> currently asking etin -> {"has_etin": false}
+    if not valid_products:
+        return "", []
 
-JSON only. No explanation."""
+    card_names = []
+    enriched_names = []
+    for p in valid_products:
+        name = p["product_name"]
+        card_names.append(name)
+        banking = p.get("banking_type", "")
+        if banking == "islami":
+            enriched_names.append(f"{name} - Islamic Shariah Halal Hasanah compliant banking")
+        else:
+            enriched_names.append(f"{name} - conventional standard banking")
 
-BULK_EXTRACT_SYSTEM = """You extract ALL profile fields you can find from the user's message for a bank eligibility check.
+    query_emb = _embed_model.encode(text)
+    card_embs = _embed_model.encode(enriched_names)
 
-RULES:
-- Return ONLY a valid JSON object
-- Extract ALL fields you can find in the message
-- Valid keys and formats:
-  age: integer (e.g. 32)
-  employment_type: "salaried" or "self_employed" or "business_owner"
-  monthly_income: integer in BDT (convert "1 lakh" to 100000, "50k" to 50000, "200k" to 200000, "10 lakhs" to 1000000)
-  employment_duration: string (e.g. "2 years", "6 months", "16 years")
-  has_etin: true or false
-- Return {} if nothing can be extracted
-- If user mentions a job title like "software engineer", "doctor", "banker" -> employment_type is "salaried"
-- If user mentions "business owner", "own business", "entrepreneur" -> employment_type is "business_owner"
-- If user mentions "self employed", "freelance", "content creator" -> employment_type is "self_employed"
+    query_norm = query_emb / (np.linalg.norm(query_emb) + 1e-10)
+    card_norms = card_embs / (np.linalg.norm(card_embs, axis=1, keepdims=True) + 1e-10)
 
-EXAMPLES:
-User: "I am 33 years old, earn 200k per month and a software engineer and been working for 8 years" -> {"age": 33, "monthly_income": 200000, "employment_type": "salaried", "employment_duration": "8 years"}
-User: "25, salaried, 1 lakh income, 3 years experience, have etin" -> {"age": 25, "employment_type": "salaried", "monthly_income": 100000, "employment_duration": "3 years", "has_etin": true}
-User: "am i eligible for visa gold?" -> {}
-User: "I'm 30 and earn 80k" -> {"age": 30, "monthly_income": 80000}
+    scores = card_norms @ query_norm
+    sorted_idx = np.argsort(scores)[::-1]
+    best_idx = int(sorted_idx[0])
+    best_score = float(scores[best_idx])
 
-JSON only. No explanation."""
+    margin = 0.0
+    if len(scores) > 1:
+        margin = best_score - float(scores[int(sorted_idx[1])])
+
+    top_n = [(card_names[int(i)], round(float(scores[int(i)]), 4)) for i in sorted_idx[:EMBED_TOP_N]]
+    log_event(
+        "embed_card_match",
+        query=text[:100],
+        top_3=str(top_n),
+        best_score=round(best_score, 4),
+        margin=round(margin, 4),
+    )
+
+    if best_score >= EMBED_CONFIDENT_THRESHOLD and margin >= EMBED_CONFIDENT_MARGIN:
+        return card_names[best_idx], top_n
+
+    if best_score >= EMBED_CANDIDATE_THRESHOLD:
+        return "", top_n
+
+    return "", []
 
 
-def _get_collections(banking: str, suffix: str) -> list[str]:
-    if banking == "both":
-        return [
-            f"conventional_credit_{suffix}",
-            f"islami_credit_{suffix}",
-        ]
-    return [f"{banking}_credit_{suffix}"]
+def _llm_disambiguate(user_message: str, candidates: list[tuple[str, float]], history: str = "") -> str:
+    candidate_names = [name for name, _ in candidates]
+    card_list = "\n".join(f"- {name}" for name in candidate_names)
 
+    prompt = f"""The user said: "{user_message}"
 
-def _resolve_target(target: str, history: str) -> str:
-    if not target:
+These are the closest matching Prime Bank credit cards:
+{card_list}
+
+Which card is the user most likely asking about?
+Consider misspellings: "hasnah"/"hasannah"/"hassanah" all mean "Hasanah", "master card" means "Mastercard".
+Return ONLY the exact card name from the list above.
+If truly none match, return "none"."""
+
+    response = chat(
+        messages=[{"role": "user", "content": prompt}],
+        system="Pick the best matching card from the short list. Return only the exact card name or 'none'. No explanation.",
+        temperature=0.0,
+        max_tokens=80,
+    )
+
+    response = response.strip().strip('"').strip("'")
+
+    log_event(
+        "llm_disambiguate",
+        query=user_message[:80],
+        candidates=str(candidate_names),
+        llm_response=response[:80],
+    )
+
+    if not response or response.lower() in ("none", "n/a", "unknown", ""):
         return ""
 
-    prompt = f"""The user asked: "{target}"
+    for name in candidate_names:
+        if response.lower() == name.lower():
+            return name
+
+    for name in candidate_names:
+        if response.lower() in name.lower() or name.lower() in response.lower():
+            return name
+
+    return ""
+
+
+def _llm_full_list_match(user_message: str, history: str = "") -> str:
+    products = list_all_products()
+    card_names = [p["product_name"] for p in products if p.get("product_name")]
+
+    if not card_names:
+        return ""
+
+    card_list = "\n".join(f"- {name}" for name in card_names)
+
+    prompt = f"""Available Prime Bank credit cards:
+{card_list}
+
+The user said: "{user_message}"
 
 Conversation history:
 {history}
 
-What specific credit card is the user asking about?
-Return ONLY the card name (e.g. "Visa Gold", "Mastercard Platinum", "Visa Hasanah Gold").
-If no specific card can be determined, return "none".
-Card name only. No explanation."""
+Which specific card from the list above is the user asking about?
+Consider misspellings: "hasnah"/"hasannah" = "Hasanah", "master card" = "Mastercard".
+If no specific card is mentioned, return "none".
+Return ONLY the exact card name from the list, or "none"."""
 
-    result = chat(
+    response = chat(
         messages=[{"role": "user", "content": prompt}],
-        system="Extract the credit card name from context. Return only the card name or 'none'.",
+        system="Match the user's query to a card from the provided list. Return only the exact card name or 'none'.",
         temperature=0.0,
-        max_tokens=50,
+        max_tokens=80,
     )
 
-    result = result.strip().strip('"').strip("'")
-    if result.lower() in ("none", "n/a", "unknown", ""):
-        return ""
-    return result
-
-
-def _bulk_extract_profile(message: str, session: SessionMemory):
-    prompt = f"""Extract ALL eligibility profile fields from this message:
-
-"{message}"
-
-Return JSON with all fields you can find."""
-
-    result = chat(
-        messages=[{"role": "user", "content": prompt}],
-        system=BULK_EXTRACT_SYSTEM,
-        temperature=0.0,
-        max_tokens=300,
-    )
-
-    try:
-        result = re.sub(r'```(?:json)?', '', result).strip()
-        match = re.search(r'\{[^{}]*\}', result, re.DOTALL)
-        if match:
-            extracted = json.loads(match.group())
-            for k, v in extracted.items():
-                if k in ELIGIBILITY_FIELDS and v is not None and str(v).strip():
-                    session.update_profile(k, v)
-    except Exception:
-        pass
-
-
-def _extract_profile(message: str, session: SessionMemory):
-    from logging_utils import log_event
-
-    profile = session.user_profile
-    missing = [f for f in ELIGIBILITY_FIELDS if f not in profile or not profile[f]]
-
-    if not missing:
-        return
-
-    current_field = missing[0]
-
-    prompt = f"""Currently asking for: {current_field}
-Question shown to user: {ELIGIBILITY_FIELDS[current_field]}
-User replied: "{message}"
-
-You MUST return a JSON object with the key "{current_field}" and the extracted value.
-The user may use informal language, typos, or indirect answers.
-
-Examples for {current_field}:
-- If asking employment_duration: "1 year 2 months" -> {{"employment_duration": "1 year 2 months"}}
-- If asking employment_duration: "almost one year" -> {{"employment_duration": "1 year"}}
-- If asking employment_duration: "for 8 tears" -> {{"employment_duration": "8 years"}}
-- If asking employment_type: "self employed" -> {{"employment_type": "self_employed"}}
-- If asking employment_type: "i am a content creator" -> {{"employment_type": "self_employed"}}
-- If asking has_etin: "obviously i have" -> {{"has_etin": true}}
-- If asking age: "my age is 66" -> {{"age": 66}}
-- If asking monthly_income: "10 lakhs" -> {{"monthly_income": 1000000}}
-
-Return ONLY valid JSON with the key "{current_field}". Nothing else."""
-
-    result = chat(
-        messages=[{"role": "user", "content": prompt}],
-        system=EXTRACT_SYSTEM,
-        temperature=0.0,
-        max_tokens=300,
-    )
+    response = response.strip().strip('"').strip("'")
 
     log_event(
-        "extract_profile_debug",
-        field=current_field,
-        user_message=message,
-        llm_raw=result,
+        "llm_full_list_match",
+        query=user_message[:80],
+        llm_response=response[:80],
     )
 
-    try:
-        cleaned = re.sub(r'```(?:json)?', '', result).strip()
-        match = re.search(r'\{[^{}]*\}', cleaned, re.DOTALL)
-        if match:
-            extracted = json.loads(match.group())
-            log_event(
-                "extract_profile_parsed",
-                field=current_field,
-                extracted=str(extracted),
-            )
-            for k, v in extracted.items():
-                if k in ELIGIBILITY_FIELDS and v is not None and str(v).strip():
-                    if k not in session.user_profile or not session.user_profile[k]:
-                        session.update_profile(k, v)
-                        log_event("extract_profile_saved", field=k, value=str(v))
-                        return
-            log_event("extract_profile_no_match", field=current_field, extracted=str(extracted))
-        else:
-            log_event("extract_profile_no_json", field=current_field, cleaned=cleaned)
-    except Exception as e:
-        log_event("extract_profile_error", field=current_field, error=str(e))
+    if not response or response.lower() in ("none", "n/a", "unknown", ""):
+        return ""
+
+    for name in card_names:
+        if response.lower() == name.lower():
+            return name
+
+    for name in card_names:
+        if response.lower() in name.lower() or name.lower() in response.lower():
+            return name
+
+    return ""
 
 
-def _collect_profile(user_message: str, session: SessionMemory) -> tuple[str, bool]:
-    _extract_profile(user_message, session)
-
-    missing = [f for f in ELIGIBILITY_FIELDS if f not in session.user_profile or not str(session.user_profile[f]).strip()]
-
-    if missing:
-        next_field = missing[0]
-        question = ELIGIBILITY_FIELDS[next_field]
-        done = len(ELIGIBILITY_FIELDS) - len(missing)
-        total = len(ELIGIBILITY_FIELDS)
-        response = (
-            f"To check your eligibility, I need a few quick details "
-            f"({done}/{total} collected so far).\n\n"
-            f"{question}"
-        )
-        return response, False
-
-    return "", True
+def get_eligibility_form_schema(target_card: str = "") -> dict:
+    return {
+        "target_card": target_card,
+        "fields": ELIGIBILITY_SCHEMA,
+    }
 
 
-def clear_eligibility_fields(session: SessionMemory):
-    for field in ELIGIBILITY_FIELDS:
-        if field in session.user_profile:
-            session.user_profile[field] = ""
+def extract_target_card(user_message: str, history: str = "") -> str:
+    confident_match, candidates = _embedding_match_card(user_message)
+
+    if confident_match:
+        log_event("target_card_resolved", method="embedding_confident", card=confident_match)
+        return confident_match
+
+    if candidates:
+        disambiguated = _llm_disambiguate(user_message, candidates, history)
+        if disambiguated:
+            log_event("target_card_resolved", method="llm_disambiguate", card=disambiguated)
+            return disambiguated
+
+    full_match = _llm_full_list_match(user_message, history)
+    if full_match:
+        log_event("target_card_resolved", method="llm_full_list", card=full_match)
+        return full_match
+
+    log_event("target_card_resolved", method="none", card="")
+    return ""
 
 
-def _enrich_profile_str(session: SessionMemory) -> str:
-    profile = session.user_profile
+def validate_eligibility_form(form_data: dict) -> list[str]:
+    errors = []
+
+    age = form_data.get("age")
+    if age is None or str(age).strip() == "":
+        errors.append("Age is required.")
+    else:
+        try:
+            age_int = int(age)
+            if age_int < 18 or age_int > 70:
+                errors.append("Age must be between 18 and 70.")
+        except (ValueError, TypeError):
+            errors.append("Age must be a valid number.")
+
+    emp = form_data.get("employment_type")
+    if not emp or emp not in ("salaried", "self_employed", "business_owner"):
+        errors.append("Please select a valid employment status.")
+
+    income = form_data.get("monthly_income")
+    if income is None or str(income).strip() == "":
+        errors.append("Monthly income is required.")
+    else:
+        try:
+            income_int = int(income)
+            if income_int < 0:
+                errors.append("Monthly income cannot be negative.")
+        except (ValueError, TypeError):
+            errors.append("Monthly income must be a valid number.")
+
+    years = form_data.get("employment_duration_years")
+    if years is None or str(years).strip() == "":
+        errors.append("Employment duration (years) is required.")
+    else:
+        try:
+            int(years)
+        except (ValueError, TypeError):
+            errors.append("Employment duration (years) must be a valid number.")
+
+    return errors
+
+
+def _build_profile_from_form(form_data: dict) -> dict:
+    profile = {
+        "age": _safe_int(form_data.get("age"), 0),
+        "employment_type": form_data.get("employment_type", ""),
+        "monthly_income": _safe_int(form_data.get("monthly_income"), 0),
+        "has_etin": bool(form_data.get("has_etin", False)),
+    }
+
+    years = _safe_int(form_data.get("employment_duration_years"), 0)
+    months = _safe_int(form_data.get("employment_duration_months"), 0)
+    duration_parts = []
+    if years:
+        duration_parts.append(f"{years} year{'s' if years != 1 else ''}")
+    if months:
+        duration_parts.append(f"{months} month{'s' if months != 1 else ''}")
+    profile["employment_duration"] = " ".join(duration_parts) if duration_parts else "0 months"
+
+    return profile
+
+
+def _enrich_profile_str(profile: dict) -> str:
     if not profile:
         return "No user profile information collected yet."
 
@@ -319,34 +392,34 @@ def _enrich_profile_str(session: SessionMemory) -> str:
     return "Known about user:\n" + "\n".join(lines)
 
 
+def _get_collections(banking: str, suffix: str) -> list[str]:
+    if banking == "both":
+        return [
+            f"conventional_credit_{suffix}",
+            f"islami_credit_{suffix}",
+        ]
+    return [f"{banking}_credit_{suffix}"]
+
+
+MIN_ELIGIBILITY_RESPONSE_CHARS = 300
+MAX_ELIGIBILITY_RETRIES = 2
+
+
 def run_eligibility(
-    user_message: str,
-    routing: dict,
+    form_data: dict,
     session: SessionMemory,
-    is_new_check: bool = False,
-) -> tuple[str, bool]:
-    if is_new_check:
-        clear_eligibility_fields(session)
-        _bulk_extract_profile(user_message, session)
+) -> str:
+    profile = _build_profile_from_form(form_data)
 
-    response, complete = _collect_profile(user_message, session)
+    for k, v in profile.items():
+        session.update_profile(k, v)
 
-    if not complete:
-        return response, False
+    target = form_data.get("target_card", "")
 
-    banking = routing["banking_type"]
-    collections = _get_collections(banking, "i_need_a_credit_card")
-    if banking != "both":
-        other = "islami" if banking == "conventional" else "conventional"
-        collections.append(f"{other}_credit_i_need_a_credit_card")
-
-    target = session.user_profile.get("eligibility_target", "")
-
-    if target:
-        resolved = _resolve_target(target, session.get_history_str(max_chars=500))
-        if resolved:
-            target = resolved
-            session.update_profile("eligibility_target", target)
+    collections = [
+        "conventional_credit_i_need_a_credit_card",
+        "islami_credit_i_need_a_credit_card",
+    ]
 
     eligibility_terms = "eligibility requirements age income employment duration etin documents"
     if target:
@@ -354,24 +427,22 @@ def run_eligibility(
     else:
         search_query = eligibility_terms
 
-    context = rag_search_multi(
-        search_query,
-        collections,
-        top_k=8,
-    )
+    context = rag_search_multi(search_query, collections, top_k=8)
 
     if context.startswith("[NO RESULTS]"):
-        return "I couldn't find eligibility criteria in my knowledge base. Please contact Prime Bank at **16218** for eligibility information.", True
+        return "I couldn't find eligibility criteria in my knowledge base. Please contact Prime Bank at **16218** for eligibility information."
 
     context = _clean_context(context)
-
-    profile_str = _enrich_profile_str(session)
+    profile_str = _enrich_profile_str(profile)
 
     if target:
         focus = f"""The user specifically asked about: "{target}"
-Focus your assessment on that card ONLY. If it is found in the chunks, assess eligibility for that card only. If not found, say so and suggest the closest alternatives."""
+Focus your assessment on that card ONLY. If it is found in the chunks, assess eligibility for that card only. If not found, say so and suggest the closest alternatives.
+You MUST provide a detailed assessment including all criteria: age requirement, income requirement, employment duration, E-TIN requirement, and your verdict."""
     else:
-        focus = "Assess eligibility for each Prime Bank credit card found in the chunks."
+        focus = """Assess eligibility for each Prime Bank credit card found in the chunks.
+For each card provide: the card name, all eligibility criteria checked, and your verdict.
+Be thorough and detailed."""
 
     prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
 {context}
@@ -383,19 +454,27 @@ User profile:
 
 {focus}
 
-Provide your eligibility assessment now. Use the annual_income value from the profile directly — do not calculate it yourself."""
+Provide your eligibility assessment now. Use the annual_income value from the profile directly — do not calculate it yourself.
+Your response MUST be detailed and comprehensive. Do not cut short."""
 
-    response = chat(
-        messages=[{"role": "user", "content": prompt}],
-        system=ELIGIBILITY_SYSTEM,
-        temperature=0.2,
-        max_tokens=1500,
-    )
+    for attempt in range(MAX_ELIGIBILITY_RETRIES + 1):
+        response = chat(
+            messages=[{"role": "user", "content": prompt}],
+            system=ELIGIBILITY_SYSTEM,
+            temperature=0.2,
+            max_tokens=2000,
+        )
 
-    if not response or len(response.strip()) < 20:
-        return "I couldn't complete the eligibility assessment. Please contact Prime Bank at **16218** for assistance.", True
+        if response and len(response.strip()) >= MIN_ELIGIBILITY_RESPONSE_CHARS:
+            return response
 
-    return response, True
+        if attempt < MAX_ELIGIBILITY_RETRIES:
+            prompt = prompt + "\n\nIMPORTANT: Your previous response was too short. Provide a COMPLETE and DETAILED assessment."
+
+    if response and len(response.strip()) >= 20:
+        return response
+
+    return "I couldn't complete the eligibility assessment. Please contact Prime Bank at **16218** for assistance."
 
 
 def run_catalog(
@@ -466,7 +545,6 @@ def run_apply(
         return "[NO RESULTS]"
 
     context = _clean_context(context)
-
     history = session.get_history_str(max_chars=1000)
 
     prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
@@ -508,7 +586,6 @@ def run_faq(
         return "[NO RESULTS]"
 
     context = _clean_context(context)
-
     history = session.get_history_str(max_chars=1000)
 
     prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
