@@ -2,6 +2,13 @@ from datetime import datetime
 
 MAX_TURNS = 10
 MAX_MSG_CHARS = 300
+SUMMARIZE_AFTER_TURNS = 6  # summarize when older-half exceeds this many full exchanges
+
+_SUMMARIZE_SYSTEM = (
+    "Summarize this conversation excerpt in 2-3 sentences. "
+    "Focus on what the user is looking for and what was already discussed. "
+    "Be concise and factual."
+)
 
 
 class SessionMemory:
@@ -11,6 +18,38 @@ class SessionMemory:
         self.history: list[dict] = []
         self.user_profile: dict = {}
         self.last_intent: str | None = None
+        self._summary: str | None = None
+
+    def _maybe_summarize(self):
+        """When history grows large, summarize the oldest half and drop it."""
+        threshold_messages = SUMMARIZE_AFTER_TURNS * 2
+        if len(self.history) < threshold_messages * 2:
+            return
+
+        cutoff = len(self.history) // 2
+        to_summarize = self.history[:cutoff]
+        self.history = self.history[cutoff:]
+
+        lines = []
+        if self._summary:
+            lines.append(f"Previous summary: {self._summary}")
+        for msg in to_summarize:
+            role = "User" if msg["role"] == "user" else "Assistant"
+            lines.append(f"{role}: {msg['content_short']}")
+        excerpt = "\n".join(lines)
+
+        try:
+            from llm.ollama_client import chat as llm_chat
+            result = llm_chat(
+                messages=[{"role": "user", "content": excerpt}],
+                system=_SUMMARIZE_SYSTEM,
+                temperature=0.0,
+                max_tokens=150,
+                think=False,
+            )
+            self._summary = result.strip() if result else self._summary
+        except Exception:
+            pass
 
     def _truncate_for_history(self, text: str, max_chars: int = MAX_MSG_CHARS) -> str:
         if len(text) <= max_chars:
@@ -36,6 +75,7 @@ class SessionMemory:
         )
         if len(self.history) > self.max_turns * 2:
             self.history = self.history[-(self.max_turns * 2):]
+        self._maybe_summarize()
 
     def set_last_intent(self, intent: str):
         self.last_intent = intent
@@ -45,6 +85,8 @@ class SessionMemory:
 
     def get_history_str(self, max_chars: int = 2000) -> str:
         lines = []
+        if self._summary:
+            lines.append(f"[Earlier summary: {self._summary}]")
         for msg in self.history:
             role = "User" if msg["role"] == "user" else "Assistant"
             lines.append(f"{role}: {msg['content_short']}")
@@ -78,6 +120,7 @@ class SessionMemory:
         self.history = []
         self.user_profile = {}
         self.last_intent = None
+        self._summary = None
 
 
 _sessions: dict[str, SessionMemory] = {}

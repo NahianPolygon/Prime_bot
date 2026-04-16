@@ -8,35 +8,21 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg:             #fafafa;
-      --surface:        #ffffff;
-      --border:         #e8e8e8;
-      --text-primary:   #111111;
-      --text-secondary: #666666;
-      --text-muted:     #999999;
-      --accent:         #1a4f9c;
-      --accent-light:   #e8f0fb;
-      --accent-hover:   #153e7a;
-      --user-bg:        #1a4f9c;
-      --user-text:      #ffffff;
-      --shadow-sm:      0 1px 3px rgba(0,0,0,0.06);
-      --radius:         12px;
-      --radius-sm:      8px;
-      --font:           'DM Sans', sans-serif;
-      --font-mono:      'DM Mono', monospace;
-      --success:        #22c55e;
-      --error:          #ef4444;
-      --warning:        #f59e0b;
+      --bg: #fafafa; --surface: #ffffff; --border: #e8e8e8;
+      --text-primary: #111111; --text-secondary: #666666; --text-muted: #999999;
+      --accent: #1a4f9c; --accent-light: #e8f0fb; --accent-hover: #153e7a;
+      --user-bg: #1a4f9c; --user-text: #ffffff;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+      --radius: 12px; --radius-sm: 8px;
+      --font: 'DM Sans', sans-serif; --font-mono: 'DM Mono', monospace;
+      --success: #22c55e; --error: #ef4444; --warning: #f59e0b;
     }
-
     html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text-primary); -webkit-font-smoothing: antialiased; }
     .app { display: flex; flex-direction: column; height: 100vh; max-width: 860px; margin: 0 auto; background: var(--surface); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
-
+    /* Header */
     .header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 10; }
     .header-brand { display: flex; align-items: center; gap: 12px; }
     .header-logo { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -47,14 +33,17 @@
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; animation: pulse-dot 2s infinite; }
     @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     .status-text { font-size: 12px; color: var(--text-muted); }
+    .lang-btn { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--text-secondary); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; transition: all 0.15s; letter-spacing: 0.01em; }
+    .lang-btn:hover { background: var(--accent-light); color: var(--accent); border-color: rgba(26,79,156,0.25); }
+    .lang-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
     .btn-clear { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--text-secondary); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; cursor: pointer; transition: all 0.15s; }
     .btn-clear:hover { background: var(--bg); color: var(--text-primary); border-color: #ccc; }
-
-    .messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth; }
+    /* Messages */
+    .messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 0; scroll-behavior: smooth; }
     .messages::-webkit-scrollbar { width: 4px; }
     .messages::-webkit-scrollbar-track { background: transparent; }
     .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
+    /* Welcome */
     .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 48px 24px; text-align: center; gap: 24px; animation: fadeUp 0.5s ease both; }
     .welcome-icon { width: 64px; height: 64px; background: var(--accent-light); border-radius: 16px; display: flex; align-items: center; justify-content: center; }
     .welcome-icon svg { width: 32px; height: 32px; fill: var(--accent); }
@@ -63,46 +52,57 @@
     .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
     .suggestion-chip { font-family: var(--font); font-size: 13px; color: var(--accent); background: var(--accent-light); border: 1px solid rgba(26,79,156,0.15); border-radius: 20px; padding: 7px 16px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
     .suggestion-chip:hover { background: var(--accent); color: white; border-color: var(--accent); }
-
-    .message-row { display: flex; gap: 10px; animation: fadeUp 0.25s ease both; }
+    /* Message groups */
+    .msg-group { margin-bottom: 16px; animation: fadeUp 0.25s ease both; }
     @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .message-row { display: flex; gap: 10px; }
     .message-row.user { flex-direction: row-reverse; }
     .avatar { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; margin-top: 2px; }
     .avatar.bot  { background: var(--accent-light); color: var(--accent); }
     .avatar.user { background: var(--user-bg); color: white; }
-
-    .bubble { max-width: 75%; border-radius: var(--radius); font-size: 14px; line-height: 1.65; box-shadow: var(--shadow-sm); }
+    /* bubble-wrap owns max-width so copy-btn is not clipped by bubble overflow */
+    .bubble-wrap { position: relative; max-width: 75%; }
+    .bubble { border-radius: var(--radius); font-size: 14px; line-height: 1.65; box-shadow: var(--shadow-sm); }
     .bubble.user { background: var(--user-bg); color: var(--user-text); padding: 12px 16px; border-top-right-radius: 4px; }
     .bubble.bot  { background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); border-top-left-radius: 4px; padding: 12px 16px; overflow: hidden; }
     .bubble.bot.has-table { padding: 0; }
-
     .bubble-text   { padding: 12px 16px 8px; }
     .bubble-footer { padding: 8px 16px 12px; }
-
     .bubble.bot p, .bubble-text p, .bubble-footer p { margin-bottom: 8px; }
     .bubble.bot p:last-child, .bubble-text p:last-child, .bubble-footer p:last-child { margin-bottom: 0; }
-
-    .bubble.bot ul, .bubble.bot ol,
-    .bubble-text ul, .bubble-text ol,
-    .bubble-footer ul, .bubble-footer ol { padding-left: 20px; margin: 6px 0 10px; }
+    .bubble.bot ul, .bubble.bot ol, .bubble-text ul, .bubble-text ol, .bubble-footer ul, .bubble-footer ol { padding-left: 20px; margin: 6px 0 10px; }
     .bubble.bot li, .bubble-text li, .bubble-footer li { margin-bottom: 5px; }
-
-    .bubble.bot h2, .bubble-text h2, .bubble-footer h2 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; letter-spacing: -0.01em; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-    .bubble.bot h3, .bubble-text h3, .bubble-footer h3 { font-size: 14px; font-weight: 600; margin: 10px 0 4px; }
+    .bubble.bot h2, .bubble-text h2 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; letter-spacing: -0.01em; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+    .bubble.bot h3, .bubble-text h3 { font-size: 14px; font-weight: 600; margin: 10px 0 4px; }
     .bubble.bot h1, .bubble-text h1 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; }
-
     .bubble.bot strong, .bubble-text strong, .bubble-footer strong { font-weight: 600; }
     .bubble.bot em, .bubble-text em, .bubble-footer em { font-style: italic; color: var(--text-secondary); }
     .bubble.bot code, .bubble-text code { font-family: var(--font-mono); font-size: 12px; background: var(--bg); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); }
     .bubble.bot blockquote, .bubble-text blockquote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--text-secondary); margin: 8px 0; font-style: italic; }
-
+    .bubble.bot hr, .bubble-text hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+    /* Copy button — on bubble-wrap so renderBotBubble's innerHTML= won't destroy it */
+    .copy-btn { position: absolute; top: 7px; right: 7px; width: 26px; height: 26px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.15s, background 0.15s; z-index: 2; padding: 0; }
+    .copy-btn svg { width: 13px; height: 13px; fill: var(--text-secondary); pointer-events: none; }
+    .bubble-wrap:hover .copy-btn { opacity: 1; }
+    .copy-btn:hover { background: var(--accent-light); }
+    .copy-btn.copied { background: #dcfce7; border-color: #bbf7d0; }
+    .copy-btn.copied svg { fill: #16a34a; }
+    /* Timestamps */
+    .msg-meta { display: flex; align-items: center; margin-top: 3px; padding-left: 42px; }
+    .msg-group.user .msg-meta { padding-left: 0; padding-right: 42px; justify-content: flex-end; }
+    .msg-time { font-size: 11px; color: var(--text-muted); }
+    /* Follow-up chips */
+    .follow-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-left: 42px; }
+    .follow-chip { font-family: var(--font); font-size: 12px; color: var(--accent); background: var(--accent-light); border: 1px solid rgba(26,79,156,0.15); border-radius: 16px; padding: 5px 13px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .follow-chip:hover { background: var(--accent); color: white; border-color: var(--accent); }
+    /* Table */
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
     .table-wrapper table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 13px; margin: 0; background: white; }
     .table-wrapper th { background: #f0f5ff; font-weight: 600; white-space: nowrap; padding: 9px 14px; border: 1px solid var(--border); color: var(--accent); }
     .table-wrapper td { padding: 8px 14px; border: 1px solid var(--border); vertical-align: top; min-width: 110px; max-width: 260px; word-break: break-word; }
     .table-wrapper tbody tr:nth-child(even) { background: #f7f9ff; }
     .table-wrapper tbody tr:hover { background: #eef3fd; }
-
+    /* Thinking indicator */
     .thinking-indicator { display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
     .thinking-text { font-size: 13px; color: var(--text-muted); font-style: italic; }
     .thinking-dots { display: flex; gap: 4px; }
@@ -110,19 +110,31 @@
     .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
     .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
     @keyframes thinking-pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
-
-    .input-area { padding: 16px 24px; border-top: 1px solid var(--border); background: var(--surface); }
-    .input-row { display: flex; gap: 10px; align-items: flex-end; }
-    .input-wrap { flex: 1; }
-    textarea { font-family: var(--font); font-size: 14px; color: var(--text-primary); width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 14px; resize: none; outline: none; min-height: 44px; max-height: 140px; overflow-y: auto; transition: border-color 0.15s; line-height: 1.5; }
-    textarea::placeholder { color: var(--text-muted); }
-    textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,79,156,0.08); }
-    .send-btn { width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--accent); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
-    .send-btn:hover:not(:disabled) { background: var(--accent-hover); }
-    .send-btn:disabled { background: var(--border); cursor: not-allowed; }
-    .send-btn svg { width: 18px; height: 18px; fill: white; }
-    .input-hint { font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center; }
-
+    .thinking-elapsed { font-size: 11px; color: var(--text-muted); min-width: 20px; }
+    /* EMI / Rewards calculator */
+    .calc-bubble { padding: 0 !important; min-width: 280px; max-width: 340px; }
+    .calc-hdr { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; color: var(--accent); }
+    .calc-hdr svg { flex-shrink: 0; fill: var(--accent); }
+    .calc-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .calc-field label { display: block; font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .calc-input { font-family: var(--font); font-size: 13px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-primary); outline: none; transition: border-color 0.15s; }
+    .calc-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(26,79,156,0.08); }
+    .tenure-row { display: flex; gap: 6px; }
+    .t-btn { font-family: var(--font); font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text-secondary); cursor: pointer; transition: all 0.15s; flex: 1; }
+    .t-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .calc-results { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .calc-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; }
+    .calc-row + .calc-row { border-top: 1px solid var(--border); }
+    .calc-row:first-child { background: var(--accent-light); }
+    .calc-row-label { font-size: 12px; color: var(--text-secondary); }
+    .calc-row-val { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+    .calc-row:first-child .calc-row-val { color: var(--accent); font-size: 14px; }
+    .calc-note { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+    /* Scroll FAB */
+    .scroll-fab { position: fixed; bottom: 90px; right: calc(50% - 430px + 16px); width: 36px; height: 36px; border-radius: 50%; background: var(--accent); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); opacity: 0; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; z-index: 100; pointer-events: none; }
+    .scroll-fab.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .scroll-fab svg { width: 18px; height: 18px; fill: white; }
+    /* Eligibility form */
     .elig-form { width: 100%; }
     .elig-form-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
     .elig-form-icon { width: 36px; height: 36px; background: var(--accent-light); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -131,16 +143,12 @@
     .elig-form-target { font-size: 12px; color: var(--accent); font-weight: 500; }
     .elig-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .elig-field { display: flex; flex-direction: column; gap: 4px; }
-    .elig-field.full-width { grid-column: 1 / -1; }
     .elig-field label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
     .elig-field label .req { color: var(--error); }
-    .elig-field input[type="number"],
-    .elig-field select { font-family: var(--font); font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-primary); outline: none; transition: border-color 0.15s; width: 100%; }
-    .elig-field input[type="number"]:focus,
-    .elig-field select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(26,79,156,0.08); }
+    .elig-field input[type="number"], .elig-field select { font-family: var(--font); font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-primary); outline: none; transition: border-color 0.15s; width: 100%; }
+    .elig-field input[type="number"]:focus, .elig-field select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(26,79,156,0.08); }
     .elig-field input[type="number"]::placeholder { color: var(--text-muted); }
-    .elig-field input.field-error,
-    .elig-field select.field-error { border-color: var(--error); }
+    .elig-field input.field-error, .elig-field select.field-error { border-color: var(--error); }
     .elig-checkbox-row { display: flex; align-items: center; gap: 8px; padding: 10px 0 4px; grid-column: 1 / -1; }
     .elig-checkbox-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
     .elig-checkbox-row label { font-size: 13px; color: var(--text-primary); cursor: pointer; user-select: none; }
@@ -154,18 +162,38 @@
     .elig-form-errors { margin-top: 8px; }
     .elig-form-errors p { font-size: 12px; color: var(--error); margin: 2px 0; }
     .elig-form-submitted { opacity: 0.6; pointer-events: none; }
-
     .elig-bubble { max-width: 420px; padding: 16px !important; }
-
+    .prefill-badge { display: inline-block; font-size: 10px; background: #fef9c3; color: #854d0e; border: 1px solid #fde047; border-radius: 4px; padding: 1px 6px; margin-left: 6px; font-weight: 500; vertical-align: middle; }
+    /* Input area */
+    .input-area { padding: 16px 24px; border-top: 1px solid var(--border); background: var(--surface); }
+    .input-row { display: flex; gap: 10px; align-items: flex-end; }
+    .input-wrap { flex: 1; }
+    textarea { font-family: var(--font); font-size: 14px; color: var(--text-primary); width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 14px; resize: none; outline: none; min-height: 44px; max-height: 140px; overflow-y: auto; transition: border-color 0.15s; line-height: 1.5; }
+    textarea::placeholder { color: var(--text-muted); }
+    textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,79,156,0.08); }
+    .send-btn { width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--accent); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+    .send-btn:hover:not(:disabled) { background: var(--accent-hover); }
+    .send-btn:disabled { background: var(--border); cursor: not-allowed; }
+    .send-btn svg { width: 18px; height: 18px; fill: white; }
+    .input-hint { font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center; }
+    /* Responsive */
+    @media (max-width: 920px) { .scroll-fab { right: 16px; } }
     @media (max-width: 720px) {
-      .bubble { max-width: 94%; }
-      .elig-bubble { max-width: 94%; }
+      .bubble-wrap { max-width: 90%; }
+      .elig-bubble { max-width: 90%; }
       .elig-form-grid { grid-template-columns: 1fr; }
       .table-wrapper td, .table-wrapper th { font-size: 12px; padding: 6px 10px; min-width: 80px; }
+      .status-text { display: none; }
+      .scroll-fab { right: 12px; bottom: 80px; }
     }
   </style>
 </head>
 <body>
+
+<button class="scroll-fab" id="scrollFab" title="Scroll to bottom">
+  <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+</button>
+
 <div class="app">
   <header class="header">
     <div class="header-brand">
@@ -173,14 +201,15 @@
         <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
       </div>
       <div>
-        <div class="header-title">Prime Bank Assistant</div>
-        <div class="header-subtitle">Credit Card Help & Guidance</div>
+        <div class="header-title" id="hdrTitle">Prime Bank Assistant</div>
+        <div class="header-subtitle" id="hdrSub">Credit Card Help &amp; Guidance</div>
       </div>
     </div>
     <div class="header-actions">
+      <button class="lang-btn" id="langBtn" title="Switch language" onclick="toggleLanguage()">&#2476;&#2494;&#2434;</button>
       <div class="status-dot" id="statusDot"></div>
       <span class="status-text" id="statusText">Connecting...</span>
-      <button class="btn-clear" onclick="clearConversation()">New chat</button>
+      <button class="btn-clear" id="btnClear" onclick="clearConversation()">New chat</button>
     </div>
   </header>
 
@@ -189,419 +218,297 @@
       <div class="welcome-icon">
         <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
       </div>
-      <h2>How can I help you today?</h2>
-      <p>I can help you find the right Prime Bank credit card, check your eligibility, compare products, or assist with your existing card.</p>
-      <div class="suggestions">
-        <button class="suggestion-chip" onclick="sendSuggestion('What credit cards does Prime Bank offer?')">What cards do you offer?</button>
-        <button class="suggestion-chip" onclick="sendSuggestion('I need a halal credit card')">Halal / Islamic card</button>
-        <button class="suggestion-chip" onclick="sendSuggestion('Am I eligible for a credit card?')">Check my eligibility</button>
-        <button class="suggestion-chip" onclick="sendSuggestion('Compare Visa Gold and Visa Platinum')">Compare cards</button>
-        <button class="suggestion-chip" onclick="sendSuggestion('How do I apply for a credit card?')">How to apply</button>
-        <button class="suggestion-chip" onclick="sendSuggestion('I lost my card, what should I do?')">Lost card help</button>
-      </div>
+      <h2 id="welcomeTitle"></h2>
+      <p id="welcomeDesc"></p>
+      <div class="suggestions" id="welcomeChips"></div>
     </div>
   </div>
 
   <div class="input-area">
     <div class="input-row">
       <div class="input-wrap">
-        <textarea id="inputBox" placeholder="Ask about credit cards, eligibility, fees..." rows="1"
-          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <textarea id="inputBox" rows="1"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this); updateSendBtn();"></textarea>
       </div>
       <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
         <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       </button>
     </div>
-    <div class="input-hint">
-      Press <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Enter</kbd> to send ·
-      <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Shift+Enter</kbd> for new line
-    </div>
+    <div class="input-hint" id="inputHint"></div>
   </div>
 </div>
 
 <script>
   marked.setOptions({ breaks: true, gfm: true });
 
-  const messagesEl  = document.getElementById("messages");
-  const welcomeEl   = document.getElementById("welcome");
-  const inputEl     = document.getElementById("inputBox");
-  const sendBtnEl   = document.getElementById("sendBtn");
-  const statusDot   = document.getElementById("statusDot");
-  const statusText  = document.getElementById("statusText");
+  /* ── UI translations ── */
+  var UI = {
+    en: {
+      title: "Prime Bank Assistant", subtitle: "Credit Card Help & Guidance",
+      placeholder: "Ask about credit cards, eligibility, fees...",
+      hint: 'Press <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Enter</kbd> to send \xB7 <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Shift+Enter</kbd> for new line',
+      newChat: "New chat", thinking: "Thinking",
+      welcomeTitle: "How can I help you today?",
+      welcomeDesc: "I can help you find the right Prime Bank credit card, check your eligibility, compare products, or assist with your existing card.",
+      chips: [
+        { label: "What cards do you offer?",  msg: "What credit cards does Prime Bank offer?" },
+        { label: "Halal / Islamic card",       msg: "I need a halal credit card" },
+        { label: "Check my eligibility",       msg: "Am I eligible for a credit card?" },
+        { label: "Compare cards",              msg: "Compare Visa Gold and Visa Platinum" },
+        { label: "How to apply",               msg: "How do I apply for a credit card?" },
+        { label: "Lost card help",             msg: "I lost my card, what should I do?" },
+      ],
+      langBtn: "\u09AC\u09BE\u0982",
+    },
+    bn: {
+      title: "\u09AA\u09CD\u09B0\u09BE\u0987\u09AE \u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u09B8\u09B9\u0995\u09BE\u09B0\u09C0",
+      subtitle: "\u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1 \u09B8\u09BE\u09B9\u09BE\u09AF\u09CD\u09AF \u0993 \u0997\u09BE\u0987\u09A1\u09C7\u09A8\u09CD\u09B8",
+      placeholder: "\u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1, \u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE, \u09AB\u09BF \u09B8\u09AE\u09CD\u09AA\u09B0\u09CD\u0995\u09C7 \u099C\u09BF\u099C\u09CD\u099E\u09C7\u09B8 \u0995\u09B0\u09C1\u09A8...",
+      hint: '\u09AA\u09BE\u09A0\u09BE\u09A4\u09C7 <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Enter</kbd> \xB7 \u09A8\u09A4\u09C1\u09A8 \u09B2\u09BE\u0987\u09A8\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Shift+Enter</kbd>',
+      newChat: "\u09A8\u09A4\u09C1\u09A8 \u099A\u09CD\u09AF\u09BE\u099F", thinking: "\u09AD\u09BE\u09AC\u099B\u09BF",
+      welcomeTitle: "\u0986\u099C \u0995\u09C0\u09AD\u09BE\u09AC\u09C7 \u09B8\u09BE\u09B9\u09BE\u09AF\u09CD\u09AF \u0995\u09B0\u09A4\u09C7 \u09AA\u09BE\u09B0\u09BF?",
+      welcomeDesc: "\u0986\u09AE\u09BF \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09A0\u09BF\u0995 \u09AA\u09CD\u09B0\u09BE\u0987\u09AE \u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1 \u0996\u09C1\u0981\u099C\u09C7 \u09AA\u09C7\u09A4\u09C7, \u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09A4\u09C7, \u09AA\u09A3\u09CD\u09AF \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09A4\u09C7 \u09AC\u09BE \u09AC\u09BF\u09A6\u09CD\u09AF\u09AE\u09BE\u09A8 \u0995\u09BE\u09B0\u09CD\u09A1\u09C7 \u09B8\u09BE\u09B9\u09BE\u09AF\u09CD\u09AF \u0995\u09B0\u09A4\u09C7 \u09AA\u09BE\u09B0\u09BF\u0964",
+      chips: [
+        { label: "\u0995\u09C0 \u0995\u09BE\u09B0\u09CD\u09A1 \u0986\u099B\u09C7?",           msg: "\u09AA\u09CD\u09B0\u09BE\u0987\u09AE \u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u0995\u09C0 \u0995\u09C0 \u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1 \u0985\u09AB\u09BE\u09B0 \u0995\u09B0\u09C7?" },
+        { label: "\u09B9\u09BE\u09B2\u09BE\u09B2 / \u0987\u09B8\u09B2\u09BE\u09AE\u09BF\u0995 \u0995\u09BE\u09B0\u09CD\u09A1",   msg: "\u0986\u09AE\u09BE\u09B0 \u098F\u0995\u099F\u09BF \u09B9\u09BE\u09B2\u09BE\u09B2 \u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1 \u09A6\u09B0\u0995\u09BE\u09B0" },
+        { label: "\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8",       msg: "\u0986\u09AE\u09BF \u0995\u09BF \u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF \u09AF\u09CB\u0997\u09CD\u09AF?" },
+        { label: "\u0995\u09BE\u09B0\u09CD\u09A1 \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09C1\u09A8",          msg: "\u09AD\u09BF\u09B8\u09BE \u0997\u09CB\u09B2\u09CD\u09A1 \u098F\u09AC\u0982 \u09AD\u09BF\u09B8\u09BE \u09AA\u09CD\u09B2\u09BE\u099F\u09BF\u09A8\u09BE\u09AE \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09C1\u09A8" },
+        { label: "\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC\u09C7\u09A8 \u0995\u09C0\u09AD\u09BE\u09AC\u09C7",       msg: "\u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF \u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?" },
+        { label: "\u0995\u09BE\u09B0\u09CD\u09A1 \u09B9\u09BE\u09B0\u09BF\u09AF\u09BC\u09C7\u099B\u09BF",           msg: "\u0986\u09AE\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09B9\u09BE\u09B0\u09BF\u09AF\u09BC\u09C7 \u0997\u09C7\u099B\u09C7, \u0995\u09C0 \u0995\u09B0\u09AC?" },
+      ],
+      langBtn: "EN",
+    },
+  };
 
-  let sessionId       = null;
-  let isLoading       = false;
-  let ws              = null;
-  let wsReady         = false;
-  let reconnectDelay  = 1000;
-  let reconnectTimer  = null;
-  let pingInterval    = null;
-  let activeBubble    = null;
-  let activeThinkId   = null;
-  let fullText        = "";
-  let activeFormId    = null;
+  var FOLLOWUP = {
+    en: {
+      eligible:        ["How do I apply?", "What documents do I need?", "Compare with another card"],
+      ineligible:      ["Show me other options", "What are the income requirements?", "How to improve eligibility?"],
+      borderline:      ["Show easier-to-get cards", "What's the minimum income?", "Tips to strengthen application"],
+      comparison:      ["Check my eligibility", "How to apply?", "Explain the fees"],
+      product_details: ["Check my eligibility", "Compare cards", "How to apply?"],
+      how_to_apply:    ["Check eligibility first", "What are the fees?", "How long does approval take?"],
+      emergency:       ["Get a replacement card", "How do I check my transactions?", "How do I change my PIN?"],
+      discovery:       ["Conventional please", "Islamic / Halal please", "Tell me more"],
+      general:         ["What cards are available?", "Check my eligibility", "Compare cards"],
+    },
+    bn: {
+      eligible:        ["\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?", "\u0995\u09C0 \u0995\u09C0 \u0995\u09BE\u0997\u099C\u09AA\u09A4\u09CD\u09B0 \u09B2\u09BE\u0997\u09AC\u09C7?", "\u0985\u09A8\u09CD\u09AF \u0995\u09BE\u09B0\u09CD\u09A1\u09C7\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09A4\u09C1\u09B2\u09A8\u09BE"],
+      ineligible:      ["\u0985\u09A8\u09CD\u09AF \u0985\u09AA\u09B6\u09A8 \u09A6\u09C7\u0996\u09BE\u09A8", "\u0986\u09AF\u09BC\u09C7\u09B0 \u09AA\u09CD\u09B0\u09AF\u09BC\u09CB\u099C\u09A8\u09C0\u09AF\u09BC\u09A4\u09BE \u0995\u09C0?", "\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u0989\u09A8\u09CD\u09A8\u09A4 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?"],
+      borderline:      ["\u09B8\u09B9\u099C\u09C7 \u09AA\u09BE\u0993\u09AF\u09BC\u09BE \u09AF\u09BE\u09AF\u09BC \u098F\u09AE\u09A8 \u0995\u09BE\u09B0\u09CD\u09A1", "\u09A8\u09CD\u09AF\u09C2\u09A8\u09A4\u09AE \u0986\u09AF\u09BC \u0995\u09A4?", "\u0986\u09AC\u09C7\u09A6\u09A8 \u09B6\u0995\u09CD\u09A4\u09BF\u09B6\u09BE\u09B2\u09C0 \u0995\u09B0\u09BE\u09B0 \u099F\u09BF\u09AA\u09B8"],
+      comparison:      ["\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?", "\u09AB\u09BF \u09B8\u09AE\u09CD\u09AA\u09B0\u09CD\u0995\u09C7 \u099C\u09BE\u09A8\u09C1\u09A8"],
+      product_details: ["\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u0995\u09BE\u09B0\u09CD\u09A1 \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09C1\u09A8", "\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?"],
+      how_to_apply:    ["\u0986\u0997\u09C7 \u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u09AB\u09BF \u0995\u09A4?", "\u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09A8 \u09AA\u09C7\u09A4\u09C7 \u0995\u09A4\u09A6\u09BF\u09A8 \u09B2\u09BE\u0997\u09C7?"],
+      emergency:       ["\u09A8\u09A4\u09C1\u09A8 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AA\u09BE\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?", "\u09B2\u09C7\u09A8\u09A6\u09C7\u09A8 \u0987\u09A4\u09BF\u09B9\u09BE\u09B8 \u0995\u09C0\u09AD\u09BE\u09AC\u09C7 \u09A6\u09C7\u0996\u09AC?", "\u09AA\u09BF\u09A8 \u09AA\u09B0\u09BF\u09AC\u09B0\u09CD\u09A4\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?"],
+      discovery:       ["\u09AA\u09CD\u09B0\u099A\u09B2\u09BF\u09A4 \u09AC\u09CD\u09AF\u09BE\u0982\u0995\u09BF\u0982", "\u0987\u09B8\u09B2\u09BE\u09AE\u09BF\u0995 / \u09B9\u09BE\u09B2\u09BE\u09B2", "\u09AA\u09BE\u09B0\u09CD\u09A5\u0995\u09CD\u09AF \u09B8\u09AE\u09CD\u09AA\u09B0\u09CD\u0995\u09C7 \u0986\u09B0\u09CB \u099C\u09BE\u09A8\u09C1\u09A8"],
+      general:         ["\u0995\u09C0 \u0995\u09BE\u09B0\u09CD\u09A1 \u0986\u099B\u09C7?", "\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u0995\u09BE\u09B0\u09CD\u09A1 \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09C1\u09A8"],
+    },
+  };
 
+  /* ── State ── */
+  var lang = "en", isBengali = false;
+  var sessionId = null, isLoading = false;
+  var ws = null, wsReady = false, reconnectDelay = 1000;
+  var reconnectTimer = null, pingInterval = null;
+  var activeBubble = null, activeThinkId = null, fullText = "";
+  var activeFormId = null, thinkTimer = null, thinkStart = 0;
+  var emiTenure = 12;
+
+  /* ── DOM refs ── */
+  var messagesEl = document.getElementById("messages");
+  var welcomeEl  = document.getElementById("welcome");
+  var inputEl    = document.getElementById("inputBox");
+  var sendBtnEl  = document.getElementById("sendBtn");
+  var statusDot  = document.getElementById("statusDot");
+  var statusText = document.getElementById("statusText");
+  var scrollFab  = document.getElementById("scrollFab");
+  var langBtn    = document.getElementById("langBtn");
+  var btnClear   = document.getElementById("btnClear");
+
+  /* ── Language ── */
+  function applyUI() {
+    var t = UI[lang];
+    document.getElementById("hdrTitle").textContent     = t.title;
+    document.getElementById("hdrSub").textContent       = t.subtitle;
+    document.getElementById("welcomeTitle").textContent = t.welcomeTitle;
+    document.getElementById("welcomeDesc").textContent  = t.welcomeDesc;
+    document.getElementById("inputHint").innerHTML      = t.hint;
+    inputEl.placeholder  = t.placeholder;
+    langBtn.textContent  = t.langBtn;
+    btnClear.textContent = t.newChat;
+    renderWelcomeChips();
+  }
+
+  function renderWelcomeChips() {
+    var el = document.getElementById("welcomeChips");
+    el.innerHTML = "";
+    UI[lang].chips.forEach(function(c) {
+      var btn = document.createElement("button");
+      btn.className = "suggestion-chip";
+      btn.textContent = c.label;
+      btn.onclick = function() { sendSuggestion(c.msg); };
+      el.appendChild(btn);
+    });
+  }
+
+  function toggleLanguage() {
+    isBengali = !isBengali;
+    lang = isBengali ? "bn" : "en";
+    langBtn.classList.toggle("active", isBengali);
+    applyUI();
+  }
+
+  function getBengaliSuffix() {
+    return isBengali ? "\n\n\u0985\u09A8\u09C1\u0997\u09CD\u09B0\u09B9 \u0995\u09B0\u09C7 \u09AC\u09BE\u0982\u09B2\u09BE\u09AF\u09BC \u0989\u09A4\u09CD\u09A4\u09B0 \u09A6\u09BF\u09A8\u0964" : "";
+  }
+
+  /* ── WebSocket ── */
   function wsUrl() {
-    const proto = location.protocol === "https:" ? "wss" : "ws";
-    return `${proto}://${location.host}/ws/chat`;
+    var proto = location.protocol === "https:" ? "wss" : "ws";
+    return proto + "://" + location.host + "/ws/chat";
   }
 
   function connect() {
     if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
-
     setStatus("connecting");
     ws = new WebSocket(wsUrl());
-
-    ws.onopen = () => {
-      wsReady = true;
-      reconnectDelay = 1000;
-      setStatus("online");
-      setInputEnabled(true);
-      inputEl.focus();
-      pingInterval = setInterval(() => {
+    ws.onopen = function() {
+      wsReady = true; reconnectDelay = 1000;
+      setStatus("online"); setInputEnabled(true); inputEl.focus();
+      pingInterval = setInterval(function() {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
       }, 25000);
     };
-
-    ws.onmessage = (evt) => {
-      let data;
-      try { data = JSON.parse(evt.data); } catch { return; }
+    ws.onmessage = function(evt) {
+      var data; try { data = JSON.parse(evt.data); } catch(e) { return; }
       handleServerMessage(data);
     };
-
-    ws.onclose = () => {
-      wsReady = false;
-      clearInterval(pingInterval);
-      setStatus("offline");
-      setInputEnabled(false);
+    ws.onclose = function() {
+      wsReady = false; clearInterval(pingInterval);
+      setStatus("offline"); setInputEnabled(false);
       if (isLoading) finishLoading();
-      reconnectTimer = setTimeout(() => {
-        reconnectDelay = Math.min(reconnectDelay * 2, 16000);
-        connect();
+      reconnectTimer = setTimeout(function() {
+        reconnectDelay = Math.min(reconnectDelay * 2, 16000); connect();
       }, reconnectDelay);
     };
-
-    ws.onerror = () => {
-      ws.close();
-    };
+    ws.onerror = function() { ws.close(); };
   }
 
   function handleServerMessage(data) {
     switch (data.type) {
-      case "session_id":
-        sessionId = data.session_id;
-        break;
-
+      case "session_id": sessionId = data.session_id; break;
       case "show_eligibility_form":
         if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
-        activeBubble = null;
-        fullText = "";
-        renderEligibilityForm(data.schema);
-        finishLoading();
-        break;
-
+        activeBubble = null; fullText = "";
+        renderEligibilityForm(data.schema); finishLoading(); break;
       case "token":
         if (!activeBubble) {
           if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
-          const created = createBotBubble();
-          activeBubble = created.bubble;
-          fullText = "";
+          activeBubble = createBotBubble(); fullText = "";
         }
         fullText += data.token;
         renderBotBubble(activeBubble, fullText);
-        scrollToBottom();
-        break;
-
+        scrollToBottom(); break;
       case "done":
-        activeBubble = null;
-        fullText = "";
-        finishLoading();
-        break;
-
-      case "cleared":
-        sessionId = null;
-        break;
-
+        if (activeBubble) appendFollowupChips(detectResponseTopic(fullText));
+        activeBubble = null; fullText = ""; finishLoading(); break;
+      case "cleared": sessionId = null; break;
       case "error":
         if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
-        activeBubble = null;
-        fullText = "";
-        appendBubble("bot", "Sorry, something went wrong. Please try again or call **16218**.");
-        finishLoading();
-        break;
-
-      case "pong":
-        break;
+        activeBubble = null; fullText = "";
+        appendBotBubble("Sorry, something went wrong. Please try again or call **16218**.");
+        finishLoading(); break;
+      case "pong": break;
     }
   }
 
-  function renderEligibilityForm(schema) {
-    const formId = "elig_" + Date.now();
-    activeFormId = formId;
-
-    const row = document.createElement("div");
-    row.className = "message-row bot";
-    row.id = formId + "_row";
-
-    const avatar = document.createElement("div");
-    avatar.className = "avatar bot";
-    avatar.textContent = "P";
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble bot elig-bubble";
-
-    const targetCard = schema.target_card || "";
-    const fields = schema.fields || {};
-
-    let targetHtml = "";
-    if (targetCard) {
-      targetHtml = `<div class="elig-form-target">Checking eligibility for: <strong>${targetCard}</strong></div>`;
-    }
-
-    let fieldsHtml = "";
-    const fieldKeys = Object.keys(fields);
-
-    for (const key of fieldKeys) {
-      const f = fields[key];
-      const reqMark = f.required ? '<span class="req">*</span>' : "";
-
-      if (f.type === "number") {
-        fieldsHtml += `
-          <div class="elig-field">
-            <label for="${formId}_${key}">${f.label} ${reqMark}</label>
-            <input type="number" id="${formId}_${key}" data-key="${key}"
-              placeholder="${f.placeholder || ""}"
-              ${f.min !== undefined ? 'min="' + f.min + '"' : ""}
-              ${f.max !== undefined ? 'max="' + f.max + '"' : ""} />
-          </div>`;
-      } else if (f.type === "select") {
-        let opts = '<option value="" disabled selected>Select...</option>';
-        for (const o of (f.options || [])) {
-          opts += `<option value="${o.value}">${o.label}</option>`;
-        }
-        fieldsHtml += `
-          <div class="elig-field">
-            <label for="${formId}_${key}">${f.label} ${reqMark}</label>
-            <select id="${formId}_${key}" data-key="${key}">${opts}</select>
-          </div>`;
-      } else if (f.type === "checkbox") {
-        fieldsHtml += `
-          <div class="elig-checkbox-row">
-            <input type="checkbox" id="${formId}_${key}" data-key="${key}" />
-            <label for="${formId}_${key}">${f.label}</label>
-          </div>`;
-      }
-    }
-
-    bubble.innerHTML = `
-      <div class="elig-form" id="${formId}">
-        <div class="elig-form-header">
-          <div class="elig-form-icon">
-            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
-          </div>
-          <div>
-            <div class="elig-form-title">Eligibility Check</div>
-            ${targetHtml}
-          </div>
-        </div>
-        <div class="elig-form-grid">
-          ${fieldsHtml}
-        </div>
-        <div class="elig-form-errors" id="${formId}_errors"></div>
-        <div class="elig-form-actions">
-          <button class="elig-btn elig-btn-cancel" onclick="cancelEligForm('${formId}')">Cancel</button>
-          <button class="elig-btn elig-btn-submit" id="${formId}_submit" onclick="submitEligForm('${formId}', '${targetCard}')">Check Eligibility</button>
-        </div>
-      </div>`;
-
-    row.appendChild(avatar);
-    row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    scrollToBottom();
+  /* ── Message helpers ── */
+  function nowTime() {
+    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
-  function submitEligForm(formId, targetCard) {
-    const formEl = document.getElementById(formId);
-    if (!formEl) return;
-
-    const errorsEl = document.getElementById(formId + "_errors");
-    errorsEl.innerHTML = "";
-
-    const inputs = formEl.querySelectorAll("input[data-key], select[data-key]");
-    const formData = {};
-    const errors = [];
-
-    inputs.forEach(el => {
-      const key = el.dataset.key;
-      if (el.type === "checkbox") {
-        formData[key] = el.checked;
-      } else if (el.type === "number") {
-        formData[key] = el.value.trim() !== "" ? Number(el.value) : null;
-      } else {
-        formData[key] = el.value;
-      }
-    });
-
-    if (!formData.age || formData.age < 18 || formData.age > 70) {
-      errors.push("Age must be between 18 and 70.");
-      markFieldError(formId, "age");
-    }
-    if (!formData.employment_type) {
-      errors.push("Please select an employment status.");
-      markFieldError(formId, "employment_type");
-    }
-    if (!formData.monthly_income || formData.monthly_income <= 0) {
-      errors.push("Please enter a valid monthly income.");
-      markFieldError(formId, "monthly_income");
-    }
-    if (formData.employment_duration_years === null || formData.employment_duration_years === "" || formData.employment_duration_years === undefined) {
-      errors.push("Please select employment duration (years).");
-      markFieldError(formId, "employment_duration_years");
-    }
-
-    if (errors.length > 0) {
-      errorsEl.innerHTML = errors.map(e => `<p>${e}</p>`).join("");
-      scrollToBottom();
-      return;
-    }
-
-    if (targetCard) {
-      formData.target_card = targetCard;
-    }
-
-    formEl.classList.add("elig-form-submitted");
-    const submitBtn = document.getElementById(formId + "_submit");
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Checking...";
-    }
-
-    activeThinkId = showThinking();
-    startLoading();
-
-    ws.send(JSON.stringify({
-      type: "eligibility_form_submit",
-      form_data: formData,
-      session_id: sessionId,
-    }));
+  function appendTimestamp(group, isUser) {
+    var meta = document.createElement("div"); meta.className = "msg-meta";
+    var span = document.createElement("span"); span.className = "msg-time";
+    span.textContent = nowTime(); meta.appendChild(span); group.appendChild(meta);
   }
 
-  function cancelEligForm(formId) {
-    const row = document.getElementById(formId + "_row");
-    if (row) row.remove();
-    activeFormId = null;
-  }
-
-  function markFieldError(formId, key) {
-    const el = document.getElementById(formId + "_" + key);
-    if (el) el.classList.add("field-error");
-    if (el) {
-      el.addEventListener("input", () => el.classList.remove("field-error"), { once: true });
-      el.addEventListener("change", () => el.classList.remove("field-error"), { once: true });
-    }
-  }
-
-  function sendMessage() {
-    const text = inputEl.value.trim();
-    if (!text || isLoading || !wsReady) return;
-
-    if (welcomeEl) welcomeEl.style.display = "none";
-    appendBubble("user", text);
-    inputEl.value = "";
-    inputEl.style.height = "auto";
-
-    activeThinkId = showThinking();
-    startLoading();
-
-    ws.send(JSON.stringify({ type: "message", message: text, session_id: sessionId }));
-  }
-
-  function sendSuggestion(text) {
-    inputEl.value = text;
-    autoResize(inputEl);
-    sendMessage();
-  }
-
-  function startLoading() {
-    isLoading = true;
-    sendBtnEl.disabled = true;
-    inputEl.disabled = true;
-  }
-
-  function finishLoading() {
-    isLoading = false;
-    if (wsReady) {
-      sendBtnEl.disabled = false;
-      inputEl.disabled = false;
-      inputEl.focus();
-    }
-  }
-
-  function setInputEnabled(enabled) {
-    if (!isLoading) {
-      sendBtnEl.disabled = !enabled;
-      inputEl.disabled = !enabled;
-    }
-  }
-
-  function setStatus(s) {
-    const map = {
-      online:     { color: "#22c55e", anim: "pulse-dot 2s infinite", label: "Online" },
-      offline:    { color: "#ef4444", anim: "none",                  label: "Reconnecting..." },
-      connecting: { color: "#f59e0b", anim: "pulse-dot 1s infinite", label: "Connecting..." },
+  function makeCopyBtn(bubbleEl) {
+    var btn = document.createElement("button");
+    btn.className = "copy-btn"; btn.title = "Copy";
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      var text = bubbleEl.innerText || "";
+      navigator.clipboard.writeText(text).then(function() {
+        btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>';
+        btn.classList.add("copied");
+        setTimeout(function() {
+          btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+          btn.classList.remove("copied");
+        }, 1500);
+      }).catch(function() {});
     };
-    const cfg = map[s] || map.offline;
-    statusDot.style.background  = cfg.color;
-    statusDot.style.animation   = cfg.anim;
-    statusText.textContent      = cfg.label;
+    return btn;
   }
 
-  function clearConversation() {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "clear", session_id: sessionId }));
-    }
-    sessionId = null;
-    activeBubble = null;
-    fullText = "";
-    activeFormId = null;
-    if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
-    messagesEl.querySelectorAll(".message-row").forEach(el => el.remove());
-    if (welcomeEl) welcomeEl.style.display = "flex";
-    if (!isLoading) finishLoading();
+  function createBotBubble() {
+    var group  = document.createElement("div"); group.className  = "msg-group";
+    var row    = document.createElement("div"); row.className    = "message-row bot";
+    var avatar = document.createElement("div"); avatar.className = "avatar bot"; avatar.textContent = "P";
+    var wrap   = document.createElement("div"); wrap.className   = "bubble-wrap";
+    var bubble = document.createElement("div"); bubble.className = "bubble bot";
+    wrap.appendChild(bubble); wrap.appendChild(makeCopyBtn(bubble));
+    row.appendChild(avatar); row.appendChild(wrap);
+    group.appendChild(row); appendTimestamp(group, false);
+    messagesEl.appendChild(group); scrollToBottom();
+    return bubble;
   }
 
+  function appendBotBubble(text) {
+    var group  = document.createElement("div"); group.className  = "msg-group";
+    var row    = document.createElement("div"); row.className    = "message-row bot";
+    var avatar = document.createElement("div"); avatar.className = "avatar bot"; avatar.textContent = "P";
+    var wrap   = document.createElement("div"); wrap.className   = "bubble-wrap";
+    var bubble = document.createElement("div"); bubble.className = "bubble bot";
+    renderBotBubble(bubble, text);
+    wrap.appendChild(bubble); wrap.appendChild(makeCopyBtn(bubble));
+    row.appendChild(avatar); row.appendChild(wrap);
+    group.appendChild(row); appendTimestamp(group, false);
+    messagesEl.appendChild(group); scrollToBottom();
+  }
+
+  function appendUserBubble(text) {
+    var group  = document.createElement("div"); group.className  = "msg-group user";
+    var row    = document.createElement("div"); row.className    = "message-row user";
+    var avatar = document.createElement("div"); avatar.className = "avatar user"; avatar.textContent = "U";
+    var wrap   = document.createElement("div"); wrap.className   = "bubble-wrap";
+    var bubble = document.createElement("div"); bubble.className = "bubble user";
+    bubble.textContent = text;
+    wrap.appendChild(bubble); row.appendChild(avatar); row.appendChild(wrap);
+    group.appendChild(row); appendTimestamp(group, true);
+    messagesEl.appendChild(group); scrollToBottom();
+  }
+
+  /* ── Markdown rendering ── */
   function fixMarkdown(raw) {
-    let t = (raw || "").replace(/\r\n/g, "\n");
-    let lines = t.split("\n");
-    let result = [];
-    let inTable = false;
-    let headerSepSeen = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      let line = lines[i];
-      let trimmed = line.trim();
-      let isPipeLine = trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 2;
-      let isSepLine = /^\|[\s\-:|]+\|$/.test(trimmed);
-
+    var t = (raw || "").replace(/\r\n/g, "\n");
+    var lines = t.split("\n"), result = [], inTable = false, headerSepSeen = false;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i], trimmed = line.trim();
+      var isPipeLine = trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 2;
+      var isSepLine  = /^\|[\s\-:|]+\|$/.test(trimmed);
       if (isPipeLine || isSepLine) {
-        if (!inTable) {
-          if (result.length > 0 && result[result.length - 1].trim() !== "") result.push("");
-          inTable = true;
-          headerSepSeen = false;
-        }
-        if (isSepLine) {
-          if (!headerSepSeen) { headerSepSeen = true; result.push(trimmed); }
-        } else {
+        if (!inTable) { if (result.length && result[result.length-1].trim()) result.push(""); inTable = true; headerSepSeen = false; }
+        if (isSepLine) { if (!headerSepSeen) { headerSepSeen = true; result.push(trimmed); } }
+        else {
           if (inTable && !headerSepSeen) {
-            let nextLine = (i + 1 < lines.length) ? lines[i + 1].trim() : "";
-            let nextIsSep = /^\|[\s\-:|]+\|$/.test(nextLine);
-            if (!nextIsSep) {
+            var nextLine = (i+1 < lines.length) ? lines[i+1].trim() : "";
+            if (!/^\|[\s\-:|]+\|$/.test(nextLine)) {
               result.push(trimmed);
-              let cols = (trimmed.match(/\|/g) || []).length - 1;
-              if (cols < 1) cols = 1;
-              result.push("|" + " --- |".repeat(cols));
-              headerSepSeen = true;
-              continue;
+              var cols = Math.max(1, (trimmed.match(/\|/g)||[]).length - 1);
+              result.push("|" + " --- |".repeat(cols)); headerSepSeen = true; continue;
             }
           }
           result.push(trimmed);
@@ -614,94 +521,312 @@
         result.push(line);
       }
     }
-
-    t = result.join("\n");
-    t = t.replace(/\n{3,}/g, "\n\n");
-    t = t.replace(/([^\n])\n(#{1,3}\s)/g, "\$1\n\n\$2");
+    t = result.join("\n").replace(/\n{3,}/g, "\n\n").replace(/([^\n])\n(#{1,3}\s)/g, "$1\n\n$2");
     return t.trim();
   }
 
   function renderBotBubble(bubble, rawText) {
-    const md   = fixMarkdown(rawText);
-    const html = marked.parse(md);
-
-    if (!/<table[\s>]/i.test(html)) {
-      bubble.innerHTML = html;
-      return;
-    }
-
-    bubble.classList.add("has-table");
-    bubble.innerHTML = "";
-
-    const tStart  = html.search(/<table[\s>]/i);
-    const tEndIdx = html.lastIndexOf("</table>");
-    const tEnd    = tEndIdx >= 0 ? tEndIdx + "</table>".length : html.length;
-
-    const before = html.slice(0, tStart).trim();
-    const table  = html.slice(tStart, tEnd).trim();
-    const after  = html.slice(tEnd).trim();
-
-    if (before) { const d = document.createElement("div"); d.className = "bubble-text"; d.innerHTML = before; bubble.appendChild(d); }
-    const wrapper = document.createElement("div"); wrapper.className = "table-wrapper"; wrapper.innerHTML = table; bubble.appendChild(wrapper);
-    if (after)  { const d = document.createElement("div"); d.className = "bubble-footer"; d.innerHTML = after; bubble.appendChild(d); }
+    var md = fixMarkdown(rawText), html = marked.parse(md);
+    if (!/<table[\s>]/i.test(html)) { bubble.innerHTML = html; return; }
+    bubble.classList.add("has-table"); bubble.innerHTML = "";
+    var tStart = html.search(/<table[\s>]/i);
+    var tEndIdx = html.lastIndexOf("</table>");
+    var tEnd = tEndIdx >= 0 ? tEndIdx + "</table>".length : html.length;
+    var before = html.slice(0, tStart).trim(), table = html.slice(tStart, tEnd).trim(), after = html.slice(tEnd).trim();
+    if (before) { var d1 = document.createElement("div"); d1.className = "bubble-text";   d1.innerHTML = before; bubble.appendChild(d1); }
+    var tw = document.createElement("div"); tw.className = "table-wrapper"; tw.innerHTML = table; bubble.appendChild(tw);
+    if (after)  { var d2 = document.createElement("div"); d2.className = "bubble-footer"; d2.innerHTML = after;  bubble.appendChild(d2); }
   }
 
-  function createBotBubble() {
-    const row    = document.createElement("div"); row.className = "message-row bot";
-    const avatar = document.createElement("div"); avatar.className = "avatar bot"; avatar.textContent = "P";
-    const bubble = document.createElement("div"); bubble.className = "bubble bot";
-    row.appendChild(avatar); row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    scrollToBottom();
-    return { row, bubble };
-  }
-
-  function appendBubble(role, text) {
-    const row    = document.createElement("div"); row.className = `message-row ${role}`;
-    const avatar = document.createElement("div"); avatar.className = `avatar ${role}`; avatar.textContent = role === "user" ? "U" : "P";
-    const bubble = document.createElement("div"); bubble.className = `bubble ${role}`;
-    if (role === "bot") renderBotBubble(bubble, text); else bubble.textContent = text;
-    row.appendChild(avatar); row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    scrollToBottom();
-  }
-
+  /* ── Thinking ── */
   function showThinking() {
-    const id  = "think_" + Date.now();
-    const row = document.createElement("div");
-    row.id = id; row.className = "message-row bot";
-    row.innerHTML = `<div class="avatar bot">P</div>
-      <div class="bubble bot" style="padding:0;">
-        <div class="thinking-indicator">
-          <span class="thinking-text">Thinking</span>
-          <div class="thinking-dots">
-            <div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div>
-          </div>
-        </div>
-      </div>`;
-    messagesEl.appendChild(row);
+    var id = "think_" + Date.now();
+    var group = document.createElement("div"); group.id = id; group.className = "msg-group";
+    var thinkingLabel = UI[lang].thinking;
+    group.innerHTML =
+      '<div class="message-row bot">' +
+        '<div class="avatar bot">P</div>' +
+        '<div class="bubble-wrap">' +
+          '<div class="bubble bot" style="padding:0;">' +
+            '<div class="thinking-indicator">' +
+              '<span class="thinking-text">' + thinkingLabel + '</span>' +
+              '<div class="thinking-dots"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>' +
+              '<span class="thinking-elapsed" id="' + id + '_elapsed"></span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    messagesEl.appendChild(group);
+    thinkStart = Date.now();
+    thinkTimer = setInterval(function() {
+      var el = document.getElementById(id + "_elapsed");
+      if (el) el.textContent = Math.floor((Date.now() - thinkStart) / 1000) + "s";
+    }, 1000);
     scrollToBottom();
     return id;
   }
 
   function removeThinking(id) {
-    const el = document.getElementById(id);
-    if (el) el.remove();
+    var el = document.getElementById(id); if (el) el.remove();
+    if (thinkTimer) { clearInterval(thinkTimer); thinkTimer = null; }
   }
 
-  function autoResize(el) {
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 140) + "px";
+  /* ── Follow-up chips ── */
+  function detectResponseTopic(text) {
+    var low = text.toLowerCase();
+    if (low.includes("\u2705") && (low.includes("eligible") || low.includes("qualify"))) return "eligible";
+    if ((low.includes("\u274C") || low.includes("ineligible") || low.includes("not qualify")) && !low.includes("\u2705")) return "ineligible";
+    if (low.includes("\u26A0\uFE0F") || low.includes("borderline")) return "borderline";
+    if (low.includes("| feature |") || (low.includes("annual fee") && low.includes("credit limit") && low.includes("reward point"))) return "comparison";
+    if ((low.includes("step") || low.includes("document")) && (low.includes("apply") || low.includes("application"))) return "how_to_apply";
+    if (low.includes("16218 immediately") || low.includes("block your card")) return "emergency";
+    if ((low.includes("conventional") || low.includes("islamic")) && low.includes("prefer")) return "discovery";
+    if (low.includes("annual fee") || low.includes("credit limit") || low.includes("reward point")) return "product_details";
+    return "general";
   }
 
-  function handleKey(e) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  function appendFollowupChips(topic) {
+    var chips = FOLLOWUP[lang][topic] || FOLLOWUP[lang].general;
+    var container = document.createElement("div"); container.className = "follow-chips";
+    chips.forEach(function(label) {
+      var btn = document.createElement("button"); btn.className = "follow-chip"; btn.textContent = label;
+      btn.onclick = function() { container.remove(); sendSuggestion(label); };
+      container.appendChild(btn);
+    });
+    var groups = messagesEl.querySelectorAll(".msg-group");
+    var lastGroup = groups[groups.length - 1];
+    if (lastGroup) lastGroup.appendChild(container); else messagesEl.appendChild(container);
+    scrollToBottom();
   }
 
+  /* ── Calculators ── */
+  function shouldShowEMICalc(msg) {
+    var low = msg.toLowerCase();
+    return (low.includes("emi") || low.includes("installment") || low.includes("\u0995\u09BF\u09B8\u09CD\u09A4\u09BF")) &&
+           (low.includes("calculat") || low.includes("how much") || low.includes("monthly") || low.includes("\u09B9\u09BF\u09B8\u09BE\u09AC"));
+  }
+  function shouldShowRewardsCalc(msg) {
+    var low = msg.toLowerCase();
+    return (low.includes("reward") || low.includes("point") || low.includes("\u09AA\u09AF\u09BC\u09C7\u09A8\u09CD\u099F")) &&
+           (low.includes("calculat") || low.includes("earn") || low.includes("how many") || low.includes("how much") || low.includes("\u09B9\u09BF\u09B8\u09BE\u09AC") || low.includes("\u0986\u09AF\u09BC"));
+  }
+  function maybeShowCalculator(msg) {
+    if (shouldShowEMICalc(msg))     { createEMICalcBubble();     return true; }
+    if (shouldShowRewardsCalc(msg)) { createRewardsCalcBubble(); return true; }
+    return false;
+  }
+
+  function createEMICalcBubble() {
+    var group = document.createElement("div"); group.className = "msg-group";
+    var row   = document.createElement("div"); row.className   = "message-row bot";
+    var av    = document.createElement("div"); av.className    = "avatar bot"; av.textContent = "P";
+    var wrap  = document.createElement("div"); wrap.className  = "bubble-wrap";
+    var bub   = document.createElement("div"); bub.className   = "bubble bot calc-bubble";
+    bub.innerHTML =
+      '<div class="calc-hdr"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>0% EMI Calculator</div>' +
+      '<div class="calc-body">' +
+        '<div class="calc-field"><label>Purchase Amount (BDT)</label><input type="number" class="calc-input" id="emi_amt" placeholder="e.g. 100,000" min="0" oninput="calcEMI()" /></div>' +
+        '<div class="calc-field"><label>Tenure</label><div class="tenure-row"><button class="t-btn active" data-m="12" onclick="pickTenure(this)">12 mo</button><button class="t-btn" data-m="24" onclick="pickTenure(this)">24 mo</button><button class="t-btn" data-m="36" onclick="pickTenure(this)">36 mo</button></div></div>' +
+        '<div class="calc-results"><div class="calc-row"><span class="calc-row-label">Monthly EMI</span><span class="calc-row-val" id="emi_monthly">BDT \u2014</span></div><div class="calc-row"><span class="calc-row-label">Total Amount</span><span class="calc-row-val" id="emi_total">\u2014</span></div><div class="calc-row"><span class="calc-row-label">Conversion Fee (1%)</span><span class="calc-row-val" id="emi_fee">\u2014</span></div></div>' +
+        '<p class="calc-note">0% interest at partner stores \xB7 1% one-time conversion fee applies</p>' +
+      '</div>';
+    wrap.appendChild(bub); row.appendChild(av); row.appendChild(wrap);
+    group.appendChild(row); appendTimestamp(group, false);
+    messagesEl.appendChild(group); scrollToBottom();
+  }
+
+  function pickTenure(btn) {
+    document.querySelectorAll(".t-btn").forEach(function(b) { b.classList.remove("active"); });
+    btn.classList.add("active"); emiTenure = parseInt(btn.dataset.m); calcEMI();
+  }
+  function calcEMI() {
+    var amt = parseFloat((document.getElementById("emi_amt") || {}).value || 0);
+    if (!amt || amt <= 0) {
+      document.getElementById("emi_monthly").textContent = "BDT \u2014";
+      document.getElementById("emi_total").textContent   = "\u2014";
+      document.getElementById("emi_fee").textContent     = "\u2014"; return;
+    }
+    document.getElementById("emi_monthly").textContent = "BDT " + Math.ceil(amt / emiTenure).toLocaleString();
+    document.getElementById("emi_total").textContent   = "BDT " + Math.ceil(amt).toLocaleString();
+    document.getElementById("emi_fee").textContent     = "BDT " + Math.ceil(amt * 0.01).toLocaleString();
+  }
+
+  function createRewardsCalcBubble() {
+    var group = document.createElement("div"); group.className = "msg-group";
+    var row   = document.createElement("div"); row.className   = "message-row bot";
+    var av    = document.createElement("div"); av.className    = "avatar bot"; av.textContent = "P";
+    var wrap  = document.createElement("div"); wrap.className  = "bubble-wrap";
+    var bub   = document.createElement("div"); bub.className   = "bubble bot calc-bubble";
+    bub.innerHTML =
+      '<div class="calc-hdr"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Rewards Calculator</div>' +
+      '<div class="calc-body">' +
+        '<div class="calc-field"><label>Monthly Spend (BDT)</label><input type="number" class="calc-input" id="rwd_spend" placeholder="e.g. 50,000" min="0" oninput="calcRewards()" /></div>' +
+        '<div class="calc-results"><div class="calc-row"><span class="calc-row-label">Points / Month</span><span class="calc-row-val" id="rwd_month">\u2014</span></div><div class="calc-row"><span class="calc-row-label">Points / Year</span><span class="calc-row-val" id="rwd_year">\u2014</span></div><div class="calc-row"><span class="calc-row-label">Est. Redemption Value</span><span class="calc-row-val" id="rwd_value">\u2014</span></div></div>' +
+        '<p class="calc-note">1 point per BDT 50 on POS & e-commerce \xB7 excludes cash advances & fees \xB7 500 pts \u2248 BDT 250</p>' +
+      '</div>';
+    wrap.appendChild(bub); row.appendChild(av); row.appendChild(wrap);
+    group.appendChild(row); appendTimestamp(group, false);
+    messagesEl.appendChild(group); scrollToBottom();
+  }
+
+  function calcRewards() {
+    var spend = parseFloat((document.getElementById("rwd_spend") || {}).value || 0);
+    if (!spend || spend <= 0) {
+      document.getElementById("rwd_month").textContent = "\u2014";
+      document.getElementById("rwd_year").textContent  = "\u2014";
+      document.getElementById("rwd_value").textContent = "\u2014"; return;
+    }
+    var ptsMonth = Math.floor(spend / 50), ptsYear = ptsMonth * 12;
+    document.getElementById("rwd_month").textContent = ptsMonth.toLocaleString();
+    document.getElementById("rwd_year").textContent  = ptsYear.toLocaleString();
+    document.getElementById("rwd_value").textContent = "BDT " + Math.floor(ptsYear * 0.5).toLocaleString();
+  }
+
+  /* ── Eligibility form ── */
+  function renderEligibilityForm(schema) {
+    var formId   = "elig_" + Date.now(); activeFormId = formId;
+    var prefill  = schema.prefill || {}, hasPrefill = Object.keys(prefill).length > 0;
+    var targetCard = schema.target_card || "", fields = schema.fields || {};
+
+    var group  = document.createElement("div"); group.className  = "msg-group"; group.id = formId + "_grp";
+    var row    = document.createElement("div"); row.className    = "message-row bot"; row.id = formId + "_row";
+    var avatar = document.createElement("div"); avatar.className = "avatar bot"; avatar.textContent = "P";
+    var wrap   = document.createElement("div"); wrap.className   = "bubble-wrap";
+    var bubble = document.createElement("div"); bubble.className = "bubble bot elig-bubble";
+
+    var targetHtml   = targetCard ? '<div class="elig-form-target">Checking eligibility for: <strong>' + targetCard + '</strong></div>' : "";
+    var prefillBadge = hasPrefill ? '<span class="prefill-badge">Pre-filled from conversation</span>' : "";
+
+    var fieldsHtml = "";
+    Object.keys(fields).forEach(function(key) {
+      var f = fields[key], req = f.required ? '<span class="req">*</span>' : "", pre = prefill[key];
+      if (f.type === "number") {
+        fieldsHtml += '<div class="elig-field"><label for="' + formId + '_' + key + '">' + f.label + ' ' + req + '</label>' +
+          '<input type="number" id="' + formId + '_' + key + '" data-key="' + key + '"' +
+          ' placeholder="' + (f.placeholder || "") + '"' +
+          (f.min !== undefined ? ' min="' + f.min + '"' : "") +
+          (f.max !== undefined ? ' max="' + f.max + '"' : "") +
+          (pre !== undefined   ? ' value="' + pre + '"'  : "") + ' /></div>';
+      } else if (f.type === "select") {
+        var opts = '<option value="" disabled selected>Select...</option>';
+        (f.options || []).forEach(function(o) {
+          var sel = pre !== undefined && String(o.value) === String(pre) ? " selected" : "";
+          opts += '<option value="' + o.value + '"' + sel + '>' + o.label + '</option>';
+        });
+        fieldsHtml += '<div class="elig-field"><label for="' + formId + '_' + key + '">' + f.label + ' ' + req + '</label>' +
+          '<select id="' + formId + '_' + key + '" data-key="' + key + '">' + opts + '</select></div>';
+      } else if (f.type === "checkbox") {
+        var chkd = pre ? " checked" : "";
+        fieldsHtml += '<div class="elig-checkbox-row"><input type="checkbox" id="' + formId + '_' + key + '" data-key="' + key + '"' + chkd + ' />' +
+          '<label for="' + formId + '_' + key + '">' + f.label + '</label></div>';
+      }
+    });
+
+    bubble.innerHTML =
+      '<div class="elig-form" id="' + formId + '">' +
+        '<div class="elig-form-header"><div class="elig-form-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></div>' +
+          '<div><div class="elig-form-title">Eligibility Check ' + prefillBadge + '</div>' + targetHtml + '</div></div>' +
+        '<div class="elig-form-grid">' + fieldsHtml + '</div>' +
+        '<div class="elig-form-errors" id="' + formId + '_errors"></div>' +
+        '<div class="elig-form-actions">' +
+          '<button class="elig-btn elig-btn-cancel" onclick="cancelEligForm(\'' + formId + '\')">Cancel</button>' +
+          '<button class="elig-btn elig-btn-submit" id="' + formId + '_submit" onclick="submitEligForm(\'' + formId + '\', \'' + targetCard + '\')">Check Eligibility</button>' +
+        '</div>' +
+      '</div>';
+
+    wrap.appendChild(bubble); row.appendChild(avatar); row.appendChild(wrap);
+    group.appendChild(row); appendTimestamp(group, false);
+    messagesEl.appendChild(group); scrollToBottom();
+  }
+
+  function submitEligForm(formId, targetCard) {
+    var formEl = document.getElementById(formId); if (!formEl) return;
+    var errorsEl = document.getElementById(formId + "_errors"); errorsEl.innerHTML = "";
+    var formData = {}, errors = [];
+    formEl.querySelectorAll("input[data-key], select[data-key]").forEach(function(el) {
+      var key = el.dataset.key;
+      if (el.type === "checkbox")    formData[key] = el.checked;
+      else if (el.type === "number") formData[key] = el.value.trim() !== "" ? Number(el.value) : null;
+      else                           formData[key] = el.value;
+    });
+    if (!formData.age || formData.age < 18 || formData.age > 70)            { errors.push("Age must be between 18 and 70.");          markFieldError(formId, "age"); }
+    if (!formData.employment_type)                                            { errors.push("Please select an employment status.");      markFieldError(formId, "employment_type"); }
+    if (!formData.monthly_income || formData.monthly_income <= 0)            { errors.push("Please enter a valid monthly income.");     markFieldError(formId, "monthly_income"); }
+    if (formData.employment_duration_years === null || formData.employment_duration_years === undefined || formData.employment_duration_years === "") {
+      errors.push("Please select employment duration (years)."); markFieldError(formId, "employment_duration_years");
+    }
+    if (errors.length > 0) { errorsEl.innerHTML = errors.map(function(e) { return "<p>" + e + "</p>"; }).join(""); scrollToBottom(); return; }
+    if (targetCard) formData.target_card = targetCard;
+    formEl.classList.add("elig-form-submitted");
+    var sb = document.getElementById(formId + "_submit"); if (sb) { sb.disabled = true; sb.textContent = "Checking..."; }
+    activeThinkId = showThinking(); startLoading();
+    ws.send(JSON.stringify({ type: "eligibility_form_submit", form_data: formData, session_id: sessionId }));
+  }
+
+  function cancelEligForm(formId) {
+    var grp = document.getElementById(formId + "_grp"); if (grp) grp.remove(); activeFormId = null;
+  }
+
+  function markFieldError(formId, key) {
+    var el = document.getElementById(formId + "_" + key); if (!el) return;
+    el.classList.add("field-error");
+    el.addEventListener("input",  function() { el.classList.remove("field-error"); }, { once: true });
+    el.addEventListener("change", function() { el.classList.remove("field-error"); }, { once: true });
+  }
+
+  /* ── Input & send ── */
+  function sendMessage() {
+    var text = inputEl.value.trim();
+    if (!text || isLoading || !wsReady) return;
+    if (welcomeEl) welcomeEl.style.display = "none";
+    appendUserBubble(text);
+    maybeShowCalculator(text);
+    inputEl.value = ""; inputEl.style.height = "auto"; updateSendBtn();
+    activeThinkId = showThinking(); startLoading();
+    ws.send(JSON.stringify({ type: "message", message: text + getBengaliSuffix(), session_id: sessionId }));
+  }
+
+  function sendSuggestion(text) { inputEl.value = text; autoResize(inputEl); sendMessage(); }
+  function autoResize(el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; }
+  function handleKey(e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+  function updateSendBtn() { if (!isLoading && wsReady) sendBtnEl.disabled = !inputEl.value.trim(); }
+
+  /* ── UI state ── */
+  function startLoading()  { isLoading = true; sendBtnEl.disabled = true; inputEl.disabled = true; }
+  function finishLoading() { isLoading = false; if (wsReady) { inputEl.disabled = false; sendBtnEl.disabled = !inputEl.value.trim(); inputEl.focus(); } }
+  function setInputEnabled(enabled) { if (!isLoading) { inputEl.disabled = !enabled; sendBtnEl.disabled = !enabled || !inputEl.value.trim(); } }
+
+  function setStatus(s) {
+    var map = { online: { color: "#22c55e", anim: "pulse-dot 2s infinite", label: "Online" }, offline: { color: "#ef4444", anim: "none", label: "Reconnecting..." }, connecting: { color: "#f59e0b", anim: "pulse-dot 1s infinite", label: "Connecting..." } };
+    var cfg = map[s] || map.offline;
+    statusDot.style.background = cfg.color; statusDot.style.animation = cfg.anim; statusText.textContent = cfg.label;
+  }
+
+  function clearConversation() {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "clear", session_id: sessionId }));
+    sessionId = null; activeBubble = null; fullText = ""; activeFormId = null;
+    if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
+    messagesEl.querySelectorAll(".msg-group").forEach(function(el) { el.remove(); });
+    if (welcomeEl) welcomeEl.style.display = "flex";
+    if (!isLoading) finishLoading();
+  }
+
+  /* ── Scroll FAB ── */
   function scrollToBottom() {
-    requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; });
+    var threshold = 200;
+    var atBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < threshold;
+    if (atBottom) requestAnimationFrame(function() { messagesEl.scrollTop = messagesEl.scrollHeight; });
+    updateScrollFab();
   }
+  function updateScrollFab() {
+    var atBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
+    scrollFab.classList.toggle("visible", !atBottom && messagesEl.scrollHeight > messagesEl.clientHeight);
+  }
+  messagesEl.addEventListener("scroll", updateScrollFab);
+  scrollFab.addEventListener("click", function() { messagesEl.scrollTop = messagesEl.scrollHeight; scrollFab.classList.remove("visible"); });
 
+  /* ── Init ── */
+  applyUI();
   connect();
 </script>
 </body>

@@ -330,10 +330,46 @@ def _needs_filter_extraction(user_message: str, banking_type: str) -> bool:
     )
 
 
+_OFF_TOPIC_SYSTEM = """You are a topic classifier for a bank credit card chatbot.
+Decide if the user's message is related to banking, credit cards, loans, payments, or financial services.
+
+Reply ONLY with JSON: {"on_topic": true} or {"on_topic": false}
+
+Examples:
+"What is the annual fee?" -> {"on_topic": true}
+"How do I apply for a card?" -> {"on_topic": true}
+"Who won the World Cup?" -> {"on_topic": false}
+"Tell me a joke" -> {"on_topic": false}
+"What's the weather today?" -> {"on_topic": false}
+"Hello" -> {"on_topic": true}
+"""
+
+
+def _is_off_topic(user_message: str) -> bool:
+    from llm.ollama_client import chat as llm_chat
+    try:
+        result = llm_chat(
+            messages=[{"role": "user", "content": user_message}],
+            system=_OFF_TOPIC_SYSTEM,
+            temperature=0.0,
+            max_tokens=20,
+            think=False,
+        )
+        cleaned = re.sub(r'```(?:json)?', '', result).strip()
+        match = re.search(r'\{[^{}]*\}', cleaned)
+        if match:
+            parsed = json.loads(match.group())
+            return not bool(parsed.get("on_topic", True))
+    except Exception:
+        pass
+    return False
+
+
 def _build_eligibility_form_signal(user_message: str, session: SessionMemory) -> str:
     history = session.get_history_str(max_chars=500)
     target = compliance_faq.extract_target_card(user_message, history)
-    schema = compliance_faq.get_eligibility_form_schema(target)
+    profile = session.user_profile if session.user_profile else None
+    schema = compliance_faq.get_eligibility_form_schema(target, profile)
     intro = f"Please fill out the form below to check your eligibility{' for **' + target + '**' if target else ''}."
     session.add(user_message, intro)
     return json.dumps({"__form_signal__": True, "type": "show_eligibility_form", "schema": schema})
@@ -407,6 +443,12 @@ def _get_draft(
         return product_advisor.run_details(user_message, routing, session), None
 
     else:
+        if _is_off_topic(user_message):
+            return (
+                "I'm Prime Bank's credit card assistant and can only help with credit card products, "
+                "eligibility, fees, rewards, and account services. "
+                "Is there anything credit-card related I can help you with?"
+            ), "no_synth"
         log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="faq_compliance")
         return compliance_faq.run_faq(user_message, routing, session), None
 
@@ -667,6 +709,26 @@ def handle_eligibility_form(
     final_response = synthesis_agent.run(draft, user_summary)
     clean = _guardrails(final_response)
 
+    clean_lower = clean.lower()
+    if "✅" in clean or "eligible" in clean_lower and "not eligible" not in clean_lower:
+        cta = (
+            "\n\n**Ready to apply?** Visit any Prime Bank branch or call **16218** "
+            "to start your application today."
+        )
+    elif "⚠️" in clean or "conditional" in clean_lower:
+        cta = (
+            "\n\nFor guidance on meeting the remaining requirements, "
+            "call **16218** or visit a Prime Bank branch."
+        )
+    elif "❌" in clean or "not eligible" in clean_lower:
+        cta = (
+            "\n\nWould you like to explore other cards that may suit your profile? "
+            "Call **16218** or visit a branch for personalised advice."
+        )
+    else:
+        cta = "\n\nFor further assistance, contact Prime Bank at **16218** or visit any branch."
+    clean = clean + cta
+
     session.history[-1]["content"] = clean
     session.history[-1]["content_short"] = session._truncate_for_history(clean)
 
@@ -682,6 +744,80 @@ def handle_eligibility_form(
     return clean
 
 
+def _discovery_step1_stream(
+    user_message: str,
+    session: SessionMemory,
+    request_id: str | None,
+    started: float,
+) -> Generator[str, None, None]:
+    """Stream a product recommendation for the discovery step-1 path."""
+    session_id = session.session_id
+    state = _discovery_sessions.get(session_id, {})
+    banking_type = state.get("banking_type", "both")
+    history = session.get_history_str(max_chars=500)
+
+    classifier_output = classify(user_message, history)
+    log_event(
+        "classifier_result",
+        request_id=request_id,
+        session_id=session_id,
+        intent=classifier_output.get("intent"),
+        banking_type=classifier_output.get("banking_type"),
+        intent_score=round(classifier_output.get("intent_score", 0.0), 4),
+        banking_score=round(classifier_output.get("banking_score", 0.0), 4),
+    )
+
+    breakout_intents = {"comparison", "eligibility_check", "existing_cardholder", "how_to_apply", "product_details"}
+    if classifier_output["intent"] in breakout_intents:
+        _discovery_sessions.pop(session_id, None)
+        if classifier_output["intent"] == "eligibility_check":
+            yield _build_eligibility_form_signal(user_message, session)
+            return
+        draft, mode = _get_draft(user_message, classifier_output, session, request_id)
+        if mode == "no_synth":
+            clean = _guardrails(draft)
+            session.add(user_message, clean)
+            yield clean
+            return
+        collected = []
+        for token in synthesis_agent.run_stream(draft, user_message):
+            collected.append(token)
+            yield token
+        full = "".join(collected)
+        clean = _guardrails(full)
+        session.add(user_message, clean)
+        return
+
+    _discovery_sessions.pop(session_id, None)
+
+    routing = {
+        "intent": "i_need_a_credit_card",
+        "banking_type": banking_type,
+        "collection": f"{banking_type}_credit_i_need_a_credit_card",
+        "search_query": user_message,
+    }
+    log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="product_advisor")
+    draft = product_advisor.run(user_message, routing, session)
+
+    collected = []
+    for token in synthesis_agent.run_stream(draft, user_message):
+        collected.append(token)
+        yield token
+
+    full_response = "".join(collected)
+    clean = _guardrails(full_response)
+    session.add(user_message, clean)
+    log_event(
+        "pipeline_complete_stream",
+        request_id=request_id,
+        session_id=session_id,
+        intent="discovery_recommendation",
+        banking_type=banking_type,
+        response_chars=len(clean),
+        latency_ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+
+
 def build_crew_stream(
     user_message: str,
     session: SessionMemory,
@@ -693,12 +829,15 @@ def build_crew_stream(
     history = session.get_history_str(max_chars=500)
 
     if in_discovery:
+        state = _discovery_sessions.get(session_id, {"step": 0, "retries": 0})
+        if state.get("step") == 1:
+            for token in _discovery_step1_stream(user_message, session, request_id, started):
+                yield token
+            return
+
         result = _handle_discovery_stream(user_message, session, request_id, started)
         if result is not None:
-            if result.startswith('{"__form_signal__"'):
-                yield result
-            else:
-                yield result
+            yield result
             return
 
     classifier_output = classify(user_message, history)

@@ -84,6 +84,7 @@ You MUST:
 - If ineligible, suggest alternatives from the chunks using their actual card names
 - Provide detailed reasoning for each assessment covering: age, income, employment duration, E-TIN
 - Your response must be comprehensive and cover all relevant criteria from the chunks
+- Conclude with a clear recommendation and the next step (e.g. "You can apply at any Prime Bank branch")
 
 You MUST NOT:
 - Invent eligibility criteria not in the chunks
@@ -281,11 +282,22 @@ Return ONLY the exact card name from the list, or "none"."""
     return ""
 
 
-def get_eligibility_form_schema(target_card: str = "") -> dict:
-    return {
+def get_eligibility_form_schema(target_card: str = "", profile: dict | None = None) -> dict:
+    schema = {
         "target_card": target_card,
         "fields": ELIGIBILITY_SCHEMA,
     }
+    if profile:
+        prefill = {}
+        if profile.get("monthly_income"):
+            prefill["monthly_income"] = profile["monthly_income"]
+        if profile.get("employment_type"):
+            prefill["employment_type"] = profile["employment_type"]
+        if profile.get("age"):
+            prefill["age"] = profile["age"]
+        if prefill:
+            schema["prefill"] = prefill
+    return schema
 
 
 def extract_target_card(user_message: str, history: str = "") -> str:
@@ -336,6 +348,8 @@ def validate_eligibility_form(form_data: dict) -> list[str]:
             income_int = int(income)
             if income_int < 0:
                 errors.append("Monthly income cannot be negative.")
+            elif income_int == 0:
+                errors.append("Please enter your actual monthly income.")
         except (ValueError, TypeError):
             errors.append("Monthly income must be a valid number.")
 
@@ -376,16 +390,25 @@ def _enrich_profile_str(profile: dict) -> str:
         return "No user profile information collected yet."
 
     lines = []
-    for k, v in profile.items():
-        lines.append(f"- {k}: {v}")
+    field_labels = {
+        "age": "Age",
+        "employment_type": "Employment Type",
+        "monthly_income": "Monthly Income (BDT)",
+        "employment_duration": "Employment Duration",
+        "has_etin": "Has E-TIN",
+    }
+
+    for k, label in field_labels.items():
+        if k in profile:
+            lines.append(f"- {label}: {profile[k]}")
 
     monthly = profile.get("monthly_income")
     if monthly:
         try:
             monthly_int = int(monthly)
             annual = monthly_int * 12
-            annual_lakh = annual / 100000
-            lines.append(f"- annual_income: {annual} BDT ({annual_lakh:.1f} lakh)")
+            annual_lakh = annual / 100_000
+            lines.append(f"- annual_income: {annual:,} BDT ({annual_lakh:.1f} lakh)")
         except (ValueError, TypeError):
             pass
 
@@ -403,6 +426,12 @@ def _get_collections(banking: str, suffix: str) -> list[str]:
 
 MIN_ELIGIBILITY_RESPONSE_CHARS = 300
 MAX_ELIGIBILITY_RETRIES = 2
+
+_RETRY_SUFFIX = (
+    "\n\nIMPORTANT: Your previous response was too brief. "
+    "Provide a COMPLETE assessment covering EVERY criterion: age, income, employment duration, E-TIN, and your final verdict. "
+    "Do not stop until you have covered all criteria and given a clear recommendation."
+)
 
 
 def run_eligibility(
@@ -422,10 +451,7 @@ def run_eligibility(
     ]
 
     eligibility_terms = "eligibility requirements age income employment duration etin documents"
-    if target:
-        search_query = f"{target} {eligibility_terms}"
-    else:
-        search_query = eligibility_terms
+    search_query = f"{target} {eligibility_terms}" if target else eligibility_terms
 
     context = rag_search_multi(search_query, collections, top_k=8)
 
@@ -436,15 +462,21 @@ def run_eligibility(
     profile_str = _enrich_profile_str(profile)
 
     if target:
-        focus = f"""The user specifically asked about: "{target}"
-Focus your assessment on that card ONLY. If it is found in the chunks, assess eligibility for that card only. If not found, say so and suggest the closest alternatives.
-You MUST provide a detailed assessment including all criteria: age requirement, income requirement, employment duration, E-TIN requirement, and your verdict."""
+        focus = (
+            f'The user specifically asked about: "{target}"\n'
+            "Focus your assessment on that card ONLY. If it is found in the chunks, assess eligibility for that card only. "
+            "If not found, say so and suggest the closest alternatives.\n"
+            "You MUST provide a detailed assessment including all criteria: age requirement, income requirement, "
+            "employment duration, E-TIN requirement, and your verdict."
+        )
     else:
-        focus = """Assess eligibility for each Prime Bank credit card found in the chunks.
-For each card provide: the card name, all eligibility criteria checked, and your verdict.
-Be thorough and detailed."""
+        focus = (
+            "Assess eligibility for each Prime Bank credit card found in the chunks.\n"
+            "For each card provide: the card name, all eligibility criteria checked, and your verdict.\n"
+            "Be thorough and detailed."
+        )
 
-    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
+    base_prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
 {context}
 
 ---
@@ -456,6 +488,9 @@ User profile:
 
 Provide your eligibility assessment now. Use the annual_income value from the profile directly — do not calculate it yourself.
 Your response MUST be detailed and comprehensive. Do not cut short."""
+
+    prompt = base_prompt
+    response = ""
 
     for attempt in range(MAX_ELIGIBILITY_RETRIES + 1):
         response = chat(
@@ -469,7 +504,7 @@ Your response MUST be detailed and comprehensive. Do not cut short."""
             return response
 
         if attempt < MAX_ELIGIBILITY_RETRIES:
-            prompt = prompt + "\n\nIMPORTANT: Your previous response was too short. Provide a COMPLETE and DETAILED assessment."
+            prompt = base_prompt + _RETRY_SUFFIX
 
     if response and len(response.strip()) >= 20:
         return response
@@ -492,7 +527,7 @@ def run_catalog(
 
     lines = []
     for p in all_products:
-        parts = [f"{p['product_name']}"]
+        parts = [p["product_name"]]
         if p.get("card_network"):
             parts.append(f"Network: {p['card_network']}")
         if p.get("tier"):
@@ -500,11 +535,12 @@ def run_catalog(
         parts.append(f"Banking: {p['banking_type']}")
         lines.append("- " + " | ".join(parts))
 
-    catalog_summary = f"""COMPLETE PRODUCT LIST ({len(all_products)} credit cards total):
-Conventional: {len(conventional)} cards
-Islamic: {len(islami)} cards
-
-{chr(10).join(lines)}"""
+    catalog_summary = (
+        f"COMPLETE PRODUCT LIST ({len(all_products)} credit cards total):\n"
+        f"Conventional: {len(conventional)} cards\n"
+        f"Islamic: {len(islami)} cards\n\n"
+        + "\n".join(lines)
+    )
 
     prompt = f"""PRODUCT CATALOG (use ONLY this list):
 {catalog_summary}

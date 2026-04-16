@@ -1,3 +1,4 @@
+import re
 import yaml
 import chromadb
 from sentence_transformers import SentenceTransformer
@@ -5,6 +6,17 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from crewai.tools import BaseTool
 from logging_utils import log_event
+
+try:
+    from rank_bm25 import BM25Okapi as _BM25Okapi
+    _BM25_AVAILABLE = True
+except ImportError:
+    _BM25Okapi = None  # type: ignore
+    _BM25_AVAILABLE = False
+
+_RRF_K = 60  # RRF constant — higher values reduce the impact of top-ranked docs
+
+_TOKEN_RE = re.compile(r'\b\w+\b')
 
 with open("config.yaml") as f:
     cfg = yaml.safe_load(f)
@@ -36,6 +48,40 @@ def _is_service_doc(meta: dict) -> bool:
     return False
 
 
+def _hybrid_rerank(
+    query: str,
+    items: list[dict],
+    top_k: int,
+) -> list[dict]:
+    """Re-rank items using BM25 + semantic RRF fusion when rank_bm25 is available."""
+    if not _BM25_AVAILABLE or len(items) <= top_k:
+        return items[:top_k]
+
+    query_tokens = _TOKEN_RE.findall(query.lower())
+    corpus_tokens = [_TOKEN_RE.findall(item["text"].lower()) for item in items]
+
+    try:
+        bm25 = _BM25Okapi(corpus_tokens)
+        bm25_scores = bm25.get_scores(query_tokens)
+    except Exception:
+        return items[:top_k]
+
+    # Semantic ranking is already by ascending distance (lower = better)
+    semantic_ranks = {i: rank for rank, i in enumerate(range(len(items)))}
+    # BM25 ranking: higher score = better rank
+    bm25_ranks = {i: rank for rank, i in enumerate(
+        sorted(range(len(items)), key=lambda i: bm25_scores[i], reverse=True)
+    )}
+
+    rrf_scores = [
+        (i, 1.0 / (_RRF_K + semantic_ranks[i]) + 1.0 / (_RRF_K + bm25_ranks[i]))
+        for i in range(len(items))
+    ]
+    rrf_scores.sort(key=lambda x: x[1], reverse=True)
+
+    return [items[i] for i, _ in rrf_scores[:top_k]]
+
+
 def rag_search(
     query: str,
     collection: str,
@@ -59,10 +105,12 @@ def rag_search(
     if banking_type_filter:
         where_filter = {"banking_type": banking_type_filter}
 
+    # Fetch a wider pool for BM25 re-ranking; fall back to top_k if BM25 unavailable
+    fetch_k = (top_k * 3) if _BM25_AVAILABLE else top_k
     try:
         kwargs = {
             "query_embeddings": [embedding],
-            "n_results": min(top_k, max(col.count(), 1)),
+            "n_results": min(fetch_k, max(col.count(), 1)),
         }
         if where_filter:
             kwargs["where"] = where_filter
@@ -79,19 +127,13 @@ def rag_search(
             top_k=top_k,
             corpus_count=count_before,
             returned=0,
+            hybrid=_BM25_AVAILABLE,
         )
         return []
 
     chunks = results["documents"][0]
     metas = results["metadatas"][0]
     distances = results.get("distances", [[]])[0]
-    log_event(
-        "rag_query",
-        collection=collection,
-        top_k=top_k,
-        corpus_count=count_before,
-        returned=len(chunks),
-    )
 
     items = []
     for i, (chunk, meta) in enumerate(zip(chunks, metas)):
@@ -109,6 +151,17 @@ def rag_search(
             "product_id": product_id,
             "collection": collection,
         })
+
+    items = _hybrid_rerank(query, items, top_k)
+
+    log_event(
+        "rag_query",
+        collection=collection,
+        top_k=top_k,
+        corpus_count=count_before,
+        returned=len(items),
+        hybrid=_BM25_AVAILABLE,
+    )
 
     return items
 

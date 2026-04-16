@@ -1,0 +1,109 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776322980142,
+  "projectRoot": "/mnt/data/github/prime_bot",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "Prime_bot": {
+      "path": "Prime_bot",
+      "purpose": null,
+      "fileCount": 8,
+      "lastAccessed": 1776322980135,
+      "keyFiles": [
+        "Dockerfile",
+        "api.py",
+        "config.yaml",
+        "crew.py",
+        "docker-compose.yml"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "Prime_bot/crew.py",
+      "accessCount": 11,
+      "lastAccessed": 1776326363843,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/api.py",
+      "accessCount": 8,
+      "lastAccessed": 1776326644741,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/memory/session_memory.py",
+      "accessCount": 6,
+      "lastAccessed": 1776326489013,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/tools/rag_tool.py",
+      "accessCount": 5,
+      "lastAccessed": 1776326746249,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/logging_utils.py",
+      "accessCount": 3,
+      "lastAccessed": 1776326415097,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/requirements.txt",
+      "accessCount": 3,
+      "lastAccessed": 1776326776764,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/static/index.html",
+      "accessCount": 1,
+      "lastAccessed": 1776325205234,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/agents/compliance_faq.py",
+      "accessCount": 1,
+      "lastAccessed": 1776325241438,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/classifier/intent_classifier.py",
+      "accessCount": 1,
+      "lastAccessed": 1776325242229,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/agents/synthesis_agent.py",
+      "accessCount": 1,
+      "lastAccessed": 1776325242525,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

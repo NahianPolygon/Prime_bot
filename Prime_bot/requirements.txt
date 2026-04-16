@@ -11,3 +11,4 @@ langchain-community>=0.2.0
 crewai>=0.41.1
 crewai-tools>=0.4.26
 pyyaml>=6.0.1
+rank-bm25>=0.2.2

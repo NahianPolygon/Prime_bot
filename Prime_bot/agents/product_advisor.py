@@ -28,9 +28,9 @@ DETAILS_SYSTEM = """You are the Prime Bank Credit Card Product Specialist.
 You provide detailed information about a specific credit card using ONLY the knowledge base chunks.
 
 You MUST:
-- Show all available details: card name, credit limit, annual fee, interest rate, reward points, insurance, key benefits, fee waiver conditions
+- Show all available details: card name, credit limit, annual fee, interest rate, reward points, insurance, key benefits, fee waiver conditions, lounge access, EMI options
 - Quote exact numbers from the chunks
-- Use bullet points for benefits
+- Use bullet points for lists of 3 or more benefits
 - Always use the actual card name (e.g. "Visa Gold", "Mastercard Platinum") not internal codes
 - End with: "Would you like to check your eligibility, compare this with another card, or know how to apply?"
 
@@ -38,6 +38,7 @@ You MUST NOT:
 - Invent any detail not in the chunks
 - Give vague descriptions when chunks have specific numbers
 - Display product_id, internal IDs, or system codes like CARD_001 or ISLAMI_CARD_001
+- Omit sections that are present in the chunks
 
 If the card is not found in chunks, say: "Please contact Prime Bank at 16218 for details about this card."
 """
@@ -63,6 +64,19 @@ def _get_collections(banking: str) -> list[str]:
     ]
 
 
+def _fetch_context(search_q: str, collections: list[str], top_k: int = 6) -> str | None:
+    context = rag_search_multi(search_q, collections, top_k=top_k)
+    if not context.startswith("[NO RESULTS]"):
+        return _clean_context(context)
+
+    broader_q = " ".join(search_q.split()[:4]) if len(search_q.split()) > 4 else search_q
+    fallback = rag_search_multi(broader_q, collections + ["all_products"], top_k=top_k)
+    if not fallback.startswith("[NO RESULTS]"):
+        return _clean_context(fallback)
+
+    return None
+
+
 def run(
     user_message: str,
     routing: dict,
@@ -70,15 +84,11 @@ def run(
 ) -> str:
     banking = routing["banking_type"]
     search_q = routing.get("search_query", user_message)
-
     collections = _get_collections(banking)
 
-    context = rag_search_multi(search_q, collections, top_k=6)
-
-    if context.startswith("[NO RESULTS]"):
+    context = _fetch_context(search_q, collections)
+    if context is None:
         return "[NO RESULTS]"
-
-    context = _clean_context(context)
 
     history = session.get_history_str(max_chars=1000)
 
@@ -109,17 +119,13 @@ def run_details(
 ) -> str:
     banking = routing["banking_type"]
     search_q = routing.get("search_query", user_message)
-
     collections = _get_collections(banking)
     collections.append("all_products")
     collections = list(dict.fromkeys(collections))
 
-    context = rag_search_multi(search_q, collections, top_k=6)
-
-    if context.startswith("[NO RESULTS]"):
+    context = _fetch_context(search_q, collections, top_k=8)
+    if context is None:
         return "[NO RESULTS]"
-
-    context = _clean_context(context)
 
     history = session.get_history_str(max_chars=1000)
 
@@ -133,11 +139,11 @@ Conversation so far:
 
 User request: {user_message}
 
-Provide all available details about the requested card using ONLY the chunks above. Use actual card names, never internal codes. Do not invent any information."""
+Provide ALL available details about the requested card using ONLY the chunks above. Cover every section present in the chunks: credit limit, fees, interest rate, rewards, insurance, lounge access, EMI options, eligibility highlights. Use actual card names, never internal codes. Do not omit any information that is present in the chunks."""
 
     return chat(
         messages=[{"role": "user", "content": prompt}],
         system=DETAILS_SYSTEM,
         temperature=0.2,
-        max_tokens=2000,
+        max_tokens=2500,
     )

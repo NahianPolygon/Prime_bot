@@ -57,6 +57,8 @@ NOT_CARDS = [
     "welcome service", "cheque", "fund transfer", "myprime",
 ]
 
+_SPEC_QUERY = "credit limit annual fee reward points interest-free period insurance fee waiver"
+
 
 def _clean_context(context: str) -> str:
     context = re.sub(r'product_id:\s*\S+', '', context)
@@ -68,6 +70,7 @@ def _clean_context(context: str) -> str:
 
 def _parse_json_response(text: str) -> dict:
     cleaned = re.sub(r'```(?:json)?', '', text).strip()
+    cleaned = re.sub(r'```', '', cleaned).strip()
 
     match = re.search(r'\{[\s\S]*\}', cleaned)
     if match:
@@ -76,11 +79,11 @@ def _parse_json_response(text: str) -> dict:
         except json.JSONDecodeError:
             pass
 
-    match = re.search(r'$$[\s\S]*$$', cleaned)
+    match = re.search(r'\[[\s\S]*\]', cleaned)
     if match:
         try:
             arr = json.loads(match.group())
-            if isinstance(arr, list) and len(arr) > 0:
+            if isinstance(arr, list) and arr:
                 return {"cards": arr, "best_for": []}
         except json.JSONDecodeError:
             pass
@@ -92,8 +95,11 @@ def _is_valid_card(name: str) -> bool:
     name_lower = name.lower().strip()
     if not name_lower:
         return False
+    has_card_identifier = any(k in name_lower for k in ("visa", "mastercard", "jcb", "card"))
+    if not has_card_identifier:
+        return False
     for pattern in NOT_CARDS:
-        if name_lower == pattern or (pattern in name_lower and "card" not in name_lower and "visa" not in name_lower and "mastercard" not in name_lower and "jcb" not in name_lower):
+        if pattern in name_lower and not has_card_identifier:
             return False
     return True
 
@@ -101,41 +107,41 @@ def _is_valid_card(name: str) -> bool:
 def _filter_cards(data: dict) -> dict:
     if "cards" not in data:
         return data
+
     valid_cards = [c for c in data["cards"] if _is_valid_card(c.get("name", ""))]
     data["cards"] = valid_cards
+
     if "best_for" in data and valid_cards:
         valid_names = {c["name"].lower() for c in valid_cards}
         filtered_best = []
-        for entry in data["best_for"]:
+        for entry in data.get("best_for", []):
             entry_lower = entry.lower()
-            for vn in valid_names:
-                if vn in entry_lower:
-                    filtered_best.append(entry)
-                    break
+            if any(vn in entry_lower for vn in valid_names):
+                filtered_best.append(entry)
         data["best_for"] = filtered_best
+
     return data
+
+
+def _safe_cell(value) -> str:
+    if not value or str(value).strip() in ("", "N/A", "n/a"):
+        return "N/A"
+    return str(value).replace("|", "\\|").replace("\n", " ").strip()
 
 
 def _build_comparison_table(data: dict) -> str:
     cards = data.get("cards", [])
     if not cards:
-        return "I could not find details for those cards. Please contact Prime Bank at 16218."
+        return "I could not find details for those cards. Please contact Prime Bank at **16218**."
 
-    header = "| Feature |"
-    sep = "| --- |"
-    for card in cards:
-        name = card.get("name", "Unknown")
-        header += f" {name} |"
-        sep += " --- |"
+    header = "| Feature |" + "".join(f" {c.get('name', 'Unknown')} |" for c in cards)
+    sep = "| --- |" + " --- |" * len(cards)
 
     rows = [header, sep]
     for label, key in TABLE_FEATURES:
         row = f"| {label} |"
         for card in cards:
-            val = card.get(key, "N/A")
-            if not val or str(val).strip() == "":
-                val = "N/A"
-            row += f" {val} |"
+            row += f" {_safe_cell(card.get(key))} |"
         rows.append(row)
 
     table = "\n".join(rows)
@@ -144,9 +150,15 @@ def _build_comparison_table(data: dict) -> str:
     if best_for:
         table += "\n\n**Best For:**\n"
         for entry in best_for:
-            table += f"\n- **{entry}**"
+            colon_idx = entry.find(":")
+            if colon_idx > 0:
+                card_part = entry[:colon_idx].strip()
+                desc_part = entry[colon_idx + 1:].strip()
+                table += f"\n- **{card_part}:** {desc_part}"
+            else:
+                table += f"\n- {entry}"
 
-    table += "\n\nWould you like to check your eligibility for any of these cards?"
+    table += "\n\nWould you like to check your eligibility for any of these cards, or learn how to apply?"
 
     return table
 
@@ -169,8 +181,7 @@ def run(
     if topic_context.startswith("[NO RESULTS]"):
         return "[NO RESULTS]"
 
-    spec_query = "credit limit annual fee reward points interest-free period insurance fee waiver"
-    spec_context = rag_search_multi(spec_query, collections, top_k=5, max_context_chars=3000)
+    spec_context = rag_search_multi(_SPEC_QUERY, collections, top_k=5, max_context_chars=3000)
 
     if spec_context.startswith("[NO RESULTS]"):
         context = _clean_context(topic_context)
@@ -225,7 +236,7 @@ Output ONLY valid JSON."""
             card_names=[c.get("name", "") for c in data.get("cards", [])],
         )
 
-        if data and "cards" in data and len(data["cards"]) > 0:
+        if data and data.get("cards"):
             table = _build_comparison_table(data)
             log_event(
                 "comparator_table_built",
@@ -237,4 +248,4 @@ Output ONLY valid JSON."""
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
         log_event("comparator_json_error", error=str(e))
 
-    return "I could not find details for those cards. Please contact Prime Bank at 16218."
+    return "I could not find details for those cards. Please contact Prime Bank at **16218**."

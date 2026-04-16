@@ -10,6 +10,38 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from logging_utils import log_event
 
+_stats_lock = threading.Lock()
+_stats = {
+    "total_requests": 0,
+    "total_eligibility_forms": 0,
+    "total_errors": 0,
+    "latency_ms_sum": 0.0,
+    "latency_count": 0,
+    "unique_sessions": set(),
+}
+
+
+def _record_request(session_id: str):
+    with _stats_lock:
+        _stats["total_requests"] += 1
+        _stats["unique_sessions"].add(session_id)
+
+
+def _record_latency(ms: float):
+    with _stats_lock:
+        _stats["latency_ms_sum"] += ms
+        _stats["latency_count"] += 1
+
+
+def _record_error():
+    with _stats_lock:
+        _stats["total_errors"] += 1
+
+
+def _record_eligibility():
+    with _stats_lock:
+        _stats["total_eligibility_forms"] += 1
+
 with open("config.yaml") as f:
     _cfg = yaml.safe_load(f)
 
@@ -87,6 +119,7 @@ async def websocket_chat(websocket: WebSocket):
                 request_id = str(uuid.uuid4())
                 form_data = data.get("form_data", {})
 
+                _record_eligibility()
                 log_event(
                     "ws_eligibility_form",
                     request_id=request_id,
@@ -136,9 +169,11 @@ async def websocket_chat(websocket: WebSocket):
             session = get_session(session_id)
             request_id = str(uuid.uuid4())
 
+            _record_request(session_id)
             log_event("ws_chat_request", request_id=request_id, session_id=session_id, message_chars=len(message))
             await websocket.send_text(json.dumps({"type": "session_id", "session_id": session_id}))
 
+            req_start = time.perf_counter()
             try:
                 for token in build_crew_stream(message, session, request_id=request_id):
                     if token.startswith('{"__form_signal__"'):
@@ -155,15 +190,33 @@ async def websocket_chat(websocket: WebSocket):
 
                     await websocket.send_text(json.dumps({"type": "token", "token": token}))
 
+                _record_latency((time.perf_counter() - req_start) * 1000)
                 await websocket.send_text(json.dumps({"type": "done"}))
                 log_event("ws_chat_complete", request_id=request_id, session_id=session_id)
 
             except Exception as e:
+                _record_error()
                 log_event("ws_stream_error", request_id=request_id, session_id=session_id, error=str(e))
                 await websocket.send_text(json.dumps({"type": "error", "message": "Stream error. Please try again."}))
 
     except WebSocketDisconnect:
         log_event("ws_disconnected", session_id=session_id)
+
+
+@app.get("/analytics")
+async def analytics():
+    with _stats_lock:
+        count = _stats["latency_count"]
+        avg_latency = round(_stats["latency_ms_sum"] / count, 1) if count else 0.0
+        error_rate = round(_stats["total_errors"] / _stats["total_requests"], 4) if _stats["total_requests"] else 0.0
+        return {
+            "total_requests": _stats["total_requests"],
+            "total_eligibility_forms": _stats["total_eligibility_forms"],
+            "total_errors": _stats["total_errors"],
+            "error_rate": error_rate,
+            "avg_latency_ms": avg_latency,
+            "unique_sessions": len(_stats["unique_sessions"]),
+        }
 
 
 @app.get("/health")
