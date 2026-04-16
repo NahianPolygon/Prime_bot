@@ -18,50 +18,23 @@ with open("config.yaml") as f:
 
 _discovery_sessions: dict[str, dict] = {}
 
-
-EXPLICIT_ISLAMI_KEYWORDS = {"halal", "islamic", "shariah", "sharia", "hasanah", "hasannah", "hasnah"}
-EXPLICIT_CONVENTIONAL_KEYWORDS = {"conventional", "regular", "standard"}
-
-
-def _explicit_banking_from_message(user_message: str) -> str | None:
-    msg = user_message.lower()
-    if any(kw in msg for kw in EXPLICIT_ISLAMI_KEYWORDS):
-        return "islami"
-    if any(kw in msg for kw in EXPLICIT_CONVENTIONAL_KEYWORDS):
-        return "conventional"
-    return None
-
 SERVICE_ID_PATTERNS = {"_services_", "cardholder_services", "conv_services", "islami_services"}
 
 MAX_DISCOVERY_RETRIES = 3
 
-FILTER_EXTRACT_SYSTEM = """You extract credit card filters from a user's message.
+DISCOVERY_SIGNAL_SYSTEM = """You analyze a Prime Bank credit card browsing message and extract browsing preferences.
 
-Return ONLY a JSON object with these optional keys:
-- banking_type: "conventional" or "islami" (if user mentions islamic, shariah, halal, hasanah, conventional, regular, standard)
-- network: "visa" or "mastercard" or "jcb" (if user mentions a specific card network)
-- tier: "gold" or "platinum" or "world" (if user mentions a specific card tier/level)
+Return ONLY JSON with this schema:
+{"banking_type":"conventional"|"islami"|"both"|"","network":"visa"|"mastercard"|"jcb"|"","tier":"gold"|"platinum"|"world"|"","show_catalog":true|false}
 
-Rules:
-- Only include keys where the user clearly expressed a preference
-- "halal", "shariah", "islamic" means banking_type is "islami"
-- "regular", "standard", "conventional" means banking_type is "conventional"
-- "premium", "high-end", "top-tier" means tier is "world"
-- "mid-range", "mid-tier" means tier is "platinum"
-- "basic", "entry", "starter", "beginner" means tier is "gold"
-- Return {} if no specific filter can be determined
-
-Examples:
-"I need a halal credit card" -> {"banking_type": "islami"}
-"Show me all Visa cards" -> {"network": "visa"}
-"What platinum cards do you have" -> {"tier": "platinum"}
-"Show me Islamic gold cards" -> {"banking_type": "islami", "tier": "gold"}
-"I want a premium Mastercard" -> {"network": "mastercard", "tier": "world"}
-"Show me entry level cards" -> {"tier": "gold"}
-"I need a credit card" -> {}
-"What cards do you offer" -> {}
-
-JSON only. No explanation."""
+Guidance:
+- Use banking_type when the user clearly prefers conventional or Islamic banking
+- Use network when the user clearly prefers Visa, Mastercard, or JCB
+- Use tier when the user clearly prefers Gold, Platinum, or World tier
+- Set show_catalog=true when the user is browsing, asking what cards are available, or answering a prior browsing follow-up
+- Set fields to empty strings when not clearly expressed
+- Infer semantically from the user's wording and the prior state
+- Do not include any text outside the JSON"""
 
 
 def _guardrails(response: str) -> str:
@@ -85,59 +58,48 @@ def _is_service_product(product: dict) -> bool:
     return False
 
 
-def _detect_banking_preference(user_message: str) -> str | None:
-    from classifier.intent_classifier import _parse_json, VALID_BANKING
+def _extract_discovery_signal(user_message: str, state: dict | None = None) -> dict:
+    from classifier.intent_classifier import _parse_json
     from llm.ollama_client import chat as llm_chat
 
-    system = """The user was asked: "Would you prefer conventional or Islamic (Shariah-compliant) banking?"
-Based on their reply, which did they choose?
-
-- conventional: standard banking, conventional, regular, normal
-- islami: islamic, shariah, halal, hasanah, interest-free
-- both: cannot determine from their reply
-
-Respond ONLY with JSON: {"banking_type": "<type>"}"""
-
+    state_json = json.dumps(state or {}, ensure_ascii=True)
     result = llm_chat(
-        messages=[{"role": "user", "content": user_message}],
-        system=system,
+        messages=[{"role": "user", "content": f"Discovery state: {state_json}\n\nUser message: {user_message}"}],
+        system=DISCOVERY_SIGNAL_SYSTEM,
         temperature=0.0,
-        max_tokens=300,
-    )
-    banking = _parse_json(result)
-    banking_type = banking.get("banking_type", None)
-    if banking_type and banking_type in VALID_BANKING and banking_type != "both":
-        return banking_type
-    return None
-
-
-def _detect_card_filters(user_message: str) -> dict:
-    from llm.ollama_client import chat as llm_chat
-
-    result = llm_chat(
-        messages=[{"role": "user", "content": user_message}],
-        system=FILTER_EXTRACT_SYSTEM,
-        temperature=0.0,
-        max_tokens=200,
+        max_tokens=180,
     )
 
-    try:
-        cleaned = re.sub(r'```(?:json)?', '', result).strip()
-        match = re.search(r'\{[^{}]*\}', cleaned, re.DOTALL)
-        if match:
-            parsed = json.loads(match.group())
-            valid = {}
-            if parsed.get("banking_type") in ("conventional", "islami"):
-                valid["banking_type"] = parsed["banking_type"]
-            if parsed.get("network") in ("visa", "mastercard", "jcb"):
-                valid["network"] = parsed["network"]
-            if parsed.get("tier") in ("gold", "platinum", "world"):
-                valid["tier"] = parsed["tier"]
-            return valid
-    except Exception:
-        pass
+    parsed = _parse_json(result)
+    valid = {
+        "banking_type": parsed.get("banking_type", ""),
+        "network": parsed.get("network", ""),
+        "tier": parsed.get("tier", ""),
+        "show_catalog": bool(parsed.get("show_catalog", False)),
+    }
+    if valid["banking_type"] not in ("conventional", "islami", "both", ""):
+        valid["banking_type"] = ""
+    if valid["network"] not in ("visa", "mastercard", "jcb", ""):
+        valid["network"] = ""
+    if valid["tier"] not in ("gold", "platinum", "world", ""):
+        valid["tier"] = ""
+    return valid
 
-    return {}
+
+def _filters_from_signal(signal: dict, classifier_output: dict | None = None) -> dict:
+    filters = {}
+    banking_type = signal.get("banking_type") or ""
+    if not banking_type and classifier_output:
+        classified = classifier_output.get("banking_type", "both")
+        if classified in ("conventional", "islami"):
+            banking_type = classified
+    if banking_type in ("conventional", "islami"):
+        filters["banking_type"] = banking_type
+    if signal.get("network") in ("visa", "mastercard", "jcb"):
+        filters["network"] = signal["network"]
+    if signal.get("tier") in ("gold", "platinum", "world"):
+        filters["tier"] = signal["tier"]
+    return filters
 
 
 def _build_dynamic_card_response(filters: dict) -> str | None:
@@ -312,21 +274,6 @@ def _build_all_cards_response() -> str | None:
         f"Great! Prime Bank offers **{len(cards_only)} credit cards** across two banking types:\n\n"
         f"{product_list}\n\n"
         f"Would you prefer **conventional** or **Islamic (Shariah-compliant)** banking?"
-    )
-
-
-def _needs_filter_extraction(user_message: str, banking_type: str) -> bool:
-    if banking_type in ("conventional", "islami"):
-        return True
-    msg_lower = user_message.lower()
-    return any(
-        term in msg_lower
-        for term in (
-            "visa", "mastercard", "jcb", "gold", "platinum", "world",
-            "premium", "entry", "basic", "starter", "top-tier", "high-end",
-            "mid-range", "mid-tier", "halal", "islamic", "shariah", "hasanah",
-            "conventional", "regular", "standard",
-        )
     )
 
 
@@ -522,13 +469,13 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
             return _handle_intent(user_message, classifier_output, session, request_id, started)
 
         if step == 0:
-            banking_pref = _detect_banking_preference(user_message)
+            signal = _extract_discovery_signal(user_message, state)
+            original_filters = dict(state.get("filters", {}))
+            original_filters.update(_filters_from_signal(signal, classifier_output))
+            banking_pref = original_filters.get("banking_type")
 
             if banking_pref:
                 session.update_profile("banking_preference", banking_pref)
-
-                original_filters = state.get("filters", {})
-                original_filters["banking_type"] = banking_pref
                 merged_response = _build_dynamic_card_response(original_filters)
 
                 if merged_response:
@@ -624,13 +571,8 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
         return response
 
     if intent in ("i_need_a_credit_card", "catalog_query") and len(session.history) == 0:
-        banking_type = classifier_output["banking_type"]
-
-        if _needs_filter_extraction(user_message, banking_type):
-            filters = _detect_card_filters(user_message)
-        else:
-            filters = {}
-
+        signal = _extract_discovery_signal(user_message, {"step": "initial"})
+        filters = _filters_from_signal(signal, classifier_output)
         if filters:
             response = _build_dynamic_card_response(filters)
             if response:
@@ -706,8 +648,7 @@ def handle_eligibility_form(
     session.add(user_summary, "")
 
     draft = compliance_faq.run_eligibility(form_data, session)
-    final_response = synthesis_agent.run(draft, user_summary)
-    clean = _guardrails(final_response)
+    clean = _guardrails(draft)
 
     clean_lower = clean.lower()
     if "✅" in clean or "eligible" in clean_lower and "not eligible" not in clean_lower:
@@ -926,13 +867,13 @@ def _handle_discovery_stream(
         return None
 
     if step == 0:
-        banking_pref = _detect_banking_preference(user_message)
+        signal = _extract_discovery_signal(user_message, state)
+        original_filters = dict(state.get("filters", {}))
+        original_filters.update(_filters_from_signal(signal, classifier_output))
+        banking_pref = original_filters.get("banking_type")
 
         if banking_pref:
             session.update_profile("banking_preference", banking_pref)
-
-            original_filters = state.get("filters", {})
-            original_filters["banking_type"] = banking_pref
             merged_response = _build_dynamic_card_response(original_filters)
 
             if merged_response:
@@ -997,17 +938,8 @@ def _handle_first_message_discovery(
     started: float,
 ) -> str | None:
     session_id = session.session_id
-    banking_type = classifier_output["banking_type"]
-
-    if _needs_filter_extraction(user_message, banking_type):
-        filters = _detect_card_filters(user_message)
-    else:
-        filters = {}
-
-    if not filters:
-        explicit_bt = _explicit_banking_from_message(user_message)
-        if explicit_bt:
-            filters = {"banking_type": explicit_bt}
+    signal = _extract_discovery_signal(user_message, {"step": "initial"})
+    filters = _filters_from_signal(signal, classifier_output)
 
     if filters:
         response = _build_dynamic_card_response(filters)

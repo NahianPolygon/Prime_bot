@@ -1,7 +1,6 @@
 import json
 import re
-import numpy as np
-from tools.rag_tool import rag_search_multi, list_all_products, _model as _embed_model
+from tools.rag_tool import rag_search_multi, list_all_products
 from llm.ollama_client import chat
 from memory.session_memory import SessionMemory
 from logging_utils import log_event
@@ -68,11 +67,6 @@ ELIGIBILITY_SCHEMA = {
     },
 }
 
-EMBED_CONFIDENT_THRESHOLD = 0.55
-EMBED_CONFIDENT_MARGIN = 0.03
-EMBED_CANDIDATE_THRESHOLD = 0.45
-EMBED_TOP_N = 3
-
 ELIGIBILITY_SYSTEM = """You are the Prime Bank Eligibility Advisor.
 You assess whether a user qualifies for Prime Bank credit cards.
 
@@ -136,102 +130,7 @@ You MUST NOT:
 """
 
 
-def _embedding_match_card(text: str) -> tuple[str, list[tuple[str, float]]]:
-    products = list_all_products()
-    valid_products = [p for p in products if p.get("product_name")]
-
-    if not valid_products:
-        return "", []
-
-    card_names = []
-    enriched_names = []
-    for p in valid_products:
-        name = p["product_name"]
-        card_names.append(name)
-        banking = p.get("banking_type", "")
-        if banking == "islami":
-            enriched_names.append(f"{name} - Islamic Shariah Halal Hasanah compliant banking")
-        else:
-            enriched_names.append(f"{name} - conventional standard banking")
-
-    query_emb = _embed_model.encode(text)
-    card_embs = _embed_model.encode(enriched_names)
-
-    query_norm = query_emb / (np.linalg.norm(query_emb) + 1e-10)
-    card_norms = card_embs / (np.linalg.norm(card_embs, axis=1, keepdims=True) + 1e-10)
-
-    scores = card_norms @ query_norm
-    sorted_idx = np.argsort(scores)[::-1]
-    best_idx = int(sorted_idx[0])
-    best_score = float(scores[best_idx])
-
-    margin = 0.0
-    if len(scores) > 1:
-        margin = best_score - float(scores[int(sorted_idx[1])])
-
-    top_n = [(card_names[int(i)], round(float(scores[int(i)]), 4)) for i in sorted_idx[:EMBED_TOP_N]]
-    log_event(
-        "embed_card_match",
-        query=text[:100],
-        top_3=str(top_n),
-        best_score=round(best_score, 4),
-        margin=round(margin, 4),
-    )
-
-    if best_score >= EMBED_CONFIDENT_THRESHOLD and margin >= EMBED_CONFIDENT_MARGIN:
-        return card_names[best_idx], top_n
-
-    if best_score >= EMBED_CANDIDATE_THRESHOLD:
-        return "", top_n
-
-    return "", []
-
-
-def _llm_disambiguate(user_message: str, candidates: list[tuple[str, float]], history: str = "") -> str:
-    candidate_names = [name for name, _ in candidates]
-    card_list = "\n".join(f"- {name}" for name in candidate_names)
-
-    prompt = f"""The user said: "{user_message}"
-
-These are the closest matching Prime Bank credit cards:
-{card_list}
-
-Which card is the user most likely asking about?
-Consider misspellings: "hasnah"/"hasannah"/"hassanah" all mean "Hasanah", "master card" means "Mastercard".
-Return ONLY the exact card name from the list above.
-If truly none match, return "none"."""
-
-    response = chat(
-        messages=[{"role": "user", "content": prompt}],
-        system="Pick the best matching card from the short list. Return only the exact card name or 'none'. No explanation.",
-        temperature=0.0,
-        max_tokens=80,
-    )
-
-    response = response.strip().strip('"').strip("'")
-
-    log_event(
-        "llm_disambiguate",
-        query=user_message[:80],
-        candidates=str(candidate_names),
-        llm_response=response[:80],
-    )
-
-    if not response or response.lower() in ("none", "n/a", "unknown", ""):
-        return ""
-
-    for name in candidate_names:
-        if response.lower() == name.lower():
-            return name
-
-    for name in candidate_names:
-        if response.lower() in name.lower() or name.lower() in response.lower():
-            return name
-
-    return ""
-
-
-def _llm_full_list_match(user_message: str, history: str = "") -> str:
+def _llm_target_card_match(user_message: str, history: str = "") -> str:
     products = list_all_products()
     card_names = [p["product_name"] for p in products if p.get("product_name")]
 
@@ -248,14 +147,12 @@ The user said: "{user_message}"
 Conversation history:
 {history}
 
-Which specific card from the list above is the user asking about?
-Consider misspellings: "hasnah"/"hasannah" = "Hasanah", "master card" = "Mastercard".
-If no specific card is mentioned, return "none".
-Return ONLY the exact card name from the list, or "none"."""
+Determine whether the user is referring to one specific card from the list above.
+Return ONLY the exact card name from the list, or "none" if the message is generic, broad, or does not point to one specific card."""
 
     response = chat(
         messages=[{"role": "user", "content": prompt}],
-        system="Match the user's query to a card from the provided list. Return only the exact card name or 'none'.",
+        system="Match the user's message to one specific card from the provided list. Return only the exact card name or 'none'.",
         temperature=0.0,
         max_tokens=80,
     )
@@ -301,19 +198,7 @@ def get_eligibility_form_schema(target_card: str = "", profile: dict | None = No
 
 
 def extract_target_card(user_message: str, history: str = "") -> str:
-    confident_match, candidates = _embedding_match_card(user_message)
-
-    if confident_match:
-        log_event("target_card_resolved", method="embedding_confident", card=confident_match)
-        return confident_match
-
-    if candidates:
-        disambiguated = _llm_disambiguate(user_message, candidates, history)
-        if disambiguated:
-            log_event("target_card_resolved", method="llm_disambiguate", card=disambiguated)
-            return disambiguated
-
-    full_match = _llm_full_list_match(user_message, history)
+    full_match = _llm_target_card_match(user_message, history)
     if full_match:
         log_event("target_card_resolved", method="llm_full_list", card=full_match)
         return full_match
