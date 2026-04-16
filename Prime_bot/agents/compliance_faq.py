@@ -132,12 +132,16 @@ You MUST NOT:
 
 def _llm_target_card_match(user_message: str, history: str = "") -> str:
     products = list_all_products()
-    card_names = [p["product_name"] for p in products if p.get("product_name")]
+    valid_products = [p for p in products if p.get("product_name")]
+    card_names = [p["product_name"] for p in valid_products]
 
     if not card_names:
         return ""
 
-    card_list = "\n".join(f"- {name}" for name in card_names)
+    card_list = "\n".join(
+        f'- {p["product_name"]} | banking_type={p.get("banking_type", "")} | network={p.get("card_network", "")} | tier={p.get("tier", "")}'
+        for p in valid_products
+    )
 
     prompt = f"""Available Prime Bank credit cards:
 {card_list}
@@ -148,16 +152,37 @@ Conversation history:
 {history}
 
 Determine whether the user is referring to one specific card from the list above.
-Return ONLY the exact card name from the list, or "none" if the message is generic, broad, or does not point to one specific card."""
+Return ONLY the exact card name from the list, or "none" if the message is generic, broad, or does not point to one specific card.
 
-    response = chat(
-        messages=[{"role": "user", "content": prompt}],
-        system="Match the user's message to one specific card from the provided list. Return only the exact card name or 'none'.",
-        temperature=0.0,
-        max_tokens=80,
-    )
+Be robust to:
+- partial names like "Hasanah Gold" or "Mastercard World"
+- reordered names like "World Mastercard"
+- casual references like "the halal gold card"
+- exact eligibility/detail/apply questions about a single card
 
-    response = response.strip().strip('"').strip("'")
+Examples:
+- "Am I eligible for Mastercard World Credit Card?" -> "Mastercard World Credit Card"
+- "Tell me about Visa Hasanah Gold" -> "Visa Hasanah Gold Credit Card"
+- "Can I apply for the halal gold card?" -> "Visa Hasanah Gold Credit Card"
+- "What is JCB Gold Credit Card?" -> "JCB Gold Credit Card"
+- "does Visa Platinum have lounge access?" -> "Visa Platinum Credit Card"
+- "How much is the annual fee for Mastercard Platinum?" -> "Mastercard Platinum Credit Card"
+- "show me islami cards" -> "none"
+- "check my eligibility" -> "none"
+- "which cards does Prime Bank offer?" -> "none"
+"""
+
+    response = ""
+    for _ in range(2):
+        response = chat(
+            messages=[{"role": "user", "content": prompt}],
+            system="Match the user's message to one specific card from the provided list. Return only the exact card name from the list or 'none'. Never return a paraphrase.",
+            temperature=0.0,
+            max_tokens=80,
+        )
+        response = response.strip().strip('"').strip("'")
+        if response:
+            break
 
     log_event(
         "llm_full_list_match",
