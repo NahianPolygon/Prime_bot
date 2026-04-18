@@ -46,7 +46,7 @@ with open("config.yaml") as f:
     _cfg = yaml.safe_load(f)
 
 from memory.session_memory import get_session, clear_session
-from crew import build_crew_stream, handle_eligibility_form, handle_preference_form
+from crew import build_crew_stream, handle_eligibility_form, handle_preference_form, clear_preference_session
 from agents.compliance_faq import extract_target_card, get_eligibility_form_schema
 
 app = FastAPI(title="Prime Bank Credit Card Assistant", version="1.0.0")
@@ -106,6 +106,7 @@ async def websocket_chat(websocket: WebSocket):
                 sid = data.get("session_id") or session_id
                 if sid:
                     clear_session(sid)
+                    clear_preference_session(sid)
                     log_event("session_cleared", session_id=sid)
                 session_id = None
                 await websocket.send_text(json.dumps({"type": "cleared"}))

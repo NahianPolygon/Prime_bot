@@ -17,6 +17,7 @@ with open("config.yaml") as f:
     cfg = yaml.safe_load(f)
 
 _discovery_sessions: dict[str, dict] = {}
+_preference_completed_sessions: set[str] = set()
 
 SERVICE_ID_PATTERNS = {"_services_", "cardholder_services", "conv_services", "islami_services"}
 
@@ -759,6 +760,7 @@ def handle_preference_form(
     session.history[-1]["content"] = clean
     session.history[-1]["content_short"] = session._truncate_for_history(clean)
 
+    _preference_completed_sessions.add(session_id)
     log_event(
         "preference_form_complete",
         request_id=request_id,
@@ -767,6 +769,11 @@ def handle_preference_form(
         latency_ms=round((time.perf_counter() - started) * 1000, 2),
     )
     return clean
+
+
+def clear_preference_session(session_id: str) -> None:
+    _preference_completed_sessions.discard(session_id)
+    _discovery_sessions.pop(session_id, None)
 
 
 def _discovery_step1_stream(
@@ -896,7 +903,7 @@ def build_crew_stream(
         yield json.dumps({"__done_signal__": True, "intent": "", "calculator": ""})
         return
 
-    if intent == "i_need_a_credit_card":
+    if intent == "i_need_a_credit_card" and session_id not in _preference_completed_sessions:
         yield _build_preference_form_signal(user_message, session)
         yield json.dumps({"__done_signal__": True, "intent": "", "calculator": ""})
         return
@@ -909,17 +916,6 @@ def build_crew_stream(
         if had_first:
             yield json.dumps({"__done_signal__": True, "intent": intent, "calculator": calculator_type})
             return
-
-    if intent_score < 0.6 and intent == "i_need_a_credit_card" and not _is_off_topic(user_message):
-        clarify = (
-            "I'd be happy to help! Could you share a bit more about what you're looking for? "
-            "For example, are you interested in a new credit card, checking your eligibility, "
-            "comparing cards, or help with your existing card?"
-        )
-        session.add(user_message, clarify)
-        yield clarify
-        yield json.dumps({"__done_signal__": True, "intent": "general", "calculator": ""})
-        return
 
     draft, mode = _get_draft(user_message, classifier_output, session, request_id)
 

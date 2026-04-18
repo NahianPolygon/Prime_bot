@@ -46,8 +46,8 @@
   "hotPaths": [
     {
       "path": "Prime_bot/crew.py",
-      "accessCount": 36,
-      "lastAccessed": 1776462602167,
+      "accessCount": 42,
+      "lastAccessed": 1776514605646,
       "type": "file"
     },
     {
@@ -58,8 +58,8 @@
     },
     {
       "path": "Prime_bot/api.py",
-      "accessCount": 16,
-      "lastAccessed": 1776462621504,
+      "accessCount": 19,
+      "lastAccessed": 1776514625051,
       "type": "file"
     },
     {
