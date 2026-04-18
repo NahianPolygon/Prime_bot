@@ -1,4 +1,4 @@
-from classifier.intent_classifier import classify
+from classifier.intent_classifier import classify, _parse_json
 from memory.session_memory import SessionMemory
 from tools.rag_tool import list_all_products
 import re
@@ -312,7 +312,41 @@ def _is_off_topic(user_message: str) -> bool:
     return False
 
 
+_PROFILE_EXTRACT_SYSTEM = """Extract financial profile signals from this conversation history.
+Return ONLY JSON: {"monthly_income":null,"employment_type":null,"age":null}
+Fill in number values only when the user explicitly stated them.
+monthly_income: monthly income in BDT as a number, or null
+employment_type: exactly "salaried", "self_employed", or "business_owner", or null
+age: age in years as a number, or null
+Do not infer, estimate, or assume — only extract values the user directly stated."""
+
+
+def _extract_profile_from_history(session: SessionMemory):
+    history = session.get_history_str(max_chars=800)
+    if not history:
+        return
+    from llm.ollama_client import chat as llm_chat
+    try:
+        result = llm_chat(
+            messages=[{"role": "user", "content": history}],
+            system=_PROFILE_EXTRACT_SYSTEM,
+            temperature=0.0,
+            max_tokens=100,
+            think=False,
+        )
+        parsed = _parse_json(result)
+        if parsed.get("monthly_income") and not session.user_profile.get("monthly_income"):
+            session.update_profile("monthly_income", int(parsed["monthly_income"]))
+        if parsed.get("employment_type") and not session.user_profile.get("employment_type"):
+            session.update_profile("employment_type", parsed["employment_type"])
+        if parsed.get("age") and not session.user_profile.get("age"):
+            session.update_profile("age", int(parsed["age"]))
+    except Exception:
+        pass
+
+
 def _build_eligibility_form_signal(user_message: str, session: SessionMemory) -> str:
+    _extract_profile_from_history(session)
     history = session.get_history_str(max_chars=500)
     target = compliance_faq.extract_target_card(user_message, history)
     profile = session.user_profile if session.user_profile else None
@@ -320,6 +354,13 @@ def _build_eligibility_form_signal(user_message: str, session: SessionMemory) ->
     intro = f"Please fill out the form below to check your eligibility{' for **' + target + '**' if target else ''}."
     session.add(user_message, intro)
     return json.dumps({"__form_signal__": True, "type": "show_eligibility_form", "schema": schema})
+
+
+def _build_preference_form_signal(user_message: str, session: SessionMemory) -> str:
+    schema = compliance_faq.get_preference_form_schema()
+    intro = "To find the best card for you, please fill out the quick preference form below."
+    session.add(user_message, intro)
+    return json.dumps({"__preference_form_signal__": True, "type": "show_preference_form", "schema": schema})
 
 
 def _form_data_summary(form_data: dict) -> str:
@@ -458,7 +499,7 @@ def build_crew(user_message: str, session: SessionMemory, request_id: str | None
             banking_score=round(classifier_output.get("banking_score", 0.0), 4),
         )
 
-        breakout_intents = {"comparison", "eligibility_check", "existing_cardholder", "how_to_apply", "product_details"}
+        breakout_intents = {"comparison", "eligibility_check", "existing_cardholder", "how_to_apply", "product_details", "i_need_a_credit_card"}
         if classifier_output["intent"] in breakout_intents:
             _discovery_sessions.pop(session_id, None)
             if classifier_output["intent"] == "eligibility_check":
@@ -685,6 +726,49 @@ def handle_eligibility_form(
     return clean
 
 
+def handle_preference_form(
+    form_data: dict,
+    session: SessionMemory,
+    request_id: str | None = None,
+) -> str:
+    started = time.perf_counter()
+    session_id = session.session_id
+
+    log_event(
+        "preference_form_received",
+        request_id=request_id,
+        session_id=session_id,
+        banking_type=form_data.get("banking_type", ""),
+        use_case=form_data.get("use_case", ""),
+    )
+
+    user_summary = (
+        f"Card preference — banking: {form_data.get('banking_type', 'any')}, "
+        f"use case: {form_data.get('use_case', 'general')}"
+    )
+    session.add(user_summary, "")
+
+    draft = compliance_faq.run_card_recommendation(form_data, session)
+    clean = _guardrails(draft)
+
+    clean += (
+        "\n\n**Want to check if you qualify?** Just ask me to check your eligibility, "
+        "or visit any Prime Bank branch to apply."
+    )
+
+    session.history[-1]["content"] = clean
+    session.history[-1]["content_short"] = session._truncate_for_history(clean)
+
+    log_event(
+        "preference_form_complete",
+        request_id=request_id,
+        session_id=session_id,
+        response_chars=len(clean),
+        latency_ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+    return clean
+
+
 def _discovery_step1_stream(
     user_message: str,
     session: SessionMemory,
@@ -708,11 +792,14 @@ def _discovery_step1_stream(
         banking_score=round(classifier_output.get("banking_score", 0.0), 4),
     )
 
-    breakout_intents = {"comparison", "eligibility_check", "existing_cardholder", "how_to_apply", "product_details"}
+    breakout_intents = {"comparison", "eligibility_check", "existing_cardholder", "how_to_apply", "product_details", "i_need_a_credit_card"}
     if classifier_output["intent"] in breakout_intents:
         _discovery_sessions.pop(session_id, None)
         if classifier_output["intent"] == "eligibility_check":
             yield _build_eligibility_form_signal(user_message, session)
+            return
+        if classifier_output["intent"] == "i_need_a_credit_card":
+            yield _build_preference_form_signal(user_message, session)
             return
         draft, mode = _get_draft(user_message, classifier_output, session, request_id)
         if mode == "no_synth":
@@ -727,6 +814,8 @@ def _discovery_step1_stream(
         full = "".join(collected)
         clean = _guardrails(full)
         session.add(user_message, clean)
+        if not full.strip():
+            yield clean
         return
 
     _discovery_sessions.pop(session_id, None)
@@ -748,6 +837,8 @@ def _discovery_step1_stream(
     full_response = "".join(collected)
     clean = _guardrails(full_response)
     session.add(user_message, clean)
+    if not full_response.strip():
+        yield clean
     log_event(
         "pipeline_complete_stream",
         request_id=request_id,
@@ -774,11 +865,15 @@ def build_crew_stream(
         if state.get("step") == 1:
             for token in _discovery_step1_stream(user_message, session, request_id, started):
                 yield token
+            yield json.dumps({"__done_signal__": True, "intent": "i_need_a_credit_card", "calculator": ""})
             return
 
-        result = _handle_discovery_stream(user_message, session, request_id, started)
-        if result is not None:
-            yield result
+        had_discovery = False
+        for token in _handle_discovery_stream_gen(user_message, session, request_id, started):
+            had_discovery = True
+            yield token
+        if had_discovery:
+            yield json.dumps({"__done_signal__": True, "intent": "discovery", "calculator": ""})
             return
 
     classifier_output = classify(user_message, history)
@@ -793,16 +888,38 @@ def build_crew_stream(
     )
 
     intent = classifier_output["intent"]
+    calculator_type = classifier_output.get("calculator_type", "")
+    intent_score = classifier_output.get("intent_score", 0.9)
 
     if intent == "eligibility_check":
         yield _build_eligibility_form_signal(user_message, session)
+        yield json.dumps({"__done_signal__": True, "intent": "", "calculator": ""})
         return
 
-    if intent in ("i_need_a_credit_card", "catalog_query") and len(session.history) == 0:
-        result = _handle_first_message_discovery(user_message, classifier_output, session, request_id, started)
-        if result is not None:
-            yield result
+    if intent == "i_need_a_credit_card":
+        yield _build_preference_form_signal(user_message, session)
+        yield json.dumps({"__done_signal__": True, "intent": "", "calculator": ""})
+        return
+
+    if intent == "catalog_query" and len(session.history) == 0:
+        had_first = False
+        for token in _handle_first_message_discovery_stream(user_message, classifier_output, session, request_id, started):
+            had_first = True
+            yield token
+        if had_first:
+            yield json.dumps({"__done_signal__": True, "intent": intent, "calculator": calculator_type})
             return
+
+    if intent_score < 0.6 and intent == "i_need_a_credit_card" and not _is_off_topic(user_message):
+        clarify = (
+            "I'd be happy to help! Could you share a bit more about what you're looking for? "
+            "For example, are you interested in a new credit card, checking your eligibility, "
+            "comparing cards, or help with your existing card?"
+        )
+        session.add(user_message, clarify)
+        yield clarify
+        yield json.dumps({"__done_signal__": True, "intent": "general", "calculator": ""})
+        return
 
     draft, mode = _get_draft(user_message, classifier_output, session, request_id)
 
@@ -817,6 +934,7 @@ def build_crew_stream(
             latency_ms=round((time.perf_counter() - started) * 1000, 2),
         )
         yield clean
+        yield json.dumps({"__done_signal__": True, "intent": intent, "calculator": calculator_type})
         return
 
     collected = []
@@ -827,6 +945,9 @@ def build_crew_stream(
     full_response = "".join(collected)
     clean = _guardrails(full_response)
     session.add(user_message, clean)
+    if not full_response.strip():
+        yield clean
+    yield json.dumps({"__done_signal__": True, "intent": intent, "calculator": calculator_type})
     log_event(
         "pipeline_complete_stream",
         request_id=request_id,
@@ -837,12 +958,12 @@ def build_crew_stream(
     )
 
 
-def _handle_discovery_stream(
+def _handle_discovery_stream_gen(
     user_message: str,
     session: SessionMemory,
     request_id: str | None,
     started: float,
-) -> str | None:
+) -> Generator[str, None, None]:
     session_id = session.session_id
     state = _discovery_sessions.get(session_id, {"step": 0, "retries": 0})
     step = state.get("step", 0)
@@ -859,12 +980,14 @@ def _handle_discovery_stream(
         banking_score=round(classifier_output.get("banking_score", 0.0), 4),
     )
 
-    breakout_intents = {"comparison", "eligibility_check", "existing_cardholder", "how_to_apply", "product_details"}
+    breakout_intents = {"comparison", "eligibility_check", "existing_cardholder", "how_to_apply", "product_details", "i_need_a_credit_card"}
     if classifier_output["intent"] in breakout_intents:
         _discovery_sessions.pop(session_id, None)
         if classifier_output["intent"] == "eligibility_check":
-            return _build_eligibility_form_signal(user_message, session)
-        return None
+            yield _build_eligibility_form_signal(user_message, session)
+        elif classifier_output["intent"] == "i_need_a_credit_card":
+            yield _build_preference_form_signal(user_message, session)
+        return
 
     if step == 0:
         signal = _extract_discovery_signal(user_message, state)
@@ -883,9 +1006,24 @@ def _handle_discovery_stream(
                 state["filters"] = original_filters
                 _discovery_sessions[session_id] = state
 
-                clean = _guardrails(merged_response)
+                collected = []
+                for token in synthesis_agent.run_stream(merged_response, user_message):
+                    collected.append(token)
+                    yield token
+                full = "".join(collected)
+                clean = _guardrails(full if full.strip() else merged_response)
                 session.add(user_message, clean)
-                return clean
+                if not full.strip():
+                    yield clean
+                log_event(
+                    "discovery_step",
+                    request_id=request_id,
+                    session_id=session_id,
+                    step=1,
+                    banking_type=banking_pref,
+                    filters=str(original_filters),
+                    latency_ms=round((time.perf_counter() - started) * 1000, 2),
+                )
             else:
                 response = _build_filtered_card_response(banking_pref)
                 state["banking_type"] = banking_pref
@@ -893,14 +1031,19 @@ def _handle_discovery_stream(
                 state["retries"] = 0
                 _discovery_sessions[session_id] = state
 
-                clean = _guardrails(response)
+                collected = []
+                for token in synthesis_agent.run_stream(response, user_message):
+                    collected.append(token)
+                    yield token
+                full = "".join(collected)
+                clean = _guardrails(full if full.strip() else response)
                 session.add(user_message, clean)
-                return clean
+                if not full.strip():
+                    yield clean
         else:
             state["retries"] = state.get("retries", 0) + 1
             if state["retries"] >= MAX_DISCOVERY_RETRIES:
                 _discovery_sessions.pop(session_id, None)
-                return None
             else:
                 _discovery_sessions[session_id] = state
                 response = (
@@ -908,7 +1051,7 @@ def _handle_discovery_stream(
                     "**conventional** or **Islamic (Shariah-compliant)** banking?"
                 )
                 session.add(user_message, response)
-                return response
+                yield response
 
     elif step == 1:
         banking_type = state.get("banking_type", "both")
@@ -921,22 +1064,36 @@ def _handle_discovery_stream(
             "search_query": user_message,
         }
 
+        log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="product_advisor")
         draft = product_advisor.run(user_message, routing, session)
-        final_response = synthesis_agent.run(draft, user_message)
-        clean = _guardrails(final_response)
+
+        collected = []
+        for token in synthesis_agent.run_stream(draft, user_message):
+            collected.append(token)
+            yield token
+        full = "".join(collected)
+        clean = _guardrails(full if full.strip() else draft)
         session.add(user_message, clean)
-        return clean
+        if not full.strip():
+            yield clean
+        log_event(
+            "pipeline_complete_stream",
+            request_id=request_id,
+            session_id=session_id,
+            intent="discovery_recommendation",
+            banking_type=banking_type,
+            response_chars=len(clean),
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+        )
 
-    return None
 
-
-def _handle_first_message_discovery(
+def _handle_first_message_discovery_stream(
     user_message: str,
     classifier_output: dict,
     session: SessionMemory,
     request_id: str | None,
     started: float,
-) -> str | None:
+) -> Generator[str, None, None]:
     session_id = session.session_id
     signal = _extract_discovery_signal(user_message, {"step": "initial"})
     filters = _filters_from_signal(signal, classifier_output)
@@ -960,8 +1117,15 @@ def _handle_first_message_discovery(
                     "retries": 0,
                 }
 
-            clean = _guardrails(response)
+            collected = []
+            for token in synthesis_agent.run_stream(response, user_message):
+                collected.append(token)
+                yield token
+            full = "".join(collected)
+            clean = _guardrails(full if full.strip() else response)
             session.add(user_message, clean)
+            if not full.strip():
+                yield clean
             log_event(
                 "discovery_response",
                 request_id=request_id,
@@ -969,19 +1133,24 @@ def _handle_first_message_discovery(
                 filters=str(filters),
                 latency_ms=round((time.perf_counter() - started) * 1000, 2),
             )
-            return clean
+            return
 
     discovery_response = _build_all_cards_response()
     if discovery_response:
         _discovery_sessions[session_id] = {"step": 0, "filters": {}, "retries": 0}
-        clean = _guardrails(discovery_response)
+
+        collected = []
+        for token in synthesis_agent.run_stream(discovery_response, user_message):
+            collected.append(token)
+            yield token
+        full = "".join(collected)
+        clean = _guardrails(full if full.strip() else discovery_response)
         session.add(user_message, clean)
+        if not full.strip():
+            yield clean
         log_event(
             "discovery_response",
             request_id=request_id,
             session_id=session_id,
             latency_ms=round((time.perf_counter() - started) * 1000, 2),
         )
-        return clean
-
-    return None

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1776322980142,
+  "lastScanned": 1776460614648,
   "projectRoot": "/mnt/data/github/prime_bot",
   "techStack": {
     "languages": [],
@@ -33,7 +33,7 @@
       "path": "Prime_bot",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1776322980135,
+      "lastAccessed": 1776460614637,
       "keyFiles": [
         "Dockerfile",
         "api.py",
@@ -46,32 +46,56 @@
   "hotPaths": [
     {
       "path": "Prime_bot/crew.py",
-      "accessCount": 11,
-      "lastAccessed": 1776326363843,
+      "accessCount": 36,
+      "lastAccessed": 1776462602167,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/static/index.html",
+      "accessCount": 20,
+      "lastAccessed": 1776462726719,
       "type": "file"
     },
     {
       "path": "Prime_bot/api.py",
-      "accessCount": 8,
-      "lastAccessed": 1776326644741,
+      "accessCount": 16,
+      "lastAccessed": 1776462621504,
       "type": "file"
     },
     {
       "path": "Prime_bot/memory/session_memory.py",
-      "accessCount": 6,
-      "lastAccessed": 1776326489013,
+      "accessCount": 7,
+      "lastAccessed": 1776460922968,
       "type": "file"
     },
     {
       "path": "Prime_bot/tools/rag_tool.py",
+      "accessCount": 7,
+      "lastAccessed": 1776460960838,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/agents/compliance_faq.py",
+      "accessCount": 6,
+      "lastAccessed": 1776462542879,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/agents/synthesis_agent.py",
       "accessCount": 5,
-      "lastAccessed": 1776326746249,
+      "lastAccessed": 1776460918442,
+      "type": "file"
+    },
+    {
+      "path": "Prime_bot/classifier/intent_classifier.py",
+      "accessCount": 5,
+      "lastAccessed": 1776461353536,
       "type": "file"
     },
     {
       "path": "Prime_bot/logging_utils.py",
-      "accessCount": 3,
-      "lastAccessed": 1776326415097,
+      "accessCount": 4,
+      "lastAccessed": 1776460923637,
       "type": "file"
     },
     {
@@ -81,28 +105,40 @@
       "type": "file"
     },
     {
-      "path": "Prime_bot/static/index.html",
-      "accessCount": 1,
-      "lastAccessed": 1776325205234,
+      "path": "Prime_bot/agents/cardholder_svc.py",
+      "accessCount": 3,
+      "lastAccessed": 1776460922639,
       "type": "file"
     },
     {
-      "path": "Prime_bot/agents/compliance_faq.py",
-      "accessCount": 1,
-      "lastAccessed": 1776325241438,
+      "path": "Prime_bot/llm/ollama_client.py",
+      "accessCount": 2,
+      "lastAccessed": 1776461008185,
       "type": "file"
     },
     {
-      "path": "Prime_bot/classifier/intent_classifier.py",
+      "path": "Prime_bot/agents/product_advisor.py",
       "accessCount": 1,
-      "lastAccessed": 1776325242229,
+      "lastAccessed": 1776348490299,
       "type": "file"
     },
     {
-      "path": "Prime_bot/agents/synthesis_agent.py",
+      "path": "Prime_bot/agents/comparator.py",
       "accessCount": 1,
-      "lastAccessed": 1776325242525,
+      "lastAccessed": 1776348497613,
       "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 1,
+      "lastAccessed": 1776461008290,
+      "type": "directory"
+    },
+    {
+      "path": "Prime_bot",
+      "accessCount": 1,
+      "lastAccessed": 1776461698867,
+      "type": "directory"
     }
   ],
   "userDirectives": []

@@ -23,44 +23,12 @@ You MUST NOT:
 If the query is not covered in chunks, say: "Please call 16218 or visit your nearest Prime Bank branch."
 """
 
-_EMERGENCY_KEYWORDS = frozenset([
-    "lost", "stolen", "missing", "block", "blocked", "unauthorized",
-    "fraud", "fraudulent", "someone used", "not me", "compromised",
-    "theft", "lost my card", "cant find my card",
-])
-
-_INTENT_SEARCH_MAP = {
-    "activat": "activate card new card how to activate",
-    "pin": "PIN setup reset generate PIN MyPrime",
-    "bill": "bill payment pay dues outstanding balance MyPrime internet banking",
-    "statement": "transaction history statement balance inquiry",
-    "reward": "reward points redeem points balance points expiry",
-    "limit": "credit limit increase request limit enhancement",
-    "emi": "EMI conversion installment 0 percent interest",
-    "supplement": "supplementary card add family member",
-    "endorse": "endorsement foreign currency passport branch",
-    "damage": "damaged card replacement branch visit",
-}
-
 
 def _clean_context(context: str) -> str:
     context = re.sub(r'product_id:\s*\S+', '', context)
     context = re.sub(r'\b(?:CARD|ISLAMI_CARD)_\d+\b', '', context)
     context = re.sub(r'\n\s*\n\s*\n', '\n\n', context)
     return context.strip()
-
-
-def _get_intent_search_query(message: str) -> str:
-    msg = message.lower()
-    for keyword, search_terms in _INTENT_SEARCH_MAP.items():
-        if keyword in msg:
-            return search_terms
-    return message
-
-
-def _is_emergency(message: str) -> bool:
-    msg = message.lower()
-    return any(kw in msg for kw in _EMERGENCY_KEYWORDS)
 
 
 def _get_collections(banking: str) -> list[str]:
@@ -85,34 +53,10 @@ def run(
     banking = routing["banking_type"]
     collections = _get_collections(banking)
 
-    if _is_emergency(user_message):
-        context = rag_search_multi(
-            "lost stolen card block emergency contact 16218",
-            collections,
-            top_k=4,
-        )
-        context = _clean_context(context) if not context.startswith("[NO RESULTS]") else ""
-
-        emergency_prompt = f"""KNOWLEDGE BASE CHUNKS:
-{context}
-
-Cardholder emergency: {user_message}
-
-The FIRST line of your response MUST be: "🚨 **Call 16218 IMMEDIATELY** to block your card."
-Then provide any additional steps from the chunks above."""
-
-        return chat(
-            messages=[{"role": "user", "content": emergency_prompt}],
-            system=SYSTEM,
-            temperature=0.1,
-            max_tokens=600,
-        )
-
-    search_q = _get_intent_search_query(routing.get("search_query", user_message))
-    context = rag_search_multi(search_q, collections, top_k=5)
+    context = rag_search_multi(user_message, collections, top_k=5)
 
     if context.startswith("[NO RESULTS]"):
-        fallback_context = rag_search_multi(user_message, collections, top_k=4)
+        fallback_context = rag_search_multi(user_message, collections + ["all_products"], top_k=4)
         if fallback_context.startswith("[NO RESULTS]"):
             return "Please call **16218** or visit your nearest Prime Bank branch for assistance with your card."
         context = fallback_context

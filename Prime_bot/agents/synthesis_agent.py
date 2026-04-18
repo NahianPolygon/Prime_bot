@@ -28,10 +28,6 @@ _TABLE_RE = re.compile(r'\|.+\|')
 _PRODUCT_ID_RE = re.compile(r'\(?product_id[:\s]*[A-Z_0-9]+\)?', re.IGNORECASE)
 _INTERNAL_CODE_RE = re.compile(r'\b(?:ISLAMI_CARD|CARD)_\d+\b')
 
-_REPEATED_FACT_RE = re.compile(r'(\b\d[\d,]+\s*(?:BDT|%|points?|months?)\b).*?\1', re.DOTALL | re.IGNORECASE)
-_EXCESSIVE_HEADING_RE = re.compile(r'^#{3,4}\s', re.MULTILINE)
-_REDUNDANT_BLANK_RE = re.compile(r'\n{3,}')
-
 
 def _strip_product_ids(text: str) -> str:
     text = _PRODUCT_ID_RE.sub('', text)
@@ -41,58 +37,6 @@ def _strip_product_ids(text: str) -> str:
     text = re.sub(r'\|\s*\|', '| N/A |', text)
     text = re.sub(r'  +', ' ', text)
     return text.strip()
-
-
-def _has_internal_codes(text: str) -> bool:
-    return bool(_INTERNAL_CODE_RE.search(text)) or bool(_PRODUCT_ID_RE.search(text))
-
-
-def _has_formatting_issues(draft: str) -> bool:
-    if _EXCESSIVE_HEADING_RE.search(draft):
-        return True
-
-    lines = draft.split('\n')
-    consecutive_bullets = 0
-    for line in lines:
-        if line.strip().startswith(('- ', '* ', '• ')):
-            consecutive_bullets += 1
-        else:
-            consecutive_bullets = 0
-        if consecutive_bullets > 8:
-            return True
-
-    word_count = len(draft.split())
-    heading_count = len(re.findall(r'^#{1,2}\s', draft, re.MULTILINE))
-    if word_count < 80 and heading_count >= 2:
-        return True
-
-    sentences = re.split(r'(?<=[.!?])\s+', draft)
-    seen = set()
-    for s in sentences:
-        key = re.sub(r'\s+', ' ', s.lower().strip())[:60]
-        if len(key) > 20 and key in seen:
-            return True
-        seen.add(key)
-
-    return False
-
-
-def _draft_is_clean(draft: str) -> bool:
-    if _has_internal_codes(draft):
-        return False
-
-    if _has_formatting_issues(draft):
-        return False
-
-    has_table = bool(_TABLE_RE.search(draft))
-    if has_table:
-        return True
-
-    length = len(draft)
-    if 120 < length < 1800:
-        return True
-
-    return False
 
 
 def _build_prompt(draft: str, user_message: str) -> str:
@@ -117,9 +61,6 @@ def run(draft: str, user_message: str) -> str:
     if not draft or len(draft.strip()) < 15:
         return FALLBACK
 
-    if _draft_is_clean(draft):
-        return draft
-
     prompt = _build_prompt(draft, user_message)
 
     result = chat(
@@ -132,12 +73,7 @@ def run(draft: str, user_message: str) -> str:
     if not result or len(result.strip()) < 15:
         return draft
 
-    result = _strip_product_ids(result)
-
-    if not result or len(result.strip()) < 15:
-        return draft
-
-    return result
+    return _strip_product_ids(result)
 
 
 def run_stream(draft: str, user_message: str) -> Generator[str, None, None]:
@@ -156,10 +92,6 @@ def run_stream(draft: str, user_message: str) -> Generator[str, None, None]:
         yield FALLBACK
         return
 
-    if _draft_is_clean(draft):
-        yield draft
-        return
-
     prompt = _build_prompt(draft, user_message)
 
     collected = []
@@ -172,7 +104,5 @@ def run_stream(draft: str, user_message: str) -> Generator[str, None, None]:
         collected.append(token)
         yield token
 
-    full = "".join(collected)
-    cleaned = _strip_product_ids(full)
-    if cleaned != full and len(cleaned) > 15:
-        pass
+    if not collected:
+        yield draft

@@ -280,6 +280,37 @@ def extract_target_card(user_message: str, history: str = "") -> str:
     return ""
 
 
+PREFERENCE_FORM_SCHEMA = {
+    "banking_type": {
+        "label": "Banking Preference",
+        "type": "button_group",
+        "options": [
+            {"value": "conventional", "label": "Conventional"},
+            {"value": "islami", "label": "Islamic (Halal)"},
+            {"value": "both", "label": "No Preference"},
+        ],
+        "required": True,
+    },
+    "use_case": {
+        "label": "Primary Use",
+        "type": "tile_grid",
+        "options": [
+            {"value": "shopping lifestyle", "label": "Shopping & Daily Use"},
+            {"value": "travel international_travel lounge_access", "label": "Travel & Lounge"},
+            {"value": "dining premium_lifestyle", "label": "Dining & Lifestyle"},
+            {"value": "rewards_earning cashback", "label": "Rewards & Cashback"},
+            {"value": "business_spending business_travel high_spenders", "label": "Business Spending"},
+            {"value": "entry_level_premium", "label": "First Premium Card"},
+        ],
+        "required": True,
+    },
+}
+
+
+def get_preference_form_schema() -> dict:
+    return {"fields": PREFERENCE_FORM_SCHEMA}
+
+
 def validate_eligibility_form(form_data: dict) -> list[str]:
     errors = []
 
@@ -598,4 +629,83 @@ Answer using ONLY the chunks above. Do not display any product_id or internal co
         messages=[{"role": "user", "content": prompt}],
         system=FAQ_SYSTEM,
         temperature=0.2,
+    )
+
+
+RECOMMENDATION_SYSTEM = """You are the Prime Bank Card Recommendation Specialist.
+
+Based on the customer's stated preferences and the knowledge base chunks provided, recommend the 1-2 BEST matching Prime Bank credit cards.
+
+You MUST:
+- Recommend at most 2 cards that best match the customer's stated preferences
+- Explain clearly WHY each recommended card fits their needs using specific features from the chunks
+- Highlight the most relevant benefits for their primary use case
+- Conclude with an invitation to check eligibility or visit any Prime Bank branch
+
+You MUST NOT:
+- Recommend more than 2 cards
+- Invent features, fees, or benefits not in the chunks
+- Display product_id, internal IDs, or system codes like CARD_001
+"""
+
+
+def run_card_recommendation(form_data: dict, session: SessionMemory) -> str:
+    banking_type = form_data.get("banking_type", "both")
+    use_case = form_data.get("use_case", "")
+
+    if banking_type in ("conventional", "islami"):
+        collections = [f"{banking_type}_credit_i_need_a_credit_card"]
+    else:
+        collections = [
+            "conventional_credit_i_need_a_credit_card",
+            "islami_credit_i_need_a_credit_card",
+        ]
+
+    query_parts = []
+    if use_case:
+        query_parts.append(use_case)
+    query_parts.append("credit card features benefits rewards annual fee")
+    search_query = " ".join(query_parts)
+
+    context = rag_search_multi(search_query, collections, top_k=8)
+
+    if context.startswith("[NO RESULTS]"):
+        return (
+            "I couldn't find suitable card recommendations in my knowledge base. "
+            "Please contact Prime Bank at **16218** for personalised advice."
+        )
+
+    context = _clean_context(context)
+    history = session.get_history_str(max_chars=500)
+
+    pref_lines = []
+    if banking_type and banking_type != "both":
+        label = "Conventional" if banking_type == "conventional" else "Islamic (Shariah-compliant)"
+        pref_lines.append(f"- Banking preference: {label}")
+    else:
+        pref_lines.append("- Banking preference: No preference (show best options)")
+    if use_case:
+        pref_lines.append(f"- Primary use case: {use_case}")
+    pref_str = "\n".join(pref_lines)
+
+    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
+{context}
+
+---
+
+Customer preferences:
+{pref_str}
+
+Previous conversation:
+{history or 'None'}
+
+Based on the customer's preferences above, recommend the 1-2 BEST matching Prime Bank credit cards from the chunks.
+For each recommended card, explain specifically which features match the customer's stated use case.
+Be conversational and helpful. End with a suggestion to check eligibility or visit any Prime Bank branch."""
+
+    return chat(
+        messages=[{"role": "user", "content": prompt}],
+        system=RECOMMENDATION_SYSTEM,
+        temperature=0.2,
+        max_tokens=1500,
     )

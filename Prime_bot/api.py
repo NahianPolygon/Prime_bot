@@ -46,7 +46,7 @@ with open("config.yaml") as f:
     _cfg = yaml.safe_load(f)
 
 from memory.session_memory import get_session, clear_session
-from crew import build_crew_stream, handle_eligibility_form
+from crew import build_crew_stream, handle_eligibility_form, handle_preference_form
 from agents.compliance_faq import extract_target_card, get_eligibility_form_schema
 
 app = FastAPI(title="Prime Bank Credit Card Assistant", version="1.0.0")
@@ -111,6 +111,40 @@ async def websocket_chat(websocket: WebSocket):
                 await websocket.send_text(json.dumps({"type": "cleared"}))
                 continue
 
+            if msg_type == "preference_form_submit":
+                if not session_id:
+                    session_id = data.get("session_id") or str(uuid.uuid4())
+
+                session = get_session(session_id)
+                request_id = str(uuid.uuid4())
+                form_data = data.get("form_data", {})
+
+                log_event(
+                    "ws_preference_form",
+                    request_id=request_id,
+                    session_id=session_id,
+                    banking_type=form_data.get("banking_type", ""),
+                    use_case=form_data.get("use_case", ""),
+                )
+
+                await websocket.send_text(json.dumps({
+                    "type": "session_id",
+                    "session_id": session_id,
+                }))
+
+                try:
+                    result = handle_preference_form(form_data, session, request_id=request_id)
+                    await websocket.send_text(json.dumps({"type": "token", "token": result}))
+                    await websocket.send_text(json.dumps({"type": "done", "intent": "i_need_a_credit_card", "calculator": ""}))
+                    log_event("ws_preference_complete", request_id=request_id, session_id=session_id)
+                except Exception as e:
+                    log_event("ws_preference_error", request_id=request_id, session_id=session_id, error=str(e))
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "message": "Card recommendation failed. Please try again.",
+                    }))
+                continue
+
             if msg_type == "eligibility_form_submit":
                 if not session_id:
                     session_id = data.get("session_id") or str(uuid.uuid4())
@@ -134,12 +168,22 @@ async def websocket_chat(websocket: WebSocket):
 
                 try:
                     result = handle_eligibility_form(form_data, session, request_id=request_id)
+                    rl = result.lower()
+                    if "\u2705" in result or ("eligible" in rl and "not eligible" not in rl and "ineligible" not in rl):
+                        elig_outcome = "eligible"
+                    elif "\u26a0\ufe0f" in result or "borderline" in rl or "conditional" in rl:
+                        elig_outcome = "borderline"
+                    elif "\u274c" in result or "not eligible" in rl or "ineligible" in rl:
+                        elig_outcome = "ineligible"
+                    else:
+                        elig_outcome = "eligible"
                     await websocket.send_text(json.dumps({"type": "token", "token": result}))
-                    await websocket.send_text(json.dumps({"type": "done"}))
+                    await websocket.send_text(json.dumps({"type": "done", "intent": elig_outcome, "calculator": ""}))
                     log_event(
                         "ws_eligibility_complete",
                         request_id=request_id,
                         session_id=session_id,
+                        outcome=elig_outcome,
                     )
                 except Exception as e:
                     log_event(
@@ -175,7 +219,21 @@ async def websocket_chat(websocket: WebSocket):
 
             req_start = time.perf_counter()
             try:
+                done_intent = ""
+                done_calculator = ""
                 for token in build_crew_stream(message, session, request_id=request_id):
+                    if token.startswith('{"__preference_form_signal__"'):
+                        try:
+                            signal = json.loads(token)
+                            if signal.get("__preference_form_signal__"):
+                                await websocket.send_text(json.dumps({
+                                    "type": "show_preference_form",
+                                    "schema": signal["schema"],
+                                }))
+                                continue
+                        except json.JSONDecodeError:
+                            pass
+
                     if token.startswith('{"__form_signal__"'):
                         try:
                             signal = json.loads(token)
@@ -188,10 +246,19 @@ async def websocket_chat(websocket: WebSocket):
                         except json.JSONDecodeError:
                             pass
 
+                    if token.startswith('{"__done_signal__"'):
+                        try:
+                            sig = json.loads(token)
+                            done_intent = sig.get("intent", "")
+                            done_calculator = sig.get("calculator", "")
+                        except json.JSONDecodeError:
+                            pass
+                        continue
+
                     await websocket.send_text(json.dumps({"type": "token", "token": token}))
 
                 _record_latency((time.perf_counter() - req_start) * 1000)
-                await websocket.send_text(json.dumps({"type": "done"}))
+                await websocket.send_text(json.dumps({"type": "done", "intent": done_intent, "calculator": done_calculator}))
                 log_event("ws_chat_complete", request_id=request_id, session_id=session_id)
 
             except Exception as e:

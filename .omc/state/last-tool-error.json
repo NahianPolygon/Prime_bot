@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"docker exec primebot-api pwd && docker exec primebot-api ls *.py 2>&1\",\"description\":\"Check container working directory\"}",
+  "error": "Exit code 1\n/app\n(eval):1: no matches found: *.py",
+  "timestamp": "2026-04-17T21:36:55.117Z",
+  "retry_count": 1
+}

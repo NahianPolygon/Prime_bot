@@ -164,6 +164,31 @@
     .elig-form-submitted { opacity: 0.6; pointer-events: none; }
     .elig-bubble { max-width: 420px; padding: 16px !important; }
     .prefill-badge { display: inline-block; font-size: 10px; background: #fef9c3; color: #854d0e; border: 1px solid #fde047; border-radius: 4px; padding: 1px 6px; margin-left: 6px; font-weight: 500; vertical-align: middle; }
+    /* Preference form */
+    .pref-bubble { max-width: 460px; padding: 16px !important; }
+    .pref-form-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .pref-form-icon { width: 36px; height: 36px; background: var(--accent-light); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .pref-form-icon svg { width: 18px; height: 18px; fill: var(--accent); }
+    .pref-form-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .pref-form-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+    .pref-section { margin-bottom: 14px; }
+    .pref-section-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .pref-btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pref-pill { font-family: var(--font); font-size: 13px; font-weight: 500; padding: 7px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg); color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
+    .pref-pill.selected { background: var(--accent); color: white; border-color: var(--accent); }
+    .pref-pill:hover:not(.selected) { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+    .pref-tile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .pref-tile { font-family: var(--font); font-size: 12px; font-weight: 500; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text-secondary); cursor: pointer; transition: all 0.15s; text-align: left; line-height: 1.4; }
+    .pref-tile.selected { background: var(--accent-light); color: var(--accent); border-color: rgba(26,79,156,0.4); font-weight: 600; }
+    .pref-tile:hover:not(.selected) { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+    .pref-form-actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .pref-submit-btn { font-family: var(--font); font-size: 13px; font-weight: 500; padding: 9px 20px; border-radius: 8px; cursor: pointer; transition: all 0.15s; border: none; background: var(--accent); color: white; flex: 1; }
+    .pref-submit-btn:hover:not(:disabled) { background: var(--accent-hover); }
+    .pref-submit-btn:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
+    .pref-cancel-btn { font-family: var(--font); font-size: 13px; font-weight: 500; padding: 9px 16px; border-radius: 8px; cursor: pointer; transition: all 0.15s; background: none; color: var(--text-secondary); border: 1px solid var(--border); }
+    .pref-cancel-btn:hover { background: var(--bg); color: var(--text-primary); }
+    .pref-form-submitted { opacity: 0.6; pointer-events: none; }
+    @media (max-width: 720px) { .pref-bubble { max-width: 90%; } .pref-tile-grid { grid-template-columns: 1fr; } }
     /* Input area */
     .input-area { padding: 16px 24px; border-top: 1px solid var(--border); background: var(--surface); }
     .input-row { display: flex; gap: 10px; align-items: flex-end; }
@@ -283,26 +308,30 @@
 
   var FOLLOWUP = {
     en: {
-      eligible:        ["How do I apply?", "What documents do I need?", "Compare with another card"],
-      ineligible:      ["Show me other options", "What are the income requirements?", "How to improve eligibility?"],
-      borderline:      ["Show easier-to-get cards", "What's the minimum income?", "Tips to strengthen application"],
-      comparison:      ["Check my eligibility", "How to apply?", "Explain the fees"],
-      product_details: ["Check my eligibility", "Compare cards", "How to apply?"],
-      how_to_apply:    ["Check eligibility first", "What are the fees?", "How long does approval take?"],
-      emergency:       ["Get a replacement card", "How do I check my transactions?", "How do I change my PIN?"],
-      discovery:       ["Conventional please", "Islamic / Halal please", "Tell me more"],
-      general:         ["What cards are available?", "Check my eligibility", "Compare cards"],
+      eligible:             ["How do I apply?", "What documents do I need?", "Compare with another card"],
+      ineligible:           ["Show me other options", "What are the income requirements?", "How to improve eligibility?"],
+      borderline:           ["Show easier-to-get cards", "What's the minimum income?", "Tips to strengthen application"],
+      comparison:           ["Check my eligibility", "How to apply?", "Explain the fees"],
+      product_details:      ["Check my eligibility", "Compare cards", "How to apply?"],
+      how_to_apply:         ["Check eligibility first", "What are the fees?", "How long does approval take?"],
+      existing_cardholder:  ["Get a replacement card", "How do I check my transactions?", "How do I change my PIN?"],
+      i_need_a_credit_card: ["Check my eligibility", "Compare cards", "How to apply?"],
+      catalog_query:        ["Conventional cards", "Islamic / Halal cards", "Check my eligibility"],
+      discovery:            ["Conventional please", "Islamic / Halal please", "Tell me more"],
+      general:              ["What cards are available?", "Check my eligibility", "Compare cards"],
     },
     bn: {
-      eligible:        ["\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?", "\u0995\u09C0 \u0995\u09C0 \u0995\u09BE\u0997\u099C\u09AA\u09A4\u09CD\u09B0 \u09B2\u09BE\u0997\u09AC\u09C7?", "\u0985\u09A8\u09CD\u09AF \u0995\u09BE\u09B0\u09CD\u09A1\u09C7\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09A4\u09C1\u09B2\u09A8\u09BE"],
-      ineligible:      ["\u0985\u09A8\u09CD\u09AF \u0985\u09AA\u09B6\u09A8 \u09A6\u09C7\u0996\u09BE\u09A8", "\u0986\u09AF\u09BC\u09C7\u09B0 \u09AA\u09CD\u09B0\u09AF\u09BC\u09CB\u099C\u09A8\u09C0\u09AF\u09BC\u09A4\u09BE \u0995\u09C0?", "\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u0989\u09A8\u09CD\u09A8\u09A4 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?"],
-      borderline:      ["\u09B8\u09B9\u099C\u09C7 \u09AA\u09BE\u0993\u09AF\u09BC\u09BE \u09AF\u09BE\u09AF\u09BC \u098F\u09AE\u09A8 \u0995\u09BE\u09B0\u09CD\u09A1", "\u09A8\u09CD\u09AF\u09C2\u09A8\u09A4\u09AE \u0986\u09AF\u09BC \u0995\u09A4?", "\u0986\u09AC\u09C7\u09A6\u09A8 \u09B6\u0995\u09CD\u09A4\u09BF\u09B6\u09BE\u09B2\u09C0 \u0995\u09B0\u09BE\u09B0 \u099F\u09BF\u09AA\u09B8"],
-      comparison:      ["\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?", "\u09AB\u09BF \u09B8\u09AE\u09CD\u09AA\u09B0\u09CD\u0995\u09C7 \u099C\u09BE\u09A8\u09C1\u09A8"],
-      product_details: ["\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u0995\u09BE\u09B0\u09CD\u09A1 \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09C1\u09A8", "\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?"],
-      how_to_apply:    ["\u0986\u0997\u09C7 \u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u09AB\u09BF \u0995\u09A4?", "\u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09A8 \u09AA\u09C7\u09A4\u09C7 \u0995\u09A4\u09A6\u09BF\u09A8 \u09B2\u09BE\u0997\u09C7?"],
-      emergency:       ["\u09A8\u09A4\u09C1\u09A8 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AA\u09BE\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?", "\u09B2\u09C7\u09A8\u09A6\u09C7\u09A8 \u0987\u09A4\u09BF\u09B9\u09BE\u09B8 \u0995\u09C0\u09AD\u09BE\u09AC\u09C7 \u09A6\u09C7\u0996\u09AC?", "\u09AA\u09BF\u09A8 \u09AA\u09B0\u09BF\u09AC\u09B0\u09CD\u09A4\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?"],
-      discovery:       ["\u09AA\u09CD\u09B0\u099A\u09B2\u09BF\u09A4 \u09AC\u09CD\u09AF\u09BE\u0982\u0995\u09BF\u0982", "\u0987\u09B8\u09B2\u09BE\u09AE\u09BF\u0995 / \u09B9\u09BE\u09B2\u09BE\u09B2", "\u09AA\u09BE\u09B0\u09CD\u09A5\u0995\u09CD\u09AF \u09B8\u09AE\u09CD\u09AA\u09B0\u09CD\u0995\u09C7 \u0986\u09B0\u09CB \u099C\u09BE\u09A8\u09C1\u09A8"],
-      general:         ["\u0995\u09C0 \u0995\u09BE\u09B0\u09CD\u09A1 \u0986\u099B\u09C7?", "\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u0995\u09BE\u09B0\u09CD\u09A1 \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09C1\u09A8"],
+      eligible:             ["\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?", "\u0995\u09C0 \u0995\u09C0 \u0995\u09BE\u0997\u099C\u09AA\u09A4\u09CD\u09B0 \u09B2\u09BE\u0997\u09AC\u09C7?", "\u0985\u09A8\u09CD\u09AF \u0995\u09BE\u09B0\u09CD\u09A1\u09C7\u09B0 \u09B8\u09BE\u09A5\u09C7 \u09A4\u09C1\u09B2\u09A8\u09BE"],
+      ineligible:           ["\u0985\u09A8\u09CD\u09AF \u0985\u09AA\u09B6\u09A8 \u09A6\u09C7\u0996\u09BE\u09A8", "\u0986\u09AF\u09BC\u09C7\u09B0 \u09AA\u09CD\u09B0\u09AF\u09BC\u09CB\u099C\u09A8\u09C0\u09AF\u09BC\u09A4\u09BE \u0995\u09C0?", "\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u0989\u09A8\u09CD\u09A8\u09A4 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?"],
+      borderline:           ["\u09B8\u09B9\u099C\u09C7 \u09AA\u09BE\u0993\u09AF\u09BC\u09BE \u09AF\u09BE\u09AF\u09BC \u098F\u09AE\u09A8 \u0995\u09BE\u09B0\u09CD\u09A1", "\u09A8\u09CD\u09AF\u09C2\u09A8\u09A4\u09AE \u0986\u09AF\u09BC \u0995\u09A4?", "\u0986\u09AC\u09C7\u09A6\u09A8 \u09B6\u0995\u09CD\u09A4\u09BF\u09B6\u09BE\u09B2\u09C0 \u0995\u09B0\u09BE\u09B0 \u099F\u09BF\u09AA\u09B8"],
+      comparison:           ["\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?", "\u09AB\u09BF \u09B8\u09AE\u09CD\u09AA\u09B0\u09CD\u0995\u09C7 \u099C\u09BE\u09A8\u09C1\u09A8"],
+      product_details:      ["\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u0995\u09BE\u09B0\u09CD\u09A1 \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09C1\u09A8", "\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?"],
+      how_to_apply:         ["\u0986\u0997\u09C7 \u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u09AB\u09BF \u0995\u09A4?", "\u0985\u09A8\u09C1\u09AE\u09CB\u09A6\u09A8 \u09AA\u09C7\u09A4\u09C7 \u0995\u09A4\u09A6\u09BF\u09A8 \u09B2\u09BE\u0997\u09C7?"],
+      existing_cardholder:  ["\u09A8\u09A4\u09C1\u09A8 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AA\u09BE\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?", "\u09B2\u09C7\u09A8\u09A6\u09C7\u09A8 \u0987\u09A4\u09BF\u09B9\u09BE\u09B8 \u0995\u09C0\u09AD\u09BE\u09AC\u09C7 \u09A6\u09C7\u0996\u09AC?", "\u09AA\u09BF\u09A8 \u09AA\u09B0\u09BF\u09AC\u09B0\u09CD\u09A4\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?"],
+      i_need_a_credit_card: ["\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u0995\u09BE\u09B0\u09CD\u09A1 \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09C1\u09A8", "\u0986\u09AC\u09C7\u09A6\u09A8 \u0995\u09B0\u09AC \u0995\u09C0\u09AD\u09BE\u09AC\u09C7?"],
+      catalog_query:        ["\u09AA\u09CD\u09B0\u099A\u09B2\u09BF\u09A4 \u09AC\u09CD\u09AF\u09BE\u0982\u0995\u09BF\u0982 \u0995\u09BE\u09B0\u09CD\u09A1", "\u0987\u09B8\u09B2\u09BE\u09AE\u09BF\u0995 / \u09B9\u09BE\u09B2\u09BE\u09B2 \u0995\u09BE\u09B0\u09CD\u09A1", "\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8"],
+      discovery:            ["\u09AA\u09CD\u09B0\u099A\u09B2\u09BF\u09A4 \u09AC\u09CD\u09AF\u09BE\u0982\u0995\u09BF\u0982", "\u0987\u09B8\u09B2\u09BE\u09AE\u09BF\u0995 / \u09B9\u09BE\u09B2\u09BE\u09B2", "\u09AA\u09BE\u09B0\u09CD\u09A5\u0995\u09CD\u09AF \u09B8\u09AE\u09CD\u09AA\u09B0\u09CD\u0995\u09C7 \u0986\u09B0\u09CB \u099C\u09BE\u09A8\u09C1\u09A8"],
+      general:              ["\u0995\u09C0 \u0995\u09BE\u09B0\u09CD\u09A1 \u0986\u099B\u09C7?", "\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09C1\u09A8", "\u0995\u09BE\u09B0\u09CD\u09A1 \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09C1\u09A8"],
     },
   };
 
@@ -398,6 +427,10 @@
   function handleServerMessage(data) {
     switch (data.type) {
       case "session_id": sessionId = data.session_id; break;
+      case "show_preference_form":
+        if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
+        activeBubble = null; fullText = "";
+        renderPreferenceForm(data.schema); finishLoading(); break;
       case "show_eligibility_form":
         if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
         activeBubble = null; fullText = "";
@@ -411,7 +444,11 @@
         renderBotBubble(activeBubble, fullText);
         scrollToBottom(); break;
       case "done":
-        if (activeBubble) appendFollowupChips(detectResponseTopic(fullText));
+        if (activeBubble) {
+          appendFollowupChips(data.intent || "general");
+          if (data.calculator === "emi") createEMICalcBubble();
+          else if (data.calculator === "rewards") createRewardsCalcBubble();
+        }
         activeBubble = null; fullText = ""; finishLoading(); break;
       case "cleared": sessionId = null; break;
       case "error":
@@ -572,18 +609,6 @@
   }
 
   /* ── Follow-up chips ── */
-  function detectResponseTopic(text) {
-    var low = text.toLowerCase();
-    if (low.includes("\u2705") && (low.includes("eligible") || low.includes("qualify"))) return "eligible";
-    if ((low.includes("\u274C") || low.includes("ineligible") || low.includes("not qualify")) && !low.includes("\u2705")) return "ineligible";
-    if (low.includes("\u26A0\uFE0F") || low.includes("borderline")) return "borderline";
-    if (low.includes("| feature |") || (low.includes("annual fee") && low.includes("credit limit") && low.includes("reward point"))) return "comparison";
-    if ((low.includes("step") || low.includes("document")) && (low.includes("apply") || low.includes("application"))) return "how_to_apply";
-    if (low.includes("16218 immediately") || low.includes("block your card")) return "emergency";
-    if ((low.includes("conventional") || low.includes("islamic")) && low.includes("prefer")) return "discovery";
-    if (low.includes("annual fee") || low.includes("credit limit") || low.includes("reward point")) return "product_details";
-    return "general";
-  }
 
   function appendFollowupChips(topic) {
     var chips = FOLLOWUP[lang][topic] || FOLLOWUP[lang].general;
@@ -600,21 +625,6 @@
   }
 
   /* ── Calculators ── */
-  function shouldShowEMICalc(msg) {
-    var low = msg.toLowerCase();
-    return (low.includes("emi") || low.includes("installment") || low.includes("\u0995\u09BF\u09B8\u09CD\u09A4\u09BF")) &&
-           (low.includes("calculat") || low.includes("how much") || low.includes("monthly") || low.includes("\u09B9\u09BF\u09B8\u09BE\u09AC"));
-  }
-  function shouldShowRewardsCalc(msg) {
-    var low = msg.toLowerCase();
-    return (low.includes("reward") || low.includes("point") || low.includes("\u09AA\u09AF\u09BC\u09C7\u09A8\u09CD\u099F")) &&
-           (low.includes("calculat") || low.includes("earn") || low.includes("how many") || low.includes("how much") || low.includes("\u09B9\u09BF\u09B8\u09BE\u09AC") || low.includes("\u0986\u09AF\u09BC"));
-  }
-  function maybeShowCalculator(msg) {
-    if (shouldShowEMICalc(msg))     { createEMICalcBubble();     return true; }
-    if (shouldShowRewardsCalc(msg)) { createRewardsCalcBubble(); return true; }
-    return false;
-  }
 
   function createEMICalcBubble() {
     var group = document.createElement("div"); group.className = "msg-group";
@@ -767,6 +777,110 @@
     var grp = document.getElementById(formId + "_grp"); if (grp) grp.remove(); activeFormId = null;
   }
 
+  /* Preference form — content built from server-side PREFERENCE_FORM_SCHEMA constant, no user data */
+  function renderPreferenceForm(schema) {
+    var formId = "pref_" + Date.now(); activeFormId = formId;
+    var fields = schema.fields || {};
+
+    var group  = document.createElement("div"); group.className = "msg-group"; group.id = formId + "_grp";
+    var row    = document.createElement("div"); row.className = "message-row bot";
+    var avatar = document.createElement("div"); avatar.className = "avatar bot"; avatar.textContent = "P";
+    var wrap   = document.createElement("div"); wrap.className = "bubble-wrap";
+    var bubble = document.createElement("div"); bubble.className = "bubble bot pref-bubble";
+
+    var outer = document.createElement("div"); outer.id = formId;
+
+    var hdr = document.createElement("div"); hdr.className = "pref-form-header";
+    hdr.innerHTML = '<div class="pref-form-icon"><svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></div>';
+    var hdrText = document.createElement("div");
+    var t1 = document.createElement("div"); t1.className = "pref-form-title"; t1.textContent = "Find Your Perfect Card";
+    var t2 = document.createElement("div"); t2.className = "pref-form-subtitle"; t2.textContent = "Answer two quick questions for a personalised recommendation";
+    hdrText.appendChild(t1); hdrText.appendChild(t2); hdr.appendChild(hdrText);
+    outer.appendChild(hdr);
+
+    Object.keys(fields).forEach(function(key) {
+      var f = fields[key];
+      var section = document.createElement("div"); section.className = "pref-section";
+      var lbl = document.createElement("div"); lbl.className = "pref-section-label";
+      lbl.textContent = f.label;
+      if (f.required) { var req = document.createElement("span"); req.style.color = "var(--error)"; req.textContent = " *"; lbl.appendChild(req); }
+      section.appendChild(lbl);
+
+      if (f.type === "button_group") {
+        var grpEl = document.createElement("div"); grpEl.className = "pref-btn-group"; grpEl.id = formId + "_" + key;
+        (f.options || []).forEach(function(o) {
+          var btn = document.createElement("button"); btn.type = "button"; btn.className = "pref-pill";
+          btn.setAttribute("data-group", key); btn.setAttribute("data-value", o.value);
+          btn.textContent = o.label; btn.onclick = function() { selectPrefPill(btn); };
+          grpEl.appendChild(btn);
+        });
+        section.appendChild(grpEl);
+      } else if (f.type === "tile_grid") {
+        var grid = document.createElement("div"); grid.className = "pref-tile-grid"; grid.id = formId + "_" + key;
+        (f.options || []).forEach(function(o) {
+          var tile = document.createElement("button"); tile.type = "button"; tile.className = "pref-tile";
+          tile.setAttribute("data-group", key); tile.setAttribute("data-value", o.value);
+          tile.textContent = o.label; tile.onclick = function() { selectPrefTile(tile); };
+          grid.appendChild(tile);
+        });
+        section.appendChild(grid);
+      }
+      outer.appendChild(section);
+    });
+
+    var errDiv = document.createElement("div"); errDiv.id = formId + "_errors"; outer.appendChild(errDiv);
+
+    var actions = document.createElement("div"); actions.className = "pref-form-actions";
+    var cancelBtn = document.createElement("button"); cancelBtn.className = "pref-cancel-btn";
+    cancelBtn.textContent = "Cancel"; cancelBtn.onclick = function() { cancelPrefForm(formId); };
+    var submitBtn = document.createElement("button"); submitBtn.className = "pref-submit-btn"; submitBtn.id = formId + "_submit";
+    submitBtn.textContent = "Get Recommendations"; submitBtn.onclick = function() { submitPrefForm(formId); };
+    actions.appendChild(cancelBtn); actions.appendChild(submitBtn); outer.appendChild(actions);
+
+    bubble.appendChild(outer); wrap.appendChild(bubble); row.appendChild(avatar); row.appendChild(wrap);
+    group.appendChild(row); appendTimestamp(group, false);
+    messagesEl.appendChild(group); scrollToBottom();
+  }
+
+  function selectPrefPill(btn) {
+    var container = btn.closest(".pref-btn-group");
+    if (container) container.querySelectorAll(".pref-pill").forEach(function(b) { b.classList.remove("selected"); });
+    btn.classList.add("selected");
+  }
+
+  function selectPrefTile(tile) {
+    var container = tile.closest(".pref-tile-grid");
+    if (container) container.querySelectorAll(".pref-tile").forEach(function(t) { t.classList.remove("selected"); });
+    tile.classList.add("selected");
+  }
+
+  function submitPrefForm(formId) {
+    var formEl = document.getElementById(formId); if (!formEl) return;
+    var errorsEl = document.getElementById(formId + "_errors"); errorsEl.textContent = "";
+    var formData = {}, errors = [];
+    formEl.querySelectorAll("[data-group].selected").forEach(function(el) {
+      formData[el.getAttribute("data-group")] = el.getAttribute("data-value");
+    });
+    if (!formData.banking_type) errors.push("Please select a banking preference.");
+    if (!formData.use_case)     errors.push("Please select a primary use case.");
+    if (errors.length > 0) {
+      errors.forEach(function(e) {
+        var p = document.createElement("p"); p.textContent = e;
+        p.style.cssText = "font-size:12px;color:var(--error);margin:2px 0";
+        errorsEl.appendChild(p);
+      });
+      scrollToBottom(); return;
+    }
+    formEl.classList.add("pref-form-submitted");
+    var sb = document.getElementById(formId + "_submit"); if (sb) { sb.disabled = true; sb.textContent = "Finding cards..."; }
+    activeThinkId = showThinking(); startLoading();
+    ws.send(JSON.stringify({ type: "preference_form_submit", form_data: formData, session_id: sessionId }));
+  }
+
+  function cancelPrefForm(formId) {
+    var grp = document.getElementById(formId + "_grp"); if (grp) grp.remove(); activeFormId = null;
+  }
+
   function markFieldError(formId, key) {
     var el = document.getElementById(formId + "_" + key); if (!el) return;
     el.classList.add("field-error");
@@ -780,7 +894,6 @@
     if (!text || isLoading || !wsReady) return;
     if (welcomeEl) welcomeEl.style.display = "none";
     appendUserBubble(text);
-    maybeShowCalculator(text);
     inputEl.value = ""; inputEl.style.height = "auto"; updateSendBtn();
     activeThinkId = showThinking(); startLoading();
     ws.send(JSON.stringify({ type: "message", message: text + getBengaliSuffix(), session_id: sessionId }));
