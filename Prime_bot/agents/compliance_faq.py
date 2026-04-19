@@ -1,9 +1,10 @@
-import json
 import re
-from tools.rag_tool import rag_search, rag_search_multi, list_all_products
-from llm.ollama_client import chat
+from typing import Generator
+
+from llm.ollama_client import chat, chat_stream
 from memory.session_memory import SessionMemory
 from logging_utils import log_event
+from tools.rag_tool import rag_search, rag_search_multi, list_all_products
 
 
 def _clean_context(context: str) -> str:
@@ -252,11 +253,17 @@ def _grounded_target_card_match(user_message: str, history: str = "") -> str:
     return ""
 
 
-def get_eligibility_form_schema(target_card: str = "", profile: dict | None = None) -> dict:
+def get_eligibility_form_schema(
+    target_card: str = "",
+    profile: dict | None = None,
+    recommended_cards: list[str] | None = None,
+) -> dict:
     schema = {
         "target_card": target_card,
         "fields": ELIGIBILITY_SCHEMA,
     }
+    if recommended_cards:
+        schema["recommended_cards"] = recommended_cards
     if profile:
         prefill = {}
         if profile.get("monthly_income"):
@@ -268,6 +275,34 @@ def get_eligibility_form_schema(target_card: str = "", profile: dict | None = No
         if prefill:
             schema["prefill"] = prefill
     return schema
+
+
+def _meta_list(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        items = value
+    else:
+        items = str(value).split(",")
+    return [str(item).strip().lower() for item in items if str(item).strip()]
+
+
+def extract_recommended_card_names(text: str) -> list[str]:
+    if not text:
+        return []
+
+    matched = []
+    lowered = text.lower()
+    products = sorted(
+        list_all_products(),
+        key=lambda item: len(item.get("product_name", "")),
+        reverse=True,
+    )
+    for product in products:
+        name = product.get("product_name", "").strip()
+        if name and name.lower() in lowered and name not in matched:
+            matched.append(name)
+    return matched
 
 
 def extract_target_card(user_message: str, history: str = "") -> str:
@@ -295,12 +330,43 @@ PREFERENCE_FORM_SCHEMA = {
         "label": "Primary Use",
         "type": "tile_grid",
         "options": [
-            {"value": "shopping lifestyle", "label": "Shopping & Daily Use"},
-            {"value": "travel international_travel lounge_access", "label": "Travel & Lounge"},
-            {"value": "dining premium_lifestyle", "label": "Dining & Lifestyle"},
-            {"value": "rewards_earning cashback", "label": "Rewards & Cashback"},
-            {"value": "business_spending business_travel high_spenders", "label": "Business Spending"},
+            {"value": "shopping", "label": "Shopping & Daily Use"},
+            {"value": "travel", "label": "Travel & Lounge"},
+            {"value": "dining", "label": "Dining & Lifestyle"},
+            {"value": "rewards_earning", "label": "Rewards & Cashback"},
+            {"value": "business_spending", "label": "Business Spending"},
             {"value": "entry_level_premium", "label": "First Premium Card"},
+        ],
+        "required": True,
+    },
+    "income_band": {
+        "label": "Monthly Income",
+        "type": "button_group",
+        "options": [
+            {"value": "under_50k", "label": "Below BDT 50K"},
+            {"value": "50k_100k", "label": "BDT 50K-100K"},
+            {"value": "100k_200k", "label": "BDT 100K-200K"},
+            {"value": "200k_plus", "label": "BDT 200K+"},
+        ],
+        "required": True,
+    },
+    "travel_frequency": {
+        "label": "Travel Frequency",
+        "type": "button_group",
+        "options": [
+            {"value": "rare", "label": "Rarely"},
+            {"value": "occasional", "label": "Sometimes"},
+            {"value": "frequent", "label": "Frequently"},
+        ],
+        "required": True,
+    },
+    "tier_preference": {
+        "label": "Card Tier Preference",
+        "type": "button_group",
+        "options": [
+            {"value": "gold", "label": "Accessible / Gold"},
+            {"value": "premium", "label": "Premium"},
+            {"value": "no_preference", "label": "No Preference"},
         ],
         "required": True,
     },
@@ -433,6 +499,9 @@ def run_eligibility(
         session.update_profile(k, v)
 
     target = form_data.get("target_card", "")
+    recommended_cards = session.user_profile.get("recommended_cards", [])
+    if not isinstance(recommended_cards, list):
+        recommended_cards = []
 
     collections = [
         "conventional_credit_i_need_a_credit_card",
@@ -440,7 +509,12 @@ def run_eligibility(
     ]
 
     eligibility_terms = "eligibility requirements age income employment duration etin documents"
-    search_query = f"{target} {eligibility_terms}" if target else eligibility_terms
+    if target:
+        search_query = f"{target} {eligibility_terms}"
+    elif recommended_cards:
+        search_query = f"{' '.join(recommended_cards)} {eligibility_terms}"
+    else:
+        search_query = eligibility_terms
 
     context = rag_search_multi(search_query, collections, top_k=8)
 
@@ -457,6 +531,13 @@ def run_eligibility(
             "If not found, say so and suggest the closest alternatives.\n"
             "You MUST provide a detailed assessment including all criteria: age requirement, income requirement, "
             "employment duration, E-TIN requirement, and your verdict."
+        )
+    elif recommended_cards:
+        focus = (
+            "The user previously received these recommended cards:\n"
+            + "\n".join(f"- {card}" for card in recommended_cards[:3])
+            + "\nAssess eligibility for those recommended cards ONLY if they are present in the chunks.\n"
+            "For each card provide a separate verdict and reasoning for age, income, employment duration, and E-TIN."
         )
     else:
         focus = (
@@ -487,6 +568,7 @@ Your response MUST be detailed and comprehensive. Do not cut short."""
             system=ELIGIBILITY_SYSTEM,
             temperature=0.2,
             max_tokens=2000,
+            think=False,
         )
 
         if response and len(response.strip()) >= MIN_ELIGIBILITY_RESPONSE_CHARS:
@@ -548,7 +630,61 @@ Answer using ONLY the product list above. Show exact counts and card details as 
         system=CATALOG_SYSTEM,
         temperature=0.1,
         max_tokens=1000,
+        think=False,
     )
+
+
+def run_catalog_stream(
+    user_message: str,
+    session: SessionMemory,
+) -> Generator[str, None, None]:
+    all_products = list_all_products()
+    history = session.get_history_str(max_chars=1000)
+
+    if not all_products:
+        yield "[NO RESULTS] No products found in catalog."
+        return
+
+    conventional = [p for p in all_products if p["banking_type"] == "conventional"]
+    islami = [p for p in all_products if p["banking_type"] == "islami"]
+
+    lines = []
+    for p in all_products:
+        parts = [p["product_name"]]
+        if p.get("card_network"):
+            parts.append(f"Network: {p['card_network']}")
+        if p.get("tier"):
+            parts.append(f"Tier: {p['tier']}")
+        parts.append(f"Banking: {p['banking_type']}")
+        lines.append("- " + " | ".join(parts))
+
+    catalog_summary = (
+        f"COMPLETE PRODUCT LIST ({len(all_products)} credit cards total):\n"
+        f"Conventional: {len(conventional)} cards\n"
+        f"Islamic: {len(islami)} cards\n\n"
+        + "\n".join(lines)
+    )
+
+    prompt = f"""PRODUCT CATALOG (use ONLY this list):
+{catalog_summary}
+
+---
+
+Conversation so far:
+{history}
+
+User asked: {user_message}
+
+Answer using ONLY the product list above. Show exact counts and card details as requested."""
+
+    for token in chat_stream(
+        messages=[{"role": "user", "content": prompt}],
+        system=CATALOG_SYSTEM,
+        temperature=0.1,
+        max_tokens=1000,
+        think=False,
+    ):
+        yield token
 
 
 def run_apply(
@@ -589,7 +725,50 @@ Explain the application process using ONLY the chunks above. Do not display any 
         system=APPLY_SYSTEM,
         temperature=0.2,
         max_tokens=2000,
+        think=False,
     )
+
+
+def run_apply_stream(
+    user_message: str,
+    routing: dict,
+    session: SessionMemory,
+) -> Generator[str, None, None]:
+    banking = routing["banking_type"]
+    search_q = routing.get("search_query", user_message)
+
+    collections = _get_collections(banking, "i_need_a_credit_card")
+    collections += _get_collections(banking, "existing_cardholder")
+    collections.append("all_products")
+    collections = list(dict.fromkeys(collections))
+
+    context = rag_search_multi(search_q, collections, top_k=6)
+    if context.startswith("[NO RESULTS]"):
+        yield "[NO RESULTS]"
+        return
+
+    context = _clean_context(context)
+    history = session.get_history_str(max_chars=1000)
+    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
+{context}
+
+---
+
+Conversation so far:
+{history}
+
+User question: {user_message}
+
+Explain the application process using ONLY the chunks above. Do not display any product_id or internal codes."""
+
+    for token in chat_stream(
+        messages=[{"role": "user", "content": prompt}],
+        system=APPLY_SYSTEM,
+        temperature=0.2,
+        max_tokens=2000,
+        think=False,
+    ):
+        yield token
 
 
 def run_faq(
@@ -629,7 +808,50 @@ Answer using ONLY the chunks above. Do not display any product_id or internal co
         messages=[{"role": "user", "content": prompt}],
         system=FAQ_SYSTEM,
         temperature=0.2,
+        think=False,
     )
+
+
+def run_faq_stream(
+    user_message: str,
+    routing: dict,
+    session: SessionMemory,
+) -> Generator[str, None, None]:
+    banking = routing["banking_type"]
+    search_q = routing.get("search_query", user_message)
+
+    collections = _get_collections(banking, "i_need_a_credit_card")
+    collections += _get_collections(banking, "existing_cardholder")
+    collections.append("all_products")
+    collections = list(dict.fromkeys(collections))
+
+    context = rag_search_multi(search_q, collections, top_k=6)
+    if context.startswith("[NO RESULTS]"):
+        yield "[NO RESULTS]"
+        return
+
+    context = _clean_context(context)
+    history = session.get_history_str(max_chars=1000)
+    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
+{context}
+
+---
+
+Conversation so far:
+{history}
+
+User question: {user_message}
+
+Answer using ONLY the chunks above. Do not display any product_id or internal codes."""
+
+    for token in chat_stream(
+        messages=[{"role": "user", "content": prompt}],
+        system=FAQ_SYSTEM,
+        temperature=0.2,
+        max_tokens=1800,
+        think=False,
+    ):
+        yield token
 
 
 RECOMMENDATION_SYSTEM = """You are the Prime Bank Card Recommendation Specialist.
@@ -648,10 +870,27 @@ You MUST NOT:
 - Display product_id, internal IDs, or system codes like CARD_001
 """
 
+_RECOMMENDATION_RETRY_SUFFIX = (
+    "\n\nIMPORTANT: Respond now with exactly 1 or 2 card recommendations grounded in the chunks. "
+    "For each card include the card name, why it matches the customer, and the strongest specific benefits from the chunks."
+)
+
 
 def run_card_recommendation(form_data: dict, session: SessionMemory) -> str:
     banking_type = form_data.get("banking_type", "both")
     use_case = form_data.get("use_case", "")
+    income_band = form_data.get("income_band", "")
+    travel_frequency = form_data.get("travel_frequency", "")
+    tier_preference = form_data.get("tier_preference", "no_preference")
+
+    products = list_all_products(
+        banking_type_filter=banking_type if banking_type in ("conventional", "islami") else None
+    )
+    if not products:
+        return (
+            "I couldn't find suitable card recommendations in my knowledge base. "
+            "Please contact Prime Bank at **16218** for personalised advice."
+        )
 
     if banking_type in ("conventional", "islami"):
         collections = [f"{banking_type}_credit_i_need_a_credit_card"]
@@ -661,13 +900,78 @@ def run_card_recommendation(form_data: dict, session: SessionMemory) -> str:
             "islami_credit_i_need_a_credit_card",
         ]
 
-    query_parts = []
+    def score_product(product: dict) -> float:
+        score = 0.0
+        tier = (product.get("tier") or "").lower()
+        network = (product.get("card_network") or "").lower()
+        use_cases = set(_meta_list(product.get("use_cases")))
+
+        if use_case and use_case in use_cases:
+            score += 5.0
+        if use_case == "travel" and use_cases.intersection({"international_travel", "lounge_access", "business_travel"}):
+            score += 3.0
+        if use_case == "dining" and use_cases.intersection({"premium_lifestyle", "lifestyle"}):
+            score += 2.0
+        if use_case == "rewards_earning" and use_cases.intersection({"cashback", "high_spenders"}):
+            score += 3.0
+        if use_case == "business_spending" and use_cases.intersection({"business_travel", "high_spenders"}):
+            score += 3.0
+        if use_case == "entry_level_premium":
+            if tier == "gold":
+                score += 4.0
+            elif tier in {"platinum", "world"}:
+                score += 1.0
+
+        if tier_preference == "gold":
+            score += 3.0 if tier == "gold" else -1.0
+        elif tier_preference == "premium":
+            score += 3.0 if tier in {"platinum", "world"} else 0.0
+
+        if income_band == "under_50k":
+            score += 3.0 if tier == "gold" else -2.0
+        elif income_band == "50k_100k":
+            score += 3.0 if tier == "gold" else 0.0
+        elif income_band == "100k_200k":
+            score += 2.5 if tier in {"platinum", "world"} else 1.0
+        elif income_band == "200k_plus":
+            score += 3.0 if tier in {"world", "platinum"} else 1.0
+
+        if travel_frequency == "frequent":
+            if use_cases.intersection({"travel", "international_travel", "lounge_access", "business_travel"}):
+                score += 3.0
+            if tier in {"platinum", "world"}:
+                score += 1.0
+        elif travel_frequency == "rare" and tier == "gold":
+            score += 1.0
+
+        if use_case == "rewards_earning" and network == "mastercard" and tier == "world":
+            score += 2.0
+
+        return score
+
+    scored_products = sorted(
+        products,
+        key=lambda product: (score_product(product), product.get("product_name", "")),
+        reverse=True,
+    )
+    shortlisted = [product for product in scored_products[:4] if score_product(product) >= 0]
+    if not shortlisted:
+        shortlisted = scored_products[:4]
+    shortlist_names = [product["product_name"] for product in shortlisted[:4]]
+
+    query_parts = shortlist_names[:]
     if use_case:
         query_parts.append(use_case)
-    query_parts.append("credit card features benefits rewards annual fee")
+    if travel_frequency == "frequent":
+        query_parts.append("lounge travel airport")
+    if tier_preference == "gold":
+        query_parts.append("gold entry level")
+    elif tier_preference == "premium":
+        query_parts.append("platinum world premium")
+    query_parts.append("credit card features benefits rewards eligibility")
     search_query = " ".join(query_parts)
 
-    context = rag_search_multi(search_query, collections, top_k=8)
+    context = rag_search_multi(search_query, collections, top_k=5)
 
     if context.startswith("[NO RESULTS]"):
         return (
@@ -686,9 +990,17 @@ def run_card_recommendation(form_data: dict, session: SessionMemory) -> str:
         pref_lines.append("- Banking preference: No preference (show best options)")
     if use_case:
         pref_lines.append(f"- Primary use case: {use_case}")
+    if income_band:
+        pref_lines.append(f"- Monthly income band: {income_band}")
+    if travel_frequency:
+        pref_lines.append(f"- Travel frequency: {travel_frequency}")
+    if tier_preference:
+        pref_lines.append(f"- Tier preference: {tier_preference}")
+    if shortlist_names:
+        pref_lines.append("- Shortlisted cards from metadata scoring: " + ", ".join(shortlist_names))
     pref_str = "\n".join(pref_lines)
 
-    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
+    base_prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
 {context}
 
 ---
@@ -699,13 +1011,29 @@ Customer preferences:
 Previous conversation:
 {history or 'None'}
 
-Based on the customer's preferences above, recommend the 1-2 BEST matching Prime Bank credit cards from the chunks.
-For each recommended card, explain specifically which features match the customer's stated use case.
-Be conversational and helpful. End with a suggestion to check eligibility or visit any Prime Bank branch."""
+Prioritise the shortlisted cards when they are supported by the chunks.
+Recommend exactly 1 or 2 cards from the chunks.
+For each recommended card, explain specifically why it matches the customer's preferences and mention only benefits that are present in the chunks.
+End with a suggestion to check eligibility or visit any Prime Bank branch."""
 
-    return chat(
-        messages=[{"role": "user", "content": prompt}],
-        system=RECOMMENDATION_SYSTEM,
-        temperature=0.2,
-        max_tokens=1500,
+    prompt = base_prompt
+    response = ""
+    for attempt in range(2):
+        response = chat(
+            messages=[{"role": "user", "content": prompt}],
+            system=RECOMMENDATION_SYSTEM,
+            temperature=0.1,
+            max_tokens=1200,
+            think=False,
+        )
+        if response and len(response.strip()) >= 80:
+            return response
+        prompt = base_prompt + _RECOMMENDATION_RETRY_SUFFIX
+
+    if response and response.strip():
+        return response
+
+    return (
+        "I couldn't prepare a recommendation just now from my knowledge base. "
+        "Please contact Prime Bank at **16218** for personalised advice."
     )

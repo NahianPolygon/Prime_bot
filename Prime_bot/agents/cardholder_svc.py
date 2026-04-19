@@ -1,7 +1,9 @@
-from tools.rag_tool import rag_search_multi
-from llm.ollama_client import chat
-from memory.session_memory import SessionMemory
 import re
+from typing import Generator
+
+from llm.ollama_client import chat, chat_stream
+from memory.session_memory import SessionMemory
+from tools.rag_tool import rag_search_multi
 
 SYSTEM = """You are the Prime Bank Cardholder Services specialist.
 You help existing credit card holders using ONLY the knowledge base chunks provided.
@@ -81,4 +83,45 @@ Answer using ONLY the chunks above. Use actual card names, never internal codes.
         system=SYSTEM,
         temperature=0.2,
         max_tokens=2000,
+        think=False,
     )
+
+
+def run_stream(
+    user_message: str,
+    routing: dict,
+    session: SessionMemory,
+) -> Generator[str, None, None]:
+    banking = routing["banking_type"]
+    collections = _get_collections(banking)
+
+    context = rag_search_multi(user_message, collections, top_k=5)
+    if context.startswith("[NO RESULTS]"):
+        fallback_context = rag_search_multi(user_message, collections + ["all_products"], top_k=4)
+        if fallback_context.startswith("[NO RESULTS]"):
+            yield "Please call **16218** or visit your nearest Prime Bank branch for assistance with your card."
+            return
+        context = fallback_context
+
+    context = _clean_context(context)
+    history = session.get_history_str(max_chars=800)
+    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
+{context}
+
+---
+
+Conversation so far:
+{history}
+
+Cardholder query: {user_message}
+
+Answer using ONLY the chunks above. Use actual card names, never internal codes. If this is a lost/stolen card emergency, put the helpline number first."""
+
+    for token in chat_stream(
+        messages=[{"role": "user", "content": prompt}],
+        system=SYSTEM,
+        temperature=0.2,
+        max_tokens=2000,
+        think=False,
+    ):
+        yield token

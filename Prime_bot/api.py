@@ -21,6 +21,11 @@ _stats = {
 }
 
 
+def _iter_text_chunks(text: str, chunk_chars: int = 48):
+    for start in range(0, len(text), chunk_chars):
+        yield text[start:start + chunk_chars]
+
+
 def _record_request(session_id: str):
     with _stats_lock:
         _stats["total_requests"] += 1
@@ -46,7 +51,7 @@ with open("config.yaml") as f:
     _cfg = yaml.safe_load(f)
 
 from memory.session_memory import get_session, clear_session
-from crew import build_crew_stream, handle_eligibility_form, handle_preference_form, clear_preference_session
+from chat_flow import build_crew_stream, handle_eligibility_form, handle_preference_form, clear_preference_session
 from agents.compliance_faq import extract_target_card, get_eligibility_form_schema
 
 app = FastAPI(title="Prime Bank Credit Card Assistant", version="1.0.0")
@@ -135,7 +140,8 @@ async def websocket_chat(websocket: WebSocket):
 
                 try:
                     result = handle_preference_form(form_data, session, request_id=request_id)
-                    await websocket.send_text(json.dumps({"type": "token", "token": result}))
+                    for chunk in _iter_text_chunks(result):
+                        await websocket.send_text(json.dumps({"type": "token", "token": chunk}))
                     await websocket.send_text(json.dumps({"type": "done", "intent": "i_need_a_credit_card", "calculator": ""}))
                     log_event("ws_preference_complete", request_id=request_id, session_id=session_id)
                 except Exception as e:
@@ -177,8 +183,9 @@ async def websocket_chat(websocket: WebSocket):
                     elif "\u274c" in result or "not eligible" in rl or "ineligible" in rl:
                         elig_outcome = "ineligible"
                     else:
-                        elig_outcome = "eligible"
-                    await websocket.send_text(json.dumps({"type": "token", "token": result}))
+                        elig_outcome = "general"
+                    for chunk in _iter_text_chunks(result):
+                        await websocket.send_text(json.dumps({"type": "token", "token": chunk}))
                     await websocket.send_text(json.dumps({"type": "done", "intent": elig_outcome, "calculator": ""}))
                     log_event(
                         "ws_eligibility_complete",

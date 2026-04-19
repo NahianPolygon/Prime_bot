@@ -697,6 +697,7 @@
     var formId   = "elig_" + Date.now(); activeFormId = formId;
     var prefill  = schema.prefill || {}, hasPrefill = Object.keys(prefill).length > 0;
     var targetCard = schema.target_card || "", fields = schema.fields || {};
+    var recommendedCards = schema.recommended_cards || [];
 
     var group  = document.createElement("div"); group.className  = "msg-group"; group.id = formId + "_grp";
     var row    = document.createElement("div"); row.className    = "message-row bot"; row.id = formId + "_row";
@@ -705,6 +706,9 @@
     var bubble = document.createElement("div"); bubble.className = "bubble bot elig-bubble";
 
     var targetHtml   = targetCard ? '<div class="elig-form-target">Checking eligibility for: <strong>' + targetCard + '</strong></div>' : "";
+    var recommendedHtml = (!targetCard && recommendedCards.length > 1)
+      ? '<div class="elig-form-target">Checking eligibility for your recommended cards: <strong>' + recommendedCards.join(", ") + '</strong></div>'
+      : "";
     var prefillBadge = hasPrefill ? '<span class="prefill-badge">Pre-filled from conversation</span>' : "";
 
     var fieldsHtml = "";
@@ -735,7 +739,7 @@
     bubble.innerHTML =
       '<div class="elig-form" id="' + formId + '">' +
         '<div class="elig-form-header"><div class="elig-form-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></div>' +
-          '<div><div class="elig-form-title">Eligibility Check ' + prefillBadge + '</div>' + targetHtml + '</div></div>' +
+          '<div><div class="elig-form-title">Eligibility Check ' + prefillBadge + '</div>' + targetHtml + recommendedHtml + '</div></div>' +
         '<div class="elig-form-grid">' + fieldsHtml + '</div>' +
         '<div class="elig-form-errors" id="' + formId + '_errors"></div>' +
         '<div class="elig-form-actions">' +
@@ -794,7 +798,7 @@
     hdr.innerHTML = '<div class="pref-form-icon"><svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></div>';
     var hdrText = document.createElement("div");
     var t1 = document.createElement("div"); t1.className = "pref-form-title"; t1.textContent = "Find Your Perfect Card";
-    var t2 = document.createElement("div"); t2.className = "pref-form-subtitle"; t2.textContent = "Answer two quick questions for a personalised recommendation";
+    var t2 = document.createElement("div"); t2.className = "pref-form-subtitle"; t2.textContent = "Answer a few quick questions for a more accurate recommendation";
     hdrText.appendChild(t1); hdrText.appendChild(t2); hdr.appendChild(hdrText);
     outer.appendChild(hdr);
 
@@ -863,6 +867,9 @@
     });
     if (!formData.banking_type) errors.push("Please select a banking preference.");
     if (!formData.use_case)     errors.push("Please select a primary use case.");
+    if (!formData.income_band) errors.push("Please select your monthly income band.");
+    if (!formData.travel_frequency) errors.push("Please select your travel frequency.");
+    if (!formData.tier_preference) errors.push("Please select a card tier preference.");
     if (errors.length > 0) {
       errors.forEach(function(e) {
         var p = document.createElement("p"); p.textContent = e;

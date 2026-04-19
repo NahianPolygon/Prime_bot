@@ -286,14 +286,25 @@ def list_all_products(
         if exclude_services and _is_service_doc(meta):
             continue
         seen_ids.add(pid)
+        network = meta.get("card_network", "")
+        product_name = meta.get("product_name", "")
+        if not network and "visa" in product_name.lower():
+            network = "Visa"
+        elif not network and "mastercard" in product_name.lower():
+            network = "Mastercard"
+        elif not network and "jcb" in product_name.lower():
+            network = "JCB"
         products.append(
             {
                 "product_id": meta.get("product_id", ""),
-                "product_name": meta.get("product_name", ""),
+                "product_name": product_name,
                 "banking_type": meta.get("banking_type", ""),
-                "card_network": meta.get("card_network", ""),
+                "card_network": network,
                 "tier": meta.get("tier", ""),
                 "category": cat,
+                "use_cases": meta.get("use_cases", ""),
+                "employment_suitable": meta.get("employment_suitable", ""),
+                "keywords": meta.get("keywords", ""),
             }
         )
     return products

@@ -1,15 +1,17 @@
-from tools.rag_tool import rag_search_multi
-from llm.ollama_client import chat
-from memory.session_memory import SessionMemory
 import re
+from typing import Generator
+
+from llm.ollama_client import chat, chat_stream
+from memory.session_memory import SessionMemory
+from tools.rag_tool import rag_search_multi
 
 SYSTEM = """You are the Prime Bank Credit Card Product Advisor.
 You recommend credit cards using ONLY the knowledge base chunks provided below.
 
 You MUST:
 - Pick 1-3 cards from the chunks that best match the user's needs
-- For each card, list: card name, credit limit, annual fee, reward points, key benefits
-- Quote exact numbers from the chunks
+- For each card, list the card name and the most relevant available details from the chunks such as credit limit, reward points, fee waivers, or key benefits
+- Quote exact numbers only when they are present in the chunks
 - Mention fee waiver conditions if present in chunks
 - If both conventional and Islamic cards match, present both options clearly
 - Always use the actual card name (e.g. "Visa Gold", "Mastercard Platinum") not internal codes
@@ -28,8 +30,8 @@ DETAILS_SYSTEM = """You are the Prime Bank Credit Card Product Specialist.
 You provide detailed information about a specific credit card using ONLY the knowledge base chunks.
 
 You MUST:
-- Show all available details: card name, credit limit, annual fee, interest rate, reward points, insurance, key benefits, fee waiver conditions, lounge access, EMI options
-- Quote exact numbers from the chunks
+- Show all available details present in the chunks: card name, credit limit, annual fee, interest rate, reward points, insurance, key benefits, fee waiver conditions, lounge access, EMI options
+- Quote exact numbers only when they are present in the chunks
 - Use bullet points for lists of 3 or more benefits
 - Always use the actual card name (e.g. "Visa Gold", "Mastercard Platinum") not internal codes
 - End with: "Would you like to check your eligibility, compare this with another card, or know how to apply?"
@@ -102,14 +104,52 @@ Conversation so far:
 
 User request: {user_message}
 
-Using ONLY the chunks above, recommend the most suitable Prime Bank credit card(s). For each card include the card name, credit limit, annual fee, reward points rate, and top 3 benefits. Use actual card names, never internal codes. Do not invent any information."""
+Using ONLY the chunks above, recommend the most suitable Prime Bank credit card(s). For each card include the card name, the strongest matching benefits, and any exact figures that are actually present in the chunks. Use actual card names, never internal codes. Do not invent any information."""
 
     return chat(
         messages=[{"role": "user", "content": prompt}],
         system=SYSTEM,
         temperature=0.3,
         max_tokens=2000,
+        think=False,
     )
+
+
+def run_stream(
+    user_message: str,
+    routing: dict,
+    session: SessionMemory,
+) -> Generator[str, None, None]:
+    banking = routing["banking_type"]
+    search_q = routing.get("search_query", user_message)
+    collections = _get_collections(banking)
+
+    context = _fetch_context(search_q, collections)
+    if context is None:
+        yield "[NO RESULTS]"
+        return
+
+    history = session.get_history_str(max_chars=1000)
+    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
+{context}
+
+---
+
+Conversation so far:
+{history}
+
+User request: {user_message}
+
+Using ONLY the chunks above, recommend the most suitable Prime Bank credit card(s). For each card include the card name, the strongest matching benefits, and any exact figures that are actually present in the chunks. Use actual card names, never internal codes. Do not invent any information."""
+
+    for token in chat_stream(
+        messages=[{"role": "user", "content": prompt}],
+        system=SYSTEM,
+        temperature=0.3,
+        max_tokens=2000,
+        think=False,
+    ):
+        yield token
 
 
 def run_details(
@@ -146,4 +186,44 @@ Provide ALL available details about the requested card using ONLY the chunks abo
         system=DETAILS_SYSTEM,
         temperature=0.2,
         max_tokens=2500,
+        think=False,
     )
+
+
+def run_details_stream(
+    user_message: str,
+    routing: dict,
+    session: SessionMemory,
+) -> Generator[str, None, None]:
+    banking = routing["banking_type"]
+    search_q = routing.get("search_query", user_message)
+    collections = _get_collections(banking)
+    collections.append("all_products")
+    collections = list(dict.fromkeys(collections))
+
+    context = _fetch_context(search_q, collections, top_k=8)
+    if context is None:
+        yield "[NO RESULTS]"
+        return
+
+    history = session.get_history_str(max_chars=1000)
+    prompt = f"""KNOWLEDGE BASE CHUNKS (use ONLY these):
+{context}
+
+---
+
+Conversation so far:
+{history}
+
+User request: {user_message}
+
+Provide ALL available details about the requested card using ONLY the chunks above. Cover every section present in the chunks: credit limit, fees, interest rate, rewards, insurance, lounge access, EMI options, eligibility highlights. Use actual card names, never internal codes. Do not omit any information that is present in the chunks."""
+
+    for token in chat_stream(
+        messages=[{"role": "user", "content": prompt}],
+        system=DETAILS_SYSTEM,
+        temperature=0.2,
+        max_tokens=2500,
+        think=False,
+    ):
+        yield token
