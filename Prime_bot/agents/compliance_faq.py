@@ -315,6 +315,150 @@ def extract_target_card(user_message: str, history: str = "") -> str:
     return ""
 
 
+def _eligibility_status_from_text(text: str) -> tuple[str, str, str]:
+    lowered = (text or "").lower()
+    if "❌" in text or "likely ineligible" in lowered or "not eligible" in lowered or "ineligible" in lowered:
+        return ("ineligible", "Likely Ineligible", "❌")
+    if "⚠️" in text or "borderline" in lowered or "conditional" in lowered:
+        return ("borderline", "Borderline", "⚠️")
+    if "✅" in text or "likely eligible" in lowered:
+        return ("eligible", "Likely Eligible", "✅")
+    return ("general", "Needs Review", "ℹ️")
+
+
+def _clean_reason_line(line: str) -> str:
+    text = re.sub(r"^[\-\*\u2022#>\s]+", "", (line or "").strip())
+    text = re.sub(r"\s+", " ", text)
+    return text.strip(" :.-")
+
+
+def _reason_lines_from_section(section: str, card_name: str) -> list[str]:
+    reasons: list[str] = []
+    seen: set[str] = set()
+    priority_terms = (
+        "age",
+        "income",
+        "employment",
+        "duration",
+        "tenure",
+        "e-tin",
+        "etin",
+        "credit",
+        "prime bank",
+        "relationship",
+        "business",
+        "salaried",
+    )
+
+    for raw_line in section.splitlines():
+        line = _clean_reason_line(raw_line)
+        if not line:
+            continue
+        lowered = line.lower()
+        if lowered == card_name.lower():
+            continue
+        if card_name.lower() in lowered and len(line) <= len(card_name) + 10:
+            continue
+        if not any(term in lowered for term in priority_terms) and not any(sym in raw_line for sym in ("✅", "❌", "⚠️")):
+            continue
+        if len(line) > 180:
+            line = line[:177].rstrip() + "..."
+        if line.lower() in seen:
+            continue
+        seen.add(line.lower())
+        reasons.append(line)
+        if len(reasons) >= 4:
+            break
+
+    return reasons
+
+
+def extract_eligibility_verdicts(
+    text: str,
+    target_card: str = "",
+    recommended_cards: list[str] | None = None,
+) -> list[dict]:
+    if not text:
+        return []
+
+    recommended_cards = recommended_cards or []
+    lowered = text.lower()
+    discovered_cards = extract_recommended_card_names(text)
+
+    candidates: list[str] = []
+    for name in [target_card, *recommended_cards, *discovered_cards]:
+        if name and name not in candidates:
+            candidates.append(name)
+
+    positions: list[tuple[int, str]] = []
+    for name in candidates:
+        idx = lowered.find(name.lower())
+        if idx >= 0:
+            positions.append((idx, name))
+
+    positions.sort(key=lambda item: item[0])
+    verdicts: list[dict] = []
+
+    for i, (start, card_name) in enumerate(positions):
+        end = positions[i + 1][0] if i + 1 < len(positions) else len(text)
+        section = text[start:end].strip()
+        status, label, badge = _eligibility_status_from_text(section)
+        reasons = _reason_lines_from_section(section, card_name)
+        if not reasons:
+            reasons = _reason_lines_from_section(text, card_name)
+        verdicts.append(
+            {
+                "card_name": card_name,
+                "status": status,
+                "label": label,
+                "badge": badge,
+                "reasons": reasons[:3],
+            }
+        )
+
+    if verdicts:
+        return verdicts
+
+    fallback_cards = [name for name in [target_card, *recommended_cards] if name]
+    if not fallback_cards:
+        return []
+
+    status, label, badge = _eligibility_status_from_text(text)
+    reasons = _reason_lines_from_section(text, fallback_cards[0])
+    return [
+        {
+            "card_name": card_name,
+            "status": status,
+            "label": label,
+            "badge": badge,
+            "reasons": reasons[:3],
+        }
+        for card_name in fallback_cards
+    ]
+
+
+def build_eligibility_verdict_summary(verdicts: list[dict]) -> str:
+    if not verdicts:
+        return "Here is a quick summary of the eligibility assessment."
+
+    eligible = [item["card_name"] for item in verdicts if item.get("status") == "eligible"]
+    borderline = [item["card_name"] for item in verdicts if item.get("status") == "borderline"]
+    ineligible = [item["card_name"] for item in verdicts if item.get("status") == "ineligible"]
+
+    if len(verdicts) == 1:
+        item = verdicts[0]
+        return f"{item['card_name']}: {item['label']}."
+
+    parts = []
+    if eligible:
+        parts.append("Strongest match: " + ", ".join(eligible))
+    if borderline:
+        parts.append("Needs a closer check: " + ", ".join(borderline))
+    if ineligible:
+        parts.append("Harder fit: " + ", ".join(ineligible))
+    return " | ".join(parts) if parts else "Here is a quick summary of the cards checked."
+
+
 PREFERENCE_FORM_SCHEMA = {
     "banking_type": {
         "label": "Banking Preference",

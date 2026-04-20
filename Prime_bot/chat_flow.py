@@ -392,7 +392,21 @@ def handle_eligibility_form(
     session.history[-1]["content"] = clean
     session.history[-1]["content_short"] = session._truncate_for_history(clean)
     target_card = form_data.get("target_card", "")
-    active_cards = [target_card] if target_card else (session.user_profile.get("recommended_cards") or [])
+    recommended_cards = session.user_profile.get("recommended_cards") or []
+    if not isinstance(recommended_cards, list):
+        recommended_cards = []
+    verdicts = compliance_faq.extract_eligibility_verdicts(
+        clean,
+        target_card=target_card,
+        recommended_cards=recommended_cards,
+    )
+    summary = compliance_faq.build_eligibility_verdict_summary(verdicts)
+    session.update_profile("last_eligibility_verdicts", verdicts)
+    session.update_profile("last_eligibility_summary", summary)
+
+    active_cards = [item.get("card_name", "") for item in verdicts if item.get("card_name")]
+    if not active_cards:
+        active_cards = [target_card] if target_card else recommended_cards
     if isinstance(active_cards, list) and active_cards:
         _remember_active_cards(session, active_cards)
     session.set_last_intent("eligibility_check")

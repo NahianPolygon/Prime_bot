@@ -163,6 +163,25 @@
     .elig-form-errors p { font-size: 12px; color: var(--error); margin: 2px 0; }
     .elig-form-submitted { opacity: 0.6; pointer-events: none; }
     .elig-bubble { max-width: 420px; padding: 16px !important; }
+    .elig-verdict-bubble { max-width: 560px; padding: 16px !important; }
+    .elig-verdict-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .elig-verdict-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .elig-verdict-summary { font-size: 12px; color: var(--text-secondary); margin-top: 3px; line-height: 1.5; }
+    .elig-verdict-list { display: flex; flex-direction: column; gap: 10px; }
+    .elig-verdict-card { border: 1px solid var(--border); border-radius: 10px; background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%); padding: 12px; }
+    .elig-verdict-card.is-eligible { border-color: rgba(34, 197, 94, 0.28); background: linear-gradient(180deg, #ffffff 0%, #f4fff7 100%); }
+    .elig-verdict-card.is-borderline { border-color: rgba(245, 158, 11, 0.28); background: linear-gradient(180deg, #ffffff 0%, #fffaf0 100%); }
+    .elig-verdict-card.is-ineligible { border-color: rgba(239, 68, 68, 0.22); background: linear-gradient(180deg, #ffffff 0%, #fff6f6 100%); }
+    .elig-verdict-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .elig-verdict-card-name { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.4; }
+    .elig-verdict-badge { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 5px 9px; white-space: nowrap; }
+    .elig-verdict-badge.is-eligible { background: #dcfce7; color: #166534; }
+    .elig-verdict-badge.is-borderline { background: #fef3c7; color: #92400e; }
+    .elig-verdict-badge.is-ineligible { background: #fee2e2; color: #991b1b; }
+    .elig-verdict-badge.is-general { background: #e8f0fb; color: var(--accent); }
+    .elig-verdict-reasons { padding-left: 18px; margin: 0; }
+    .elig-verdict-reasons li { font-size: 12px; color: var(--text-secondary); margin-bottom: 5px; line-height: 1.5; }
+    .elig-verdict-reasons li:last-child { margin-bottom: 0; }
     .prefill-badge { display: inline-block; font-size: 10px; background: #fef9c3; color: #854d0e; border: 1px solid #fde047; border-radius: 4px; padding: 1px 6px; margin-left: 6px; font-weight: 500; vertical-align: middle; }
     /* Preference form */
     .pref-bubble { max-width: 460px; padding: 16px !important; }
@@ -205,7 +224,7 @@
     @media (max-width: 920px) { .scroll-fab { right: 16px; } }
     @media (max-width: 720px) {
       .bubble-wrap { max-width: 90%; }
-      .elig-bubble { max-width: 90%; }
+      .elig-bubble, .elig-verdict-bubble { max-width: 90%; }
       .elig-form-grid { grid-template-columns: 1fr; }
       .table-wrapper td, .table-wrapper th { font-size: 12px; padding: 6px 10px; min-width: 80px; }
       .status-text { display: none; }
@@ -435,6 +454,11 @@
         if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
         activeBubble = null; fullText = "";
         renderEligibilityForm(data.schema); finishLoading(); break;
+      case "eligibility_verdicts":
+        if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
+        activeBubble = null; fullText = "";
+        appendEligibilityVerdicts(data);
+        break;
       case "token":
         if (!activeBubble) {
           if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
@@ -510,6 +534,59 @@
     var wrap   = document.createElement("div"); wrap.className   = "bubble-wrap";
     var bubble = document.createElement("div"); bubble.className = "bubble bot";
     renderBotBubble(bubble, text);
+    wrap.appendChild(bubble); wrap.appendChild(makeCopyBtn(bubble));
+    row.appendChild(avatar); row.appendChild(wrap);
+    group.appendChild(row); appendTimestamp(group, false);
+    messagesEl.appendChild(group); scrollToBottom();
+  }
+
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function appendEligibilityVerdicts(payload) {
+    var items = Array.isArray(payload.items) ? payload.items : [];
+    if (!items.length) return;
+
+    var group  = document.createElement("div"); group.className  = "msg-group";
+    var row    = document.createElement("div"); row.className    = "message-row bot";
+    var avatar = document.createElement("div"); avatar.className = "avatar bot"; avatar.textContent = "P";
+    var wrap   = document.createElement("div"); wrap.className   = "bubble-wrap";
+    var bubble = document.createElement("div"); bubble.className = "bubble bot elig-verdict-bubble";
+
+    var cardsHtml = items.map(function(item) {
+      var status = item.status || "general";
+      var reasons = Array.isArray(item.reasons) ? item.reasons : [];
+      var reasonsHtml = reasons.length
+        ? '<ul class="elig-verdict-reasons">' + reasons.map(function(reason) {
+            return '<li>' + escapeHtml(reason) + '</li>';
+          }).join("") + '</ul>'
+        : "";
+
+      return '' +
+        '<div class="elig-verdict-card is-' + status + '">' +
+          '<div class="elig-verdict-top">' +
+            '<div class="elig-verdict-card-name">' + escapeHtml(item.card_name || "Eligibility Check") + '</div>' +
+            '<div class="elig-verdict-badge is-' + status + '">' + escapeHtml((item.badge || "") + " " + (item.label || "")) + '</div>' +
+          '</div>' +
+          reasonsHtml +
+        '</div>';
+    }).join("");
+
+    bubble.innerHTML =
+      '<div class="elig-verdict-header">' +
+        '<div>' +
+          '<div class="elig-verdict-title">Eligibility Assessment</div>' +
+          '<div class="elig-verdict-summary">' + escapeHtml(payload.summary || "Here is a quick summary of the cards checked.") + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="elig-verdict-list">' + cardsHtml + '</div>';
+
     wrap.appendChild(bubble); wrap.appendChild(makeCopyBtn(bubble));
     row.appendChild(avatar); row.appendChild(wrap);
     group.appendChild(row); appendTimestamp(group, false);

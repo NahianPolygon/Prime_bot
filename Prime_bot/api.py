@@ -41,6 +41,24 @@ def _infer_eligibility_outcome(text: str) -> str:
     return "general"
 
 
+def _infer_eligibility_outcome_from_verdicts(verdicts: list[dict]) -> str:
+    if not verdicts:
+        return "general"
+
+    statuses = {str(item.get("status", "")).lower() for item in verdicts}
+    if statuses == {"eligible"}:
+        return "eligible"
+    if statuses == {"ineligible"}:
+        return "ineligible"
+    if "borderline" in statuses or ({"eligible", "ineligible"} & statuses and len(statuses) > 1):
+        return "borderline"
+    if "eligible" in statuses:
+        return "eligible"
+    if "ineligible" in statuses:
+        return "ineligible"
+    return "general"
+
+
 def _record_request(session_id: str):
     with _stats_lock:
         _stats["total_requests"] += 1
@@ -189,14 +207,25 @@ async def websocket_chat(websocket: WebSocket):
 
                 try:
                     result = handle_eligibility_form(form_data, session, request_id=request_id)
-                    elig_outcome = _infer_eligibility_outcome(result)
-                    await _send_text_stream(websocket, result)
+                    verdicts = session.user_profile.get("last_eligibility_verdicts") or []
+                    summary = session.user_profile.get("last_eligibility_summary") or ""
+                    if isinstance(verdicts, list) and verdicts:
+                        elig_outcome = _infer_eligibility_outcome_from_verdicts(verdicts)
+                        await websocket.send_text(json.dumps({
+                            "type": "eligibility_verdicts",
+                            "summary": summary,
+                            "items": verdicts,
+                        }))
+                    else:
+                        elig_outcome = _infer_eligibility_outcome(result)
+                        await _send_text_stream(websocket, result)
                     await websocket.send_text(json.dumps({"type": "done", "intent": elig_outcome, "calculator": ""}))
                     log_event(
                         "ws_eligibility_complete",
                         request_id=request_id,
                         session_id=session_id,
                         outcome=elig_outcome,
+                        verdict_count=len(verdicts) if isinstance(verdicts, list) else 0,
                     )
                 except Exception as e:
                     log_event(
