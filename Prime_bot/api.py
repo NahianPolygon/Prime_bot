@@ -4,11 +4,13 @@ import yaml
 import time
 import json
 import threading
+import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from logging_utils import log_event
+from streaming_utils import iter_text_stream
 
 _stats_lock = threading.Lock()
 _stats = {
@@ -21,9 +23,22 @@ _stats = {
 }
 
 
-def _iter_text_chunks(text: str, chunk_chars: int = 48):
-    for start in range(0, len(text), chunk_chars):
-        yield text[start:start + chunk_chars]
+async def _send_text_stream(websocket: WebSocket, text: str, chunk_chars: int = 24, delay_ms: int = 14):
+    for chunk in iter_text_stream(text, chunk_chars=chunk_chars):
+        await websocket.send_text(json.dumps({"type": "token", "token": chunk}))
+        if delay_ms > 0:
+            await asyncio.sleep(delay_ms / 1000)
+
+
+def _infer_eligibility_outcome(text: str) -> str:
+    rl = (text or "").lower()
+    if "\u274c" in text or "likely ineligible" in rl or "not eligible" in rl or "ineligible" in rl:
+        return "ineligible"
+    if "\u26a0\ufe0f" in text or "borderline" in rl or "conditional" in rl:
+        return "borderline"
+    if "\u2705" in text or "likely eligible" in rl:
+        return "eligible"
+    return "general"
 
 
 def _record_request(session_id: str):
@@ -140,8 +155,7 @@ async def websocket_chat(websocket: WebSocket):
 
                 try:
                     result = handle_preference_form(form_data, session, request_id=request_id)
-                    for chunk in _iter_text_chunks(result):
-                        await websocket.send_text(json.dumps({"type": "token", "token": chunk}))
+                    await _send_text_stream(websocket, result)
                     await websocket.send_text(json.dumps({"type": "done", "intent": "i_need_a_credit_card", "calculator": ""}))
                     log_event("ws_preference_complete", request_id=request_id, session_id=session_id)
                 except Exception as e:
@@ -175,17 +189,8 @@ async def websocket_chat(websocket: WebSocket):
 
                 try:
                     result = handle_eligibility_form(form_data, session, request_id=request_id)
-                    rl = result.lower()
-                    if "\u2705" in result or ("eligible" in rl and "not eligible" not in rl and "ineligible" not in rl):
-                        elig_outcome = "eligible"
-                    elif "\u26a0\ufe0f" in result or "borderline" in rl or "conditional" in rl:
-                        elig_outcome = "borderline"
-                    elif "\u274c" in result or "not eligible" in rl or "ineligible" in rl:
-                        elig_outcome = "ineligible"
-                    else:
-                        elig_outcome = "general"
-                    for chunk in _iter_text_chunks(result):
-                        await websocket.send_text(json.dumps({"type": "token", "token": chunk}))
+                    elig_outcome = _infer_eligibility_outcome(result)
+                    await _send_text_stream(websocket, result)
                     await websocket.send_text(json.dumps({"type": "done", "intent": elig_outcome, "calculator": ""}))
                     log_event(
                         "ws_eligibility_complete",

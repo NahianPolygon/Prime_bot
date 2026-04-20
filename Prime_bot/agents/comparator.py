@@ -57,11 +57,28 @@ Compare the relevant Prime Bank credit cards grounded in the chunks above. Use a
 
 def _get_context(user_message: str, routing: dict) -> str:
     search_q = routing.get("search_query", user_message)
-    collections = [
-        "conventional_credit_i_need_a_credit_card",
-        "islami_credit_i_need_a_credit_card",
-        "all_products",
-    ]
+    active_cards = routing.get("active_cards") or []
+    banking_type = routing.get("banking_type", "both")
+
+    if active_cards:
+        search_q = " ".join(active_cards + [search_q])
+
+    if banking_type == "conventional":
+        collections = [
+            "conventional_credit_i_need_a_credit_card",
+            "all_products",
+        ]
+    elif banking_type == "islami":
+        collections = [
+            "islami_credit_i_need_a_credit_card",
+            "all_products",
+        ]
+    else:
+        collections = [
+            "conventional_credit_i_need_a_credit_card",
+            "islami_credit_i_need_a_credit_card",
+            "all_products",
+        ]
 
     topic_context = rag_search_multi(search_q, collections, top_k=5, max_context_chars=3200)
     if topic_context.startswith("[NO RESULTS]"):

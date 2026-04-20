@@ -9,9 +9,7 @@ import agents.product_advisor as product_advisor
 from classifier.intent_classifier import _parse_json, classify
 from logging_utils import log_event
 from memory.session_memory import SessionMemory
-
-
-STREAM_CHUNK_CHARS = 48
+from streaming_utils import iter_text_stream
 
 _PROFILE_EXTRACT_SYSTEM = """Extract financial profile signals from this conversation history.
 Return ONLY JSON: {"monthly_income":null,"employment_type":null,"age":null}
@@ -22,11 +20,9 @@ age: age in years as a number, or null
 Do not infer, estimate, or assume."""
 
 
-def _stream_text(text: str, chunk_chars: int = STREAM_CHUNK_CHARS) -> Generator[str, None, None]:
-    if not text:
-        return
-    for start in range(0, len(text), chunk_chars):
-        yield text[start:start + chunk_chars]
+def _stream_text(text: str, chunk_chars: int = 24) -> Generator[str, None, None]:
+    for chunk in iter_text_stream(text, chunk_chars=chunk_chars):
+        yield chunk
 
 
 def _guardrails(response: str) -> str:
@@ -67,8 +63,7 @@ def _extract_profile_from_history(session: SessionMemory) -> None:
 
 def _build_eligibility_form_signal(user_message: str, session: SessionMemory) -> str:
     _extract_profile_from_history(session)
-    history = session.get_history_str(max_chars=500)
-    target = compliance_faq.extract_target_card(user_message, history)
+    target = compliance_faq.extract_target_card(user_message, "")
     recommended = session.user_profile.get("recommended_cards", [])
     if not isinstance(recommended, list):
         recommended = []
@@ -118,7 +113,64 @@ def _build_routing(user_message: str, classifier_output: dict) -> dict:
         "banking_type": banking_type,
         "collection": collection,
         "search_query": classifier_output.get("search_query") or user_message,
+        "active_cards": classifier_output.get("active_cards") or [],
     }
+
+
+def _get_context_cards(session: SessionMemory) -> list[str]:
+    cards = session.user_profile.get("active_cards") or session.user_profile.get("recommended_cards") or []
+    return cards if isinstance(cards, list) else []
+
+
+def _remember_active_cards(session: SessionMemory, cards: list[str], banking_type: str = "") -> None:
+    if cards:
+        session.update_profile("active_cards", cards)
+    if banking_type in ("conventional", "islami"):
+        session.update_profile("active_banking_type", banking_type)
+
+
+def _apply_contextual_followup(
+    user_message: str,
+    session: SessionMemory,
+    classifier_output: dict,
+) -> dict:
+    history = session.get_history_str(max_chars=500)
+    target_card = compliance_faq.extract_target_card(user_message, "")
+    active_cards = _get_context_cards(session)
+    lower = user_message.lower().strip()
+
+    if target_card:
+        classifier_output["intent"] = "product_details"
+        classifier_output["needs_preference_form"] = False
+        classifier_output["needs_eligibility_form"] = False
+        classifier_output["search_query"] = target_card
+        classifier_output["active_cards"] = [target_card]
+        return classifier_output
+
+    if not active_cards:
+        return classifier_output
+
+    classifier_output["active_cards"] = active_cards
+
+    if classifier_output.get("intent") == "i_need_a_credit_card":
+        classifier_output["needs_preference_form"] = False
+        if any(term in lower for term in ("eligib", "qualif", "approved")):
+            classifier_output["intent"] = "eligibility_check"
+            classifier_output["needs_eligibility_form"] = True
+            classifier_output["search_query"] = " ".join(active_cards)
+        elif "compare" in lower:
+            classifier_output["intent"] = "comparison"
+            classifier_output["search_query"] = " ".join(active_cards)
+        elif any(term in lower for term in ("fee", "fees", "charge", "waiver")):
+            classifier_output["intent"] = "comparison" if len(active_cards) > 1 else "product_details"
+            classifier_output["search_query"] = " ".join(active_cards + ["annual fee", "fee waiver", "charges"])
+        else:
+            classifier_output["intent"] = "product_details" if len(active_cards) == 1 else "faq"
+            classifier_output["search_query"] = " ".join(active_cards + [user_message])
+    elif classifier_output.get("intent") in {"comparison", "product_details", "how_to_apply", "faq"} and len(user_message.split()) <= 6:
+        classifier_output["search_query"] = " ".join(active_cards + [user_message])
+
+    return classifier_output
 
 
 def _stream_or_chunk(
@@ -169,6 +221,7 @@ def build_crew_stream(
     session_id = session.session_id
     history = session.get_history_str(max_chars=1000)
     classifier_output = classify(user_message, history)
+    classifier_output = _apply_contextual_followup(user_message, session, classifier_output)
 
     log_event(
         "classifier_result",
@@ -271,6 +324,11 @@ def build_crew_stream(
             session,
         )
 
+    mentioned_cards = compliance_faq.extract_recommended_card_names(session.get_last_assistant_response())
+    if mentioned_cards:
+        _remember_active_cards(session, mentioned_cards, routing.get("banking_type", ""))
+    session.set_last_intent(intent)
+
     yield json.dumps({"__done_signal__": True, "intent": intent, "calculator": calculator_type})
     log_event(
         "pipeline_complete_stream",
@@ -322,17 +380,22 @@ def handle_eligibility_form(
     clean = _guardrails(draft)
 
     clean_lower = clean.lower()
-    if "✅" in clean or ("eligible" in clean_lower and "not eligible" not in clean_lower and "ineligible" not in clean_lower):
-        clean += "\n\n**Ready to apply?** Visit any Prime Bank branch or call **16218** to start your application today."
+    if "❌" in clean or "likely ineligible" in clean_lower or "not eligible" in clean_lower or "ineligible" in clean_lower:
+        clean += "\n\nWould you like to explore other cards that may suit your profile? Call **16218** or visit a branch for personalised advice."
     elif "⚠️" in clean or "conditional" in clean_lower or "borderline" in clean_lower:
         clean += "\n\nFor guidance on meeting the remaining requirements, call **16218** or visit a Prime Bank branch."
-    elif "❌" in clean or "not eligible" in clean_lower or "ineligible" in clean_lower:
-        clean += "\n\nWould you like to explore other cards that may suit your profile? Call **16218** or visit a branch for personalised advice."
+    elif "✅" in clean or "likely eligible" in clean_lower:
+        clean += "\n\n**Ready to apply?** Visit any Prime Bank branch or call **16218** to start your application today."
     else:
         clean += "\n\nFor further assistance, contact Prime Bank at **16218** or visit any branch."
 
     session.history[-1]["content"] = clean
     session.history[-1]["content_short"] = session._truncate_for_history(clean)
+    target_card = form_data.get("target_card", "")
+    active_cards = [target_card] if target_card else (session.user_profile.get("recommended_cards") or [])
+    if isinstance(active_cards, list) and active_cards:
+        _remember_active_cards(session, active_cards)
+    session.set_last_intent("eligibility_check")
 
     log_event(
         "eligibility_form_complete",
@@ -372,7 +435,9 @@ def handle_preference_form(
 
     draft = compliance_faq.run_card_recommendation(form_data, session)
     clean = _guardrails(draft)
-    session.update_profile("recommended_cards", compliance_faq.extract_recommended_card_names(clean))
+    recommended_cards = compliance_faq.extract_recommended_card_names(clean)
+    session.update_profile("recommended_cards", recommended_cards)
+    _remember_active_cards(session, recommended_cards, form_data.get("banking_type", ""))
     clean += "\n\n**Want to check if you qualify?** Just ask me to check your eligibility, or visit any Prime Bank branch to apply."
 
     session.history[-1]["content"] = clean
@@ -385,6 +450,7 @@ def handle_preference_form(
         response_chars=len(clean),
         latency_ms=round((time.perf_counter() - started) * 1000, 2),
     )
+    session.set_last_intent("i_need_a_credit_card")
     return clean
 
 

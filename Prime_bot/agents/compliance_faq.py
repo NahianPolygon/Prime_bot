@@ -936,6 +936,11 @@ def run_card_recommendation(form_data: dict, session: SessionMemory) -> str:
         elif income_band == "200k_plus":
             score += 3.0 if tier in {"world", "platinum"} else 1.0
 
+        if tier in {"platinum", "world"} and income_band in {"under_50k", "50k_100k"}:
+            score -= 4.0
+        if tier == "gold" and income_band in {"under_50k", "50k_100k"}:
+            score += 1.5
+
         if travel_frequency == "frequent":
             if use_cases.intersection({"travel", "international_travel", "lounge_access", "business_travel"}):
                 score += 3.0
