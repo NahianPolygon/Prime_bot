@@ -862,6 +862,8 @@
   function renderPreferenceForm(schema) {
     var formId = "pref_" + Date.now(); activeFormId = formId;
     var fields = schema.fields || {};
+    var prefill = schema.prefill || {};
+    var hasPrefill = Object.keys(prefill).length > 0;
 
     var group  = document.createElement("div"); group.className = "msg-group"; group.id = formId + "_grp";
     var row    = document.createElement("div"); row.className = "message-row bot";
@@ -874,7 +876,7 @@
     var hdr = document.createElement("div"); hdr.className = "pref-form-header";
     hdr.innerHTML = '<div class="pref-form-icon"><svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></div>';
     var hdrText = document.createElement("div");
-    var t1 = document.createElement("div"); t1.className = "pref-form-title"; t1.textContent = "Find Your Perfect Card";
+    var t1 = document.createElement("div"); t1.className = "pref-form-title"; t1.innerHTML = 'Find Your Perfect Card' + (hasPrefill ? ' <span class="prefill-badge">Pre-filled from conversation</span>' : '');
     var t2 = document.createElement("div"); t2.className = "pref-form-subtitle"; t2.textContent = "Answer a few quick questions for a more accurate recommendation";
     hdrText.appendChild(t1); hdrText.appendChild(t2); hdr.appendChild(hdrText);
     outer.appendChild(hdr);
@@ -892,6 +894,7 @@
         (f.options || []).forEach(function(o) {
           var btn = document.createElement("button"); btn.type = "button"; btn.className = "pref-pill";
           btn.setAttribute("data-group", key); btn.setAttribute("data-value", o.value);
+          if (prefill[key] !== undefined && String(prefill[key]) === String(o.value)) btn.classList.add("selected");
           btn.textContent = o.label; btn.onclick = function() { selectPrefPill(btn); };
           grpEl.appendChild(btn);
         });
@@ -901,6 +904,7 @@
         (f.options || []).forEach(function(o) {
           var tile = document.createElement("button"); tile.type = "button"; tile.className = "pref-tile";
           tile.setAttribute("data-group", key); tile.setAttribute("data-value", o.value);
+          if (prefill[key] !== undefined && String(prefill[key]) === String(o.value)) tile.classList.add("selected");
           tile.textContent = o.label; tile.onclick = function() { selectPrefTile(tile); };
           grid.appendChild(tile);
         });

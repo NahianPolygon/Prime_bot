@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from typing import Generator
 
@@ -18,6 +19,9 @@ monthly_income: monthly income in BDT as a number, or null
 employment_type: exactly "salaried", "self_employed", or "business_owner", or null
 age: age in years as a number, or null
 Do not infer, estimate, or assume."""
+
+_K_INCOME_RE = re.compile(r"(\d+(?:\.\d+)?)\s*k\b", re.IGNORECASE)
+_DIGIT_INCOME_RE = re.compile(r"\b(\d{4,7})\b")
 
 
 def _stream_text(text: str, chunk_chars: int = 24) -> Generator[str, None, None]:
@@ -84,8 +88,80 @@ def _build_eligibility_form_signal(user_message: str, session: SessionMemory) ->
     return json.dumps({"__form_signal__": True, "type": "show_eligibility_form", "schema": schema})
 
 
-def _build_preference_form_signal(user_message: str, session: SessionMemory) -> str:
-    schema = compliance_faq.get_preference_form_schema()
+def _infer_income_band_from_text(text: str) -> str:
+    lowered = (text or "").lower()
+    match_k = _K_INCOME_RE.search(lowered)
+    amount = None
+    if match_k:
+        amount = float(match_k.group(1)) * 1000
+    else:
+        match_digits = _DIGIT_INCOME_RE.search(lowered.replace(",", ""))
+        if match_digits:
+            try:
+                amount = float(match_digits.group(1))
+            except ValueError:
+                amount = None
+
+    if amount is None:
+        return ""
+    if amount < 50_000:
+        return "under_50k"
+    if amount < 100_000:
+        return "50k_100k"
+    if amount < 200_000:
+        return "100k_200k"
+    return "200k_plus"
+
+
+def _build_preference_prefill(user_message: str, session: SessionMemory, classifier_output: dict) -> dict:
+    prefill: dict = {}
+    lowered = (user_message or "").lower()
+
+    banking_type = classifier_output.get("banking_type")
+    if banking_type in ("conventional", "islami"):
+        prefill["banking_type"] = banking_type
+    elif session.user_profile.get("active_banking_type") in ("conventional", "islami"):
+        prefill["banking_type"] = session.user_profile.get("active_banking_type")
+
+    income_band = _infer_income_band_from_text(user_message)
+    if not income_band:
+        monthly_income = session.user_profile.get("monthly_income")
+        if monthly_income:
+            income_band = _infer_income_band_from_text(str(monthly_income))
+    if income_band:
+        prefill["income_band"] = income_band
+
+    if any(term in lowered for term in ("travel", "lounge", "airport", "trip", "abroad")):
+        prefill["use_case"] = "travel"
+    elif any(term in lowered for term in ("dining", "restaurant", "lifestyle")):
+        prefill["use_case"] = "dining"
+    elif any(term in lowered for term in ("reward", "cashback", "points")):
+        prefill["use_case"] = "rewards_earning"
+    elif any(term in lowered for term in ("business", "office", "corporate")):
+        prefill["use_case"] = "business_spending"
+    elif any(term in lowered for term in ("shop", "shopping", "daily use", "everyday")):
+        prefill["use_case"] = "shopping"
+    elif any(term in lowered for term in ("first card", "first premium", "new card")):
+        prefill["use_case"] = "entry_level_premium"
+
+    if any(term in lowered for term in ("premium", "platinum", "world", "signature")):
+        prefill["tier_preference"] = "premium"
+    elif any(term in lowered for term in ("gold", "accessible", "entry")):
+        prefill["tier_preference"] = "gold"
+
+    if any(term in lowered for term in ("frequent travel", "travel often", "frequently")):
+        prefill["travel_frequency"] = "frequent"
+    elif any(term in lowered for term in ("sometimes", "occasional", "occasionally")):
+        prefill["travel_frequency"] = "occasional"
+    elif any(term in lowered for term in ("rarely", "rare travel", "hardly travel")):
+        prefill["travel_frequency"] = "rare"
+
+    return prefill
+
+
+def _build_preference_form_signal(user_message: str, session: SessionMemory, classifier_output: dict) -> str:
+    prefill = _build_preference_prefill(user_message, session, classifier_output)
+    schema = compliance_faq.get_preference_form_schema(prefill=prefill or None)
     intro = "To recommend the best Prime Bank credit card for you, please fill out the quick preference form below."
     session.add(user_message, intro)
     return json.dumps({"__preference_form_signal__": True, "type": "show_preference_form", "schema": schema})
@@ -237,7 +313,7 @@ def build_crew_stream(
     calculator_type = classifier_output.get("calculator_type", "")
 
     if classifier_output.get("needs_preference_form"):
-        yield _build_preference_form_signal(user_message, session)
+        yield _build_preference_form_signal(user_message, session, classifier_output)
         yield json.dumps({"__done_signal__": True, "intent": "", "calculator": ""})
         return
 

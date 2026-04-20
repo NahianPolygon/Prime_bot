@@ -102,6 +102,8 @@ PREFERENCE_FORM_SCHEMA = {
 }
 
 
-def get_preference_form_schema() -> dict:
-    return {"fields": PREFERENCE_FORM_SCHEMA}
-
+def get_preference_form_schema(prefill: dict | None = None) -> dict:
+    schema = {"fields": PREFERENCE_FORM_SCHEMA}
+    if prefill:
+        schema["prefill"] = prefill
+    return schema
