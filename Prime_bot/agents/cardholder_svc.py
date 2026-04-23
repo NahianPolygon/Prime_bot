@@ -11,18 +11,19 @@ You help existing credit card holders using ONLY the knowledge base chunks provi
 You handle: lost/stolen card, card activation, bill payment, statements, balance queries, reward points, credit limit increase, EMI conversion, PIN reset, supplementary cards.
 
 You MUST:
-- For ANY lost/stolen/block emergency, put "Call 16218 IMMEDIATELY" as the FIRST line
+- For ANY lost/stolen/block emergency, put "Call 16218 (local) or +88022222222 (international) IMMEDIATELY" as the FIRST line whenever those numbers are present in the chunks
 - Use ONLY information from the provided chunks
 - Give clear step-by-step instructions when applicable
 - Be concise and action-oriented
 - Always use the actual card name not internal codes
+- When the chunks include phone numbers, preserve them exactly in the answer
 
 You MUST NOT:
 - Invent any policy, fee, process, or phone number not in the chunks
 - Give vague answers when chunks contain specific details
 - Display product_id, internal IDs, or system codes like CARD_001 or ISLAMI_CARD_001
 
-If the query is not covered in chunks, say: "Please call 16218 or visit your nearest Prime Bank branch."
+If the query is not covered in chunks, say: "Please call **16218** (local) or **+88022222222** (international) or visit your nearest Prime Bank branch."
 """
 
 
@@ -60,7 +61,7 @@ def run(
     if context.startswith("[NO RESULTS]"):
         fallback_context = rag_search_multi(user_message, collections + ["all_products"], top_k=4)
         if fallback_context.startswith("[NO RESULTS]"):
-            return "Please call **16218** or visit your nearest Prime Bank branch for assistance with your card."
+            return "Please call **16218** (local) or **+88022222222** (international) or visit your nearest Prime Bank branch for assistance with your card."
         context = fallback_context
 
     context = _clean_context(context)
@@ -76,7 +77,7 @@ Conversation so far:
 
 Cardholder query: {user_message}
 
-Answer using ONLY the chunks above. Use actual card names, never internal codes. If this is a lost/stolen card emergency, put the helpline number first."""
+Answer using ONLY the chunks above. Use actual card names, never internal codes. If this is a lost/stolen card emergency, put the local and international helpline numbers first exactly as they appear in the chunks."""
 
     return chat(
         messages=[{"role": "user", "content": prompt}],
@@ -99,7 +100,7 @@ def run_stream(
     if context.startswith("[NO RESULTS]"):
         fallback_context = rag_search_multi(user_message, collections + ["all_products"], top_k=4)
         if fallback_context.startswith("[NO RESULTS]"):
-            yield "Please call **16218** or visit your nearest Prime Bank branch for assistance with your card."
+            yield "Please call **16218** (local) or **+88022222222** (international) or visit your nearest Prime Bank branch for assistance with your card."
             return
         context = fallback_context
 
@@ -115,7 +116,7 @@ Conversation so far:
 
 Cardholder query: {user_message}
 
-Answer using ONLY the chunks above. Use actual card names, never internal codes. If this is a lost/stolen card emergency, put the helpline number first."""
+Answer using ONLY the chunks above. Use actual card names, never internal codes. If this is a lost/stolen card emergency, put the local and international helpline numbers first exactly as they appear in the chunks."""
 
     for token in chat_stream(
         messages=[{"role": "user", "content": prompt}],
