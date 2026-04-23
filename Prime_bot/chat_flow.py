@@ -195,7 +195,23 @@ def _build_routing(user_message: str, classifier_output: dict) -> dict:
 
 def _get_context_cards(session: SessionMemory) -> list[str]:
     cards = session.user_profile.get("active_cards") or session.user_profile.get("recommended_cards") or []
-    return cards if isinstance(cards, list) else []
+    if isinstance(cards, list) and cards:
+        return cards
+
+    verdicts = session.user_profile.get("last_eligibility_verdicts") or []
+    if isinstance(verdicts, list):
+        verdict_cards = [item.get("card_name", "") for item in verdicts if isinstance(item, dict) and item.get("card_name")]
+        if verdict_cards:
+            _remember_active_cards(session, verdict_cards, session.user_profile.get("active_banking_type", ""))
+            return verdict_cards
+
+    last_response = session.get_last_assistant_response()
+    recovered_cards = compliance_faq.extract_recommended_card_names(last_response)
+    if recovered_cards:
+        _remember_active_cards(session, recovered_cards, session.user_profile.get("active_banking_type", ""))
+        return recovered_cards
+
+    return []
 
 
 def _remember_active_cards(session: SessionMemory, cards: list[str], banking_type: str = "") -> None:
@@ -205,46 +221,68 @@ def _remember_active_cards(session: SessionMemory, cards: list[str], banking_typ
         session.update_profile("active_banking_type", banking_type)
 
 
-def _apply_contextual_followup(
+def _build_classifier_context(session: SessionMemory) -> dict:
+    active_cards = _get_context_cards(session)
+    recommended_cards = session.user_profile.get("recommended_cards") or []
+    if not isinstance(recommended_cards, list):
+        recommended_cards = []
+    verdicts = session.user_profile.get("last_eligibility_verdicts") or []
+    if not isinstance(verdicts, list):
+        verdicts = []
+
+    return {
+        "active_cards": active_cards,
+        "recommended_cards": recommended_cards,
+        "active_banking_type": session.user_profile.get("active_banking_type", ""),
+        "last_intent": session.get_last_intent() or "",
+        "eligibility_cards": [item.get("card_name", "") for item in verdicts if isinstance(item, dict) and item.get("card_name")],
+        "known_profile": {
+            "monthly_income": session.user_profile.get("monthly_income"),
+            "employment_type": session.user_profile.get("employment_type"),
+            "age": session.user_profile.get("age"),
+        },
+    }
+
+
+def _ground_classifier_output(
     user_message: str,
+    history: str,
     session: SessionMemory,
     classifier_output: dict,
 ) -> dict:
-    history = session.get_history_str(max_chars=500)
-    target_card = compliance_faq.extract_target_card(user_message, "")
-    active_cards = _get_context_cards(session)
-    lower = user_message.lower().strip()
+    target_card = classifier_output.get("target_card", "").strip()
+    candidate_cards = []
+    if target_card:
+        resolved_target = compliance_faq.extract_target_card(target_card, "")
+        if resolved_target:
+            target_card = resolved_target
+        else:
+            candidate_cards = compliance_faq.resolve_card_candidates(target_card, "", limit=3)
+            if len(candidate_cards) == 1:
+                target_card = candidate_cards[0]
+            else:
+                target_card = ""
+    if not target_card and classifier_output.get("intent") in {"product_details", "eligibility_check", "how_to_apply"}:
+        target_card = compliance_faq.extract_target_card(user_message, history)
+        if not target_card:
+            context_cards = _get_context_cards(session)
+            if len(context_cards) == 1:
+                target_card = context_cards[0]
+            else:
+                candidate_cards = compliance_faq.resolve_card_candidates(user_message, history, limit=3)
 
     if target_card:
-        classifier_output["intent"] = "product_details"
-        classifier_output["needs_preference_form"] = False
-        classifier_output["needs_eligibility_form"] = False
-        classifier_output["search_query"] = target_card
+        classifier_output["target_card"] = target_card
         classifier_output["active_cards"] = [target_card]
-        return classifier_output
-
-    if not active_cards:
-        return classifier_output
-
-    classifier_output["active_cards"] = active_cards
-
-    if classifier_output.get("intent") == "i_need_a_credit_card":
         classifier_output["needs_preference_form"] = False
-        if any(term in lower for term in ("eligib", "qualif", "approved")):
-            classifier_output["intent"] = "eligibility_check"
-            classifier_output["needs_eligibility_form"] = True
-            classifier_output["search_query"] = " ".join(active_cards)
-        elif "compare" in lower:
-            classifier_output["intent"] = "comparison"
-            classifier_output["search_query"] = " ".join(active_cards)
-        elif any(term in lower for term in ("fee", "fees", "charge", "waiver")):
-            classifier_output["intent"] = "comparison" if len(active_cards) > 1 else "product_details"
-            classifier_output["search_query"] = " ".join(active_cards + ["annual fee", "fee waiver", "charges"])
-        else:
-            classifier_output["intent"] = "product_details" if len(active_cards) == 1 else "faq"
-            classifier_output["search_query"] = " ".join(active_cards + [user_message])
-    elif classifier_output.get("intent") in {"comparison", "product_details", "how_to_apply", "faq"} and len(user_message.split()) <= 6:
-        classifier_output["search_query"] = " ".join(active_cards + [user_message])
+        if not classifier_output.get("search_query") or classifier_output.get("search_query") == user_message:
+            classifier_output["search_query"] = target_card
+    elif candidate_cards:
+        classifier_output["candidate_cards"] = candidate_cards
+
+    active_cards = classifier_output.get("active_cards") or []
+    if active_cards and classifier_output.get("banking_type") == "both":
+        classifier_output["banking_type"] = session.user_profile.get("active_banking_type", "both") or "both"
 
     return classifier_output
 
@@ -288,6 +326,18 @@ def _direct_response(intent: str) -> str:
     return ""
 
 
+def _clarify_candidate_cards(intent: str, candidate_cards: list[str]) -> str:
+    if len(candidate_cards) < 2:
+        return ""
+    if intent == "eligibility_check":
+        return "I found a few matching cards. Tell me which one you want to check eligibility for: " + ", ".join(candidate_cards) + "."
+    if intent == "how_to_apply":
+        return "I found a few matching cards. Tell me which one you want application steps for: " + ", ".join(candidate_cards) + "."
+    if intent == "product_details":
+        return "I found a few matching cards. Tell me which one you want details about: " + ", ".join(candidate_cards) + "."
+    return ""
+
+
 def build_crew_stream(
     user_message: str,
     session: SessionMemory,
@@ -296,8 +346,9 @@ def build_crew_stream(
     started = time.perf_counter()
     session_id = session.session_id
     history = session.get_history_str(max_chars=1000)
-    classifier_output = classify(user_message, history)
-    classifier_output = _apply_contextual_followup(user_message, session, classifier_output)
+    classifier_context = _build_classifier_context(session)
+    classifier_output = classify(user_message, history, classifier_context)
+    classifier_output = _ground_classifier_output(user_message, history, session, classifier_output)
 
     log_event(
         "classifier_result",
@@ -320,6 +371,15 @@ def build_crew_stream(
     if classifier_output.get("needs_eligibility_form"):
         yield _build_eligibility_form_signal(user_message, session)
         yield json.dumps({"__done_signal__": True, "intent": "", "calculator": ""})
+        return
+
+    clarify = _clarify_candidate_cards(intent, classifier_output.get("candidate_cards") or [])
+    if clarify:
+        clean = _guardrails(clarify)
+        session.add(user_message, clean)
+        for token in _stream_text(clean):
+            yield token
+        yield json.dumps({"__done_signal__": True, "intent": intent, "calculator": calculator_type})
         return
 
     direct = _direct_response(intent)

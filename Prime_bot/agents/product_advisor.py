@@ -3,7 +3,7 @@ from typing import Generator
 
 from llm.ollama_client import chat, chat_stream
 from memory.session_memory import SessionMemory
-from tools.rag_tool import rag_search_multi
+from tools.rag_tool import rag_search_multi, rag_search_multi_queries
 
 SYSTEM = """You are the Prime Bank Credit Card Product Advisor.
 You recommend credit cards using ONLY the knowledge base chunks provided below.
@@ -79,6 +79,28 @@ def _fetch_context(search_q: str, collections: list[str], top_k: int = 6) -> str
     return None
 
 
+def _fetch_expanded_context(
+    search_q: str,
+    collections: list[str],
+    spec_terms: str,
+    top_k_per_query: int = 4,
+    max_context_chars: int = 7000,
+) -> str | None:
+    queries = [
+        search_q,
+        f"{search_q} {spec_terms}",
+    ]
+    context = rag_search_multi_queries(
+        queries,
+        collections,
+        top_k_per_query=top_k_per_query,
+        max_context_chars=max_context_chars,
+    )
+    if not context.startswith("[NO RESULTS]"):
+        return _clean_context(context)
+    return None
+
+
 def run(
     user_message: str,
     routing: dict,
@@ -88,7 +110,13 @@ def run(
     search_q = routing.get("search_query", user_message)
     collections = _get_collections(banking)
 
-    context = _fetch_context(search_q, collections)
+    context = _fetch_expanded_context(
+        search_q,
+        collections,
+        "benefits features reward points lounge insurance fee waiver eligibility",
+        top_k_per_query=4,
+        max_context_chars=6200,
+    ) or _fetch_context(search_q, collections)
     if context is None:
         return "[NO RESULTS]"
 
@@ -124,7 +152,13 @@ def run_stream(
     search_q = routing.get("search_query", user_message)
     collections = _get_collections(banking)
 
-    context = _fetch_context(search_q, collections)
+    context = _fetch_expanded_context(
+        search_q,
+        collections,
+        "benefits features reward points lounge insurance fee waiver eligibility",
+        top_k_per_query=4,
+        max_context_chars=6200,
+    ) or _fetch_context(search_q, collections)
     if context is None:
         yield "[NO RESULTS]"
         return
@@ -163,7 +197,13 @@ def run_details(
     collections.append("all_products")
     collections = list(dict.fromkeys(collections))
 
-    context = _fetch_context(search_q, collections, top_k=8)
+    context = _fetch_expanded_context(
+        search_q,
+        collections,
+        "annual fee fee waiver charges credit limit reward points lounge travel insurance EMI interest-free period eligibility",
+        top_k_per_query=5,
+        max_context_chars=7600,
+    ) or _fetch_context(search_q, collections, top_k=8)
     if context is None:
         return "[NO RESULTS]"
 
@@ -201,7 +241,13 @@ def run_details_stream(
     collections.append("all_products")
     collections = list(dict.fromkeys(collections))
 
-    context = _fetch_context(search_q, collections, top_k=8)
+    context = _fetch_expanded_context(
+        search_q,
+        collections,
+        "annual fee fee waiver charges credit limit reward points lounge travel insurance EMI interest-free period eligibility",
+        top_k_per_query=5,
+        max_context_chars=7600,
+    ) or _fetch_context(search_q, collections, top_k=8)
     if context is None:
         yield "[NO RESULTS]"
         return

@@ -5,6 +5,7 @@ from agents.compliance import (
     extract_target_card,
     get_eligibility_form_schema,
     get_preference_form_schema,
+    resolve_card_candidates,
     run_apply,
     run_apply_stream,
     run_card_recommendation,
@@ -15,4 +16,3 @@ from agents.compliance import (
     run_faq_stream,
     validate_eligibility_form,
 )
-

@@ -27,6 +27,7 @@ def _build_payload(
     payload = {
         "model": OLLAMA_MODEL,
         "stream": stream,
+        "think": think,
         "keep_alive": OLLAMA_KEEP_ALIVE,
         "messages": [],
         "options": {
@@ -65,7 +66,8 @@ def chat(
             resp = client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
             resp.raise_for_status()
             data = resp.json()
-            raw = data.get("message", {}).get("content", "").strip()
+            message = data.get("message", {}) or {}
+            raw = (message.get("content") or data.get("response") or "").strip()
             content = _THINK_RE.sub("", raw).strip()
             if not content and raw:
                 content = raw
@@ -122,7 +124,8 @@ def chat_stream(
                     except json.JSONDecodeError:
                         continue
 
-                    token = chunk.get("message", {}).get("content", "")
+                    message = chunk.get("message", {}) or {}
+                    token = message.get("content", "")
                     if not token:
                         if chunk.get("done"):
                             break

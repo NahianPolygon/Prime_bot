@@ -8,7 +8,6 @@ from .eligibility import (
     validate_eligibility_form,
 )
 from .faq import run_faq, run_faq_stream
-from .matching import extract_recommended_card_names, extract_target_card
+from .matching import extract_recommended_card_names, extract_target_card, resolve_card_candidates
 from .recommendation import run_card_recommendation
 from .schemas import get_preference_form_schema
-

@@ -5,7 +5,7 @@ from memory.session_memory import SessionMemory
 from .common import clean_context, safe_int
 from .matching import extract_recommended_card_names
 from .schemas import ELIGIBILITY_SCHEMA
-from tools.rag_tool import rag_search_multi
+from tools.rag_tool import rag_search_multi, rag_search_multi_queries
 
 ELIGIBILITY_SYSTEM = """You are the Prime Bank Eligibility Advisor.
 You assess whether a user qualifies for Prime Bank credit cards.
@@ -325,7 +325,18 @@ def run_eligibility(
     else:
         search_query = eligibility_terms
 
-    context = rag_search_multi(search_query, collections, top_k=8)
+    context = rag_search_multi_queries(
+        [
+            search_query,
+            f"{search_query} annual income monthly income age etin employment duration",
+            f"{search_query} credit limit unsecured collateralized documentation requirements",
+        ],
+        collections,
+        top_k_per_query=4,
+        max_context_chars=7600,
+    )
+    if context.startswith("[NO RESULTS]"):
+        context = rag_search_multi(search_query, collections, top_k=8)
 
     if context.startswith("[NO RESULTS]"):
         return "I couldn't find eligibility criteria in my knowledge base. Please contact Prime Bank at **16218** for eligibility information."
@@ -390,4 +401,3 @@ Your response MUST be detailed and comprehensive. Do not cut short."""
         return response
 
     return "I couldn't complete the eligibility assessment. Please contact Prime Bank at **16218** for assistance."
-

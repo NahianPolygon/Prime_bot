@@ -25,12 +25,37 @@ _RECOMMENDATION_RETRY_SUFFIX = (
 )
 
 
+def _safe_float(value) -> float | None:
+    if value is None or str(value).strip() == "":
+        return None
+    try:
+        return float(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _income_band_monthly_range(income_band: str) -> tuple[float, float | None]:
+    if income_band == "under_50k":
+        return (0.0, 49_999.0)
+    if income_band == "50k_100k":
+        return (50_000.0, 99_999.0)
+    if income_band == "100k_200k":
+        return (100_000.0, 199_999.0)
+    if income_band == "200k_plus":
+        return (200_000.0, None)
+    return (0.0, None)
+
+
 def run_card_recommendation(form_data: dict, session: SessionMemory) -> str:
     banking_type = form_data.get("banking_type", "both")
     use_case = form_data.get("use_case", "")
     income_band = form_data.get("income_band", "")
     travel_frequency = form_data.get("travel_frequency", "")
     tier_preference = form_data.get("tier_preference", "no_preference")
+    known_age = session.user_profile.get("age")
+    known_employment = (session.user_profile.get("employment_type") or "").lower()
+    known_monthly_income = session.user_profile.get("monthly_income")
+    income_floor, income_ceiling = _income_band_monthly_range(income_band)
 
     products = list_all_products(
         banking_type_filter=banking_type if banking_type in ("conventional", "islami") else None
@@ -54,6 +79,11 @@ def run_card_recommendation(form_data: dict, session: SessionMemory) -> str:
         tier = (product.get("tier") or "").lower()
         network = (product.get("card_network") or "").lower()
         use_cases = set(meta_list(product.get("use_cases")))
+        employment_suitable = set(meta_list(product.get("employment_suitable")))
+        feature_category = str(product.get("feature_category") or "").lower()
+        age_min = _safe_float(product.get("age_min"))
+        age_max = _safe_float(product.get("age_max"))
+        income_min = _safe_float(product.get("income_min"))
 
         if use_case and use_case in use_cases:
             score += 5.0
@@ -100,6 +130,52 @@ def run_card_recommendation(form_data: dict, session: SessionMemory) -> str:
 
         if use_case == "rewards_earning" and network == "mastercard" and tier == "world":
             score += 2.0
+
+        if feature_category == "existing_cardholder":
+            score -= 10.0
+
+        if known_employment and employment_suitable:
+            if known_employment in employment_suitable:
+                score += 1.5
+            else:
+                score -= 2.0
+
+        if known_age is not None:
+            try:
+                age_value = float(known_age)
+            except (TypeError, ValueError):
+                age_value = None
+            if age_value is not None:
+                if age_min is not None and age_value < age_min:
+                    score -= 8.0
+                elif age_max is not None and age_value > age_max:
+                    score -= 8.0
+                elif age_min is not None or age_max is not None:
+                    score += 0.75
+
+        effective_monthly_income = None
+        if known_monthly_income not in (None, ""):
+            try:
+                effective_monthly_income = float(known_monthly_income)
+            except (TypeError, ValueError):
+                effective_monthly_income = None
+        elif income_band:
+            effective_monthly_income = income_floor
+
+        if income_min is not None:
+            # Frontmatter income_min may represent either monthly or annual thresholds depending on future KB updates.
+            # Compare against both monthly and annualized user income and reward whichever interpretation fits.
+            if effective_monthly_income is not None:
+                annual_income = effective_monthly_income * 12.0
+                monthly_gap = effective_monthly_income - income_min
+                annual_gap = annual_income - income_min
+                if monthly_gap >= 0 or annual_gap >= 0:
+                    score += 1.5
+                else:
+                    score -= 4.0
+
+        if income_band and income_min is not None and income_ceiling is not None and income_min > income_ceiling:
+            score -= 3.0
 
         return score
 
@@ -190,4 +266,3 @@ End with a suggestion to check eligibility or visit any Prime Bank branch."""
         "I couldn't prepare a recommendation just now from my knowledge base. "
         "Please contact Prime Bank at **16218** for personalised advice."
     )
-

@@ -222,6 +222,71 @@ def rag_search_multi(
     return "\n\n---\n\n".join(output)
 
 
+def rag_search_multi_queries(
+    queries: list[str],
+    collections: list[str],
+    top_k_per_query: int = 4,
+    banking_type_filter: Optional[str] = None,
+    max_context_chars: int = 7000,
+) -> str:
+    cleaned_queries = []
+    seen_queries = set()
+    for query in queries:
+        q = (query or "").strip()
+        if not q:
+            continue
+        key = q.lower()
+        if key in seen_queries:
+            continue
+        seen_queries.add(key)
+        cleaned_queries.append(q)
+
+    if not cleaned_queries:
+        return "[NO RESULTS] No relevant information found across all collections."
+
+    all_items = []
+    hit_collections = 0
+
+    for query_rank, query in enumerate(cleaned_queries):
+        for col_name in collections:
+            items = rag_search(query, col_name, top_k_per_query, banking_type_filter)
+            if items:
+                hit_collections += 1
+                for item in items:
+                    enriched = dict(item)
+                    enriched["_query_rank"] = query_rank
+                    all_items.append(enriched)
+
+    log_event(
+        "rag_multi_queries",
+        queries=len(cleaned_queries),
+        requested_collections=len(collections),
+        hit_collections=hit_collections,
+        top_k_per_query=top_k_per_query,
+        total_chunks=len(all_items),
+    )
+
+    if not all_items:
+        return "[NO RESULTS] No relevant information found across all collections."
+
+    all_items = _deduplicate(all_items)
+    all_items.sort(key=lambda x: (x.get("distance", 1.0), x.get("_query_rank", 999)))
+
+    output = []
+    char_count = 0
+    for item in all_items:
+        entry = item["text"]
+        if char_count + len(entry) > max_context_chars:
+            break
+        output.append(entry)
+        char_count += len(entry)
+
+    if not output:
+        output.append(all_items[0]["text"])
+
+    return "\n\n---\n\n".join(output)
+
+
 def rag_search_single(
     query: str,
     collection: str,
@@ -302,8 +367,12 @@ def list_all_products(
                 "card_network": network,
                 "tier": meta.get("tier", ""),
                 "category": cat,
+                "feature_category": meta.get("feature_category", ""),
                 "use_cases": meta.get("use_cases", ""),
                 "employment_suitable": meta.get("employment_suitable", ""),
+                "age_min": meta.get("age_min", ""),
+                "age_max": meta.get("age_max", ""),
+                "income_min": meta.get("income_min", ""),
                 "keywords": meta.get("keywords", ""),
             }
         )

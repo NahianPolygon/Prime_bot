@@ -2,7 +2,7 @@ from typing import Generator
 
 from llm.ollama_client import chat, chat_stream
 from memory.session_memory import SessionMemory
-from tools.rag_tool import rag_search_multi
+from tools.rag_tool import rag_search_multi, rag_search_multi_queries
 from .common import clean_context, get_collections
 
 APPLY_SYSTEM = """You are the Prime Bank Application Guide.
@@ -29,7 +29,18 @@ def _build_context(user_message: str, routing: dict) -> str:
     collections.append("all_products")
     collections = list(dict.fromkeys(collections))
 
-    context = rag_search_multi(search_q, collections, top_k=6)
+    context = rag_search_multi_queries(
+        [
+            search_q,
+            f"{search_q} application process documents branch apply online",
+            f"{search_q} schedule of charges terms conditions eligibility documents",
+        ],
+        collections,
+        top_k_per_query=3,
+        max_context_chars=7000,
+    )
+    if context.startswith("[NO RESULTS]"):
+        context = rag_search_multi(search_q, collections, top_k=6)
     if context.startswith("[NO RESULTS]"):
         return context
     return clean_context(context)
@@ -86,4 +97,3 @@ def run_apply_stream(
         think=False,
     ):
         yield token
-

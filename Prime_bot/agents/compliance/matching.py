@@ -35,7 +35,7 @@ def _product_aliases(product: dict) -> set[str]:
         aliases.add(" ".join(parts))
         aliases.add(" ".join(parts + ["card"]))
 
-    if network and tier:
+    if network and tier and banking != "islami":
         aliases.add(f"{network} {tier}")
         aliases.add(f"{tier} {network}")
         aliases.add(f"{network} {tier} card")
@@ -88,15 +88,15 @@ def _rag_candidate_bonus(user_message: str, products: list[dict]) -> dict[str, f
     return bonuses
 
 
-def _grounded_target_card_match(user_message: str, history: str = "") -> str:
+def _score_products(user_message: str, history: str = "") -> list[tuple[dict, float]]:
     products = list_all_products()
     valid_products = [p for p in products if p.get("product_name")]
     if not valid_products:
-        return ""
+        return []
 
     combined = _normalize_text(f"{history} {user_message}".strip())
     if not combined:
-        return ""
+        return []
 
     rag_bonus = _rag_candidate_bonus(combined, valid_products)
     scored = []
@@ -106,6 +106,14 @@ def _grounded_target_card_match(user_message: str, history: str = "") -> str:
         scored.append((product, score))
 
     scored.sort(key=lambda item: item[1], reverse=True)
+    return scored
+
+
+def _grounded_target_card_match(user_message: str, history: str = "") -> str:
+    scored = _score_products(user_message, history)
+    if not scored:
+        return ""
+
     top = [(item[0]["product_name"], round(item[1], 3)) for item in scored[:5]]
     best_product, best_score = scored[0]
     second_score = scored[1][1] if len(scored) > 1 else 0.0
@@ -125,12 +133,32 @@ def _grounded_target_card_match(user_message: str, history: str = "") -> str:
     return ""
 
 
+def resolve_card_candidates(user_message: str, history: str = "", limit: int = 3) -> list[str]:
+    scored = _score_products(user_message, history)
+    if not scored:
+        return []
+
+    best_score = scored[0][1]
+    if best_score <= 0:
+        return []
+
+    cutoff = max(6.0, best_score - 1.5)
+    candidates: list[str] = []
+    for product, score in scored:
+        if len(candidates) >= limit or score < cutoff:
+            break
+        name = product.get("product_name", "").strip()
+        if name and name not in candidates:
+            candidates.append(name)
+    return candidates
+
+
 def extract_recommended_card_names(text: str) -> list[str]:
     if not text:
         return []
 
     matched = []
-    lowered = text.lower()
+    normalized_text = _normalize_text(text)
     products = sorted(
         list_all_products(),
         key=lambda item: len(item.get("product_name", "")),
@@ -138,7 +166,11 @@ def extract_recommended_card_names(text: str) -> list[str]:
     )
     for product in products:
         name = product.get("product_name", "").strip()
-        if name and name.lower() in lowered and name not in matched:
+        if not name or name in matched:
+            continue
+
+        aliases = _product_aliases(product)
+        if any(alias in normalized_text for alias in aliases):
             matched.append(name)
     return matched
 
@@ -151,4 +183,3 @@ def extract_target_card(user_message: str, history: str = "") -> str:
 
     log_event("target_card_resolved", method="none", card="")
     return ""
-
