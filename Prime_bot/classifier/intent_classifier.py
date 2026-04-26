@@ -31,10 +31,13 @@ Rules:
 - needs_eligibility_form = true only when the user wants eligibility assessment and a form should be shown
 - If the user asks follow-ups like fees, comparison, eligibility, application, or details for already-discussed cards, prefer using session-context cards instead of restarting discovery
 - If the user mentions a specific card after a prior conversation, route to details/apply/eligibility for that card rather than showing the discovery form
+- If the previous turn was a catalog/browsing answer, short follow-ups like "conventional cards", "Islamic / Halal cards", or "show Islamic cards" are still catalog requests, not discovery/recommendation requests
 - Output JSON only
 
 Examples:
 "What credit cards do you offer?" -> {"category":"new_card","sub_intent":"catalog","banking_type":"both","confidence":0.97,"calculator":"","search_query":"credit cards offered","target_card":"","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}
+"Islamic / Halal cards" after a catalog answer -> {"category":"new_card","sub_intent":"catalog","banking_type":"islami","confidence":0.96,"calculator":"","search_query":"Islamic credit cards offered","target_card":"","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}
+"Conventional cards" after a catalog answer -> {"category":"new_card","sub_intent":"catalog","banking_type":"conventional","confidence":0.96,"calculator":"","search_query":"conventional credit cards offered","target_card":"","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}
 "I need a halal credit card" -> {"category":"new_card","sub_intent":"discover","banking_type":"islami","confidence":0.98,"calculator":"","search_query":"halal credit card recommendation","target_card":"","use_context_cards":false,"needs_preference_form":true,"needs_eligibility_form":false}
 "Check my eligibility" with session cards already known -> {"category":"new_card","sub_intent":"eligibility","banking_type":"conventional","confidence":0.96,"calculator":"","search_query":"eligibility for current shortlisted cards","target_card":"","use_context_cards":true,"needs_preference_form":false,"needs_eligibility_form":true}
 "Explain the fees" after a comparison of two cards -> {"category":"new_card","sub_intent":"compare","banking_type":"conventional","confidence":0.94,"calculator":"","search_query":"annual fee fee waiver charges for current comparison cards","target_card":"","use_context_cards":true,"needs_preference_form":false,"needs_eligibility_form":false}
@@ -47,6 +50,7 @@ Return ONLY JSON:
 
 Use the provided history and session context.
 If the latest message depends on already discussed cards, set use_context_cards to true.
+If the latest message is a short catalog refinement after a browsing/catalog answer, keep sub_intent as catalog instead of discover.
 If the user wants a recommendation, set sub_intent to discover.
 If the user wants eligibility, set sub_intent to eligibility.
 If the user asks about an existing cardholder service issue, set category to existing_card.
