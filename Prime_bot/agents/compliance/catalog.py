@@ -95,4 +95,3 @@ def run_catalog_stream(
         think=False,
     ):
         yield token
-

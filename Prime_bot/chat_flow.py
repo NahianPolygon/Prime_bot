@@ -29,6 +29,41 @@ def _stream_text(text: str, chunk_chars: int = 24) -> Generator[str, None, None]
         yield chunk
 
 
+def _collapse_repetitive_tail(text: str) -> str:
+    current = (text or "").strip()
+    while True:
+        words = current.split()
+        if len(words) < 12:
+            return current
+
+        changed = False
+        max_segment_words = min(18, len(words) // 3)
+        for segment_words in range(max_segment_words, 3, -1):
+            segment = words[-segment_words:]
+            repeats = 1
+            cursor = len(words) - segment_words
+            while cursor - segment_words >= 0 and words[cursor - segment_words:cursor] == segment:
+                repeats += 1
+                cursor -= segment_words
+            if repeats < 3:
+                continue
+
+            phrase = " ".join(segment)
+            pattern = re.compile(rf"(?:\s*{re.escape(phrase)}){{3,}}\s*$")
+            collapsed = pattern.sub(" " + phrase, current).strip()
+            if collapsed != current:
+                log_event(
+                    "response_repetition_collapsed",
+                    phrase_words=segment_words,
+                    repeats=repeats,
+                )
+                current = collapsed
+                changed = True
+                break
+        if not changed:
+            return current
+
+
 def _guardrails(response: str) -> str:
     cleaned = (response or "").strip()
     if cleaned.startswith("[ERROR]"):
@@ -37,7 +72,7 @@ def _guardrails(response: str) -> str:
         return "I could not find that in my knowledge base. Please contact Prime Bank at **16218** for assistance."
     if not cleaned:
         return "I could not find that in my knowledge base. Please contact Prime Bank at **16218** for assistance."
-    return cleaned
+    return _collapse_repetitive_tail(cleaned)
 
 
 def _extract_profile_from_history(session: SessionMemory) -> None:
@@ -301,16 +336,14 @@ def _stream_or_chunk(
     if stream_fn:
         for token in stream_fn(*args):
             collected.append(token)
-            yield token
 
     full_response = "".join(collected)
     if not full_response.strip() and fallback_fn:
         full_response = fallback_fn(*args)
-        for token in _stream_text(_guardrails(full_response)):
-            collected.append(token)
-            yield token
 
-    clean = _guardrails("".join(collected) if collected else full_response)
+    clean = _guardrails(full_response)
+    for token in _stream_text(clean):
+        yield token
     session.add(user_message, clean)
 
 
