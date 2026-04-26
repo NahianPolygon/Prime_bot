@@ -41,6 +41,7 @@ def get_eligibility_form_schema(
     target_card: str = "",
     profile: dict | None = None,
     recommended_cards: list[str] | None = None,
+    scoped_cards: list[str] | None = None,
 ) -> dict:
     schema = {
         "target_card": target_card,
@@ -48,6 +49,8 @@ def get_eligibility_form_schema(
     }
     if recommended_cards:
         schema["recommended_cards"] = recommended_cards
+    if scoped_cards:
+        schema["scoped_cards"] = scoped_cards
     if profile:
         prefill = {}
         if profile.get("monthly_income"):
@@ -216,18 +219,26 @@ def extract_eligibility_verdicts(
     text: str,
     target_card: str = "",
     recommended_cards: list[str] | None = None,
+    scoped_cards: list[str] | None = None,
 ) -> list[dict]:
     if not text:
         return []
 
     recommended_cards = recommended_cards or []
+    scoped_cards = scoped_cards or []
     lowered = text.lower()
     discovered_cards = extract_recommended_card_names(text)
 
     candidates: list[str] = []
-    for name in [target_card, *recommended_cards, *discovered_cards]:
+    preferred_scope = [target_card, *scoped_cards, *recommended_cards]
+    for name in preferred_scope:
         if name and name not in candidates:
             candidates.append(name)
+
+    if not candidates:
+        for name in discovered_cards:
+            if name and name not in candidates:
+                candidates.append(name)
 
     positions: list[tuple[int, str]] = []
     for name in candidates:
@@ -258,7 +269,7 @@ def extract_eligibility_verdicts(
     if verdicts:
         return verdicts
 
-    fallback_cards = [name for name in [target_card, *recommended_cards] if name]
+    fallback_cards = [name for name in [target_card, *scoped_cards, *recommended_cards] if name]
     if not fallback_cards:
         return []
 
@@ -308,6 +319,10 @@ def run_eligibility(
         session.update_profile(key, value)
 
     target = form_data.get("target_card", "")
+    scoped_cards = form_data.get("scoped_cards", [])
+    if not isinstance(scoped_cards, list):
+        scoped_cards = []
+    scoped_cards = [card for card in scoped_cards if isinstance(card, str) and card.strip()]
     recommended_cards = session.user_profile.get("recommended_cards", [])
     if not isinstance(recommended_cards, list):
         recommended_cards = []
@@ -320,6 +335,8 @@ def run_eligibility(
     eligibility_terms = "eligibility requirements age income employment duration etin documents"
     if target:
         search_query = f"{target} {eligibility_terms}"
+    elif scoped_cards:
+        search_query = f"{' '.join(scoped_cards)} {eligibility_terms}"
     elif recommended_cards:
         search_query = f"{' '.join(recommended_cards)} {eligibility_terms}"
     else:
@@ -351,6 +368,14 @@ def run_eligibility(
             "If not found, say so and suggest the closest alternatives.\n"
             "You MUST provide a detailed assessment including all criteria: age requirement, income requirement, "
             "employment duration, E-TIN requirement, and your verdict."
+        )
+    elif scoped_cards:
+        focus = (
+            "The user is currently discussing these cards:\n"
+            + "\n".join(f"- {card}" for card in scoped_cards)
+            + "\nAssess eligibility for these cards ONLY if they are present in the chunks.\n"
+            "Do not expand the assessment to other cards unless the user explicitly asked for alternatives.\n"
+            "For each card provide a separate verdict and reasoning for age, income, employment duration, and E-TIN."
         )
     elif recommended_cards:
         focus = (

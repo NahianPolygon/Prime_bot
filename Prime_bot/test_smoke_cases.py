@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import agents.compliance_faq as compliance_faq
 from memory.session_memory import SessionMemory
 import chat_flow
 
@@ -65,6 +66,30 @@ def main():
         return str(prefill)
 
     run_case("prefill_from_query", prefill_from_query)
+
+    def eligibility_scope_preserved():
+        text = """
+Mastercard World Credit Card
+✅ Likely Eligible
+Age: ✅ 40 years
+E-TIN: ✅ Yes
+
+Mastercard Platinum Credit Card
+❌ Likely Ineligible
+Age: ✅ 40 years
+E-TIN: ✅ Yes
+
+Alternative options you may consider: Visa Gold Credit Card, JCB Gold Credit Card
+""".strip()
+        verdicts = compliance_faq.extract_eligibility_verdicts(
+            text,
+            scoped_cards=["Mastercard World Credit Card", "Mastercard Platinum Credit Card"],
+        )
+        names = [item.get("card_name") for item in verdicts]
+        assert names == ["Mastercard World Credit Card", "Mastercard Platinum Credit Card"], names
+        return str(names)
+
+    run_case("eligibility_scope_preserved", eligibility_scope_preserved)
 
     def recommendation_submit():
         session = SessionMemory("t5")

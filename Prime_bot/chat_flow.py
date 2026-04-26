@@ -71,6 +71,7 @@ def _build_eligibility_form_signal(user_message: str, session: SessionMemory) ->
     recommended = session.user_profile.get("recommended_cards", [])
     if not isinstance(recommended, list):
         recommended = []
+    scoped_cards = _get_context_cards(session)
     if not target and len(recommended) == 1:
         target = recommended[0]
     profile = session.user_profile if session.user_profile else None
@@ -78,6 +79,7 @@ def _build_eligibility_form_signal(user_message: str, session: SessionMemory) ->
         target,
         profile,
         recommended_cards=recommended if len(recommended) > 1 else None,
+        scoped_cards=scoped_cards if len(scoped_cards) > 1 else None,
     )
     intro = "Please fill out the form below to check your eligibility."
     if target:
@@ -528,6 +530,9 @@ def handle_eligibility_form(
     session.history[-1]["content"] = clean
     session.history[-1]["content_short"] = session._truncate_for_history(clean)
     target_card = form_data.get("target_card", "")
+    scoped_cards = form_data.get("scoped_cards", [])
+    if not isinstance(scoped_cards, list):
+        scoped_cards = []
     recommended_cards = session.user_profile.get("recommended_cards") or []
     if not isinstance(recommended_cards, list):
         recommended_cards = []
@@ -535,6 +540,7 @@ def handle_eligibility_form(
         clean,
         target_card=target_card,
         recommended_cards=recommended_cards,
+        scoped_cards=scoped_cards,
     )
     summary = compliance_faq.build_eligibility_verdict_summary(verdicts)
     session.update_profile("last_eligibility_verdicts", verdicts)
@@ -542,7 +548,12 @@ def handle_eligibility_form(
 
     active_cards = [item.get("card_name", "") for item in verdicts if item.get("card_name")]
     if not active_cards:
-        active_cards = [target_card] if target_card else recommended_cards
+        active_cards = [target_card] if target_card else scoped_cards or recommended_cards
+    elif scoped_cards:
+        scoped_set = {card.lower() for card in scoped_cards}
+        filtered_active = [card for card in active_cards if card.lower() in scoped_set]
+        if filtered_active:
+            active_cards = filtered_active
     if isinstance(active_cards, list) and active_cards:
         _remember_active_cards(session, active_cards)
     session.set_last_intent("eligibility_check")

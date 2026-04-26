@@ -775,6 +775,7 @@
     var prefill  = schema.prefill || {}, hasPrefill = Object.keys(prefill).length > 0;
     var targetCard = schema.target_card || "", fields = schema.fields || {};
     var recommendedCards = schema.recommended_cards || [];
+    var scopedCards = schema.scoped_cards || [];
 
     var group  = document.createElement("div"); group.className  = "msg-group"; group.id = formId + "_grp";
     var row    = document.createElement("div"); row.className    = "message-row bot"; row.id = formId + "_row";
@@ -785,6 +786,9 @@
     var targetHtml   = targetCard ? '<div class="elig-form-target">Checking eligibility for: <strong>' + targetCard + '</strong></div>' : "";
     var recommendedHtml = (!targetCard && recommendedCards.length > 1)
       ? '<div class="elig-form-target">Checking eligibility for your recommended cards: <strong>' + recommendedCards.join(", ") + '</strong></div>'
+      : "";
+    var scopedHtml = (!targetCard && !recommendedHtml && scopedCards.length > 1)
+      ? '<div class="elig-form-target">Checking eligibility for these cards: <strong>' + scopedCards.join(", ") + '</strong></div>'
       : "";
     var prefillBadge = hasPrefill ? '<span class="prefill-badge">Pre-filled from conversation</span>' : "";
 
@@ -816,12 +820,12 @@
     bubble.innerHTML =
       '<div class="elig-form" id="' + formId + '">' +
         '<div class="elig-form-header"><div class="elig-form-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></div>' +
-          '<div><div class="elig-form-title">Eligibility Check ' + prefillBadge + '</div>' + targetHtml + recommendedHtml + '</div></div>' +
+          '<div><div class="elig-form-title">Eligibility Check ' + prefillBadge + '</div>' + targetHtml + recommendedHtml + scopedHtml + '</div></div>' +
         '<div class="elig-form-grid">' + fieldsHtml + '</div>' +
         '<div class="elig-form-errors" id="' + formId + '_errors"></div>' +
         '<div class="elig-form-actions">' +
           '<button class="elig-btn elig-btn-cancel" onclick="cancelEligForm(\'' + formId + '\')">Cancel</button>' +
-          '<button class="elig-btn elig-btn-submit" id="' + formId + '_submit" onclick="submitEligForm(\'' + formId + '\', \'' + targetCard + '\')">Check Eligibility</button>' +
+          '<button class="elig-btn elig-btn-submit" id="' + formId + '_submit" onclick="submitEligForm(\'' + formId + '\', \'' + targetCard + '\', ' + JSON.stringify(scopedCards).replace(/"/g, '&quot;') + ')">Check Eligibility</button>' +
         '</div>' +
       '</div>';
 
@@ -830,7 +834,7 @@
     messagesEl.appendChild(group); scrollToBottom();
   }
 
-  function submitEligForm(formId, targetCard) {
+  function submitEligForm(formId, targetCard, scopedCards) {
     var formEl = document.getElementById(formId); if (!formEl) return;
     var errorsEl = document.getElementById(formId + "_errors"); errorsEl.innerHTML = "";
     var formData = {}, errors = [];
@@ -848,6 +852,7 @@
     }
     if (errors.length > 0) { errorsEl.innerHTML = errors.map(function(e) { return "<p>" + e + "</p>"; }).join(""); scrollToBottom(); return; }
     if (targetCard) formData.target_card = targetCard;
+    if (Array.isArray(scopedCards) && scopedCards.length > 0) formData.scoped_cards = scopedCards;
     formEl.classList.add("elig-form-submitted");
     var sb = document.getElementById(formId + "_submit"); if (sb) { sb.disabled = true; sb.textContent = "Checking..."; }
     activeThinkId = showThinking(); startLoading();
