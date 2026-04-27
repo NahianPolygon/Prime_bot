@@ -5,12 +5,13 @@ import time
 import json
 import threading
 import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from logging_utils import log_event
 from streaming_utils import iter_text_stream
+from ingestion.company_ingest import BANKING_TYPES, DOCUMENT_TYPES, ingest_company_text
 
 _stats_lock = threading.Lock()
 _stats = {
@@ -108,6 +109,21 @@ def _warmup_model() -> None:
 
 class ClearRequest(BaseModel):
     session_id: str
+
+
+class KnowledgeBaseUploadRequest(BaseModel):
+    company_name: str
+    document_title: str
+    raw_text: str
+    document_type: str
+    banking_type: str = "both"
+    product_name: str = ""
+    card_network: str = ""
+    tier: str = ""
+    source: str = ""
+    use_cases: list[str] = []
+    employment_suitable: list[str] = []
+    replace_existing: bool = True
 
 
 @app.on_event("startup")
@@ -334,9 +350,56 @@ async def health():
     return {"status": "ok", "model": _cfg["llm"]["model"]}
 
 
+@app.get("/admin/kb/options")
+async def kb_options():
+    return {
+        "document_types": sorted(DOCUMENT_TYPES),
+        "banking_types": sorted(BANKING_TYPES),
+    }
+
+
+@app.post("/admin/kb/ingest-text")
+async def kb_ingest_text(payload: KnowledgeBaseUploadRequest):
+    try:
+        result = ingest_company_text(
+            company_name=payload.company_name,
+            document_title=payload.document_title,
+            raw_text=payload.raw_text,
+            document_type=payload.document_type,
+            banking_type=payload.banking_type,
+            product_name=payload.product_name,
+            card_network=payload.card_network,
+            tier=payload.tier,
+            source=payload.source,
+            use_cases=payload.use_cases,
+            employment_suitable=payload.employment_suitable,
+            replace_existing=payload.replace_existing,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        log_event("kb_ingest_error", level="error", error=str(exc))
+        raise HTTPException(status_code=500, detail="Knowledge base ingestion failed.") from exc
+
+    log_event(
+        "kb_ingest_complete",
+        company=result["company_slug"],
+        document_type=result["document_type"],
+        banking_type=result["banking_type"],
+        chunk_count=result["chunk_count"],
+        collections=result["collections"],
+    )
+    return result
+
+
 @app.get("/")
 async def serve_ui():
     return FileResponse("static/index.html")
+
+
+@app.get("/kb-uploader")
+async def serve_kb_uploader():
+    return FileResponse("static/kb_uploader.html")
 
 
 if os.path.exists("static"):

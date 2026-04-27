@@ -1,7 +1,7 @@
 from llm.ollama_client import chat
 from memory.session_memory import SessionMemory
 from tools.rag_tool import list_all_products, rag_search_multi
-from .common import clean_context, meta_list
+from .common import clean_context, meta_list, get_collections
 
 RECOMMENDATION_SYSTEM = """You are the Prime Bank Card Recommendation Specialist.
 
@@ -67,12 +67,9 @@ def run_card_recommendation(form_data: dict, session: SessionMemory) -> str:
         )
 
     if banking_type in ("conventional", "islami"):
-        collections = [f"{banking_type}_credit_i_need_a_credit_card"]
+        collections = get_collections(banking_type, "i_need_a_credit_card")
     else:
-        collections = [
-            "conventional_credit_i_need_a_credit_card",
-            "islami_credit_i_need_a_credit_card",
-        ]
+        collections = get_collections("both", "i_need_a_credit_card")
 
     def score_product(product: dict) -> float:
         score = 0.0

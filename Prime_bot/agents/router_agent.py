@@ -1,5 +1,6 @@
 import json
 import re
+from kb_config import get_all_products_collection, get_credit_card_collection
 from llm.ollama_client import chat
 from memory.session_memory import SessionMemory
 
@@ -89,12 +90,12 @@ Is this new message a follow-up to the previous conversation or a completely new
 
 def _resolve_collection(intent: str, banking: str) -> str:
     if banking == "both":
-        return "all_products"
+        return get_all_products_collection()
     if intent in ("i_need_a_credit_card", "how_to_apply", "product_details"):
-        return f"{banking}_credit_i_need_a_credit_card"
+        return get_credit_card_collection(banking, "i_need_a_credit_card")
     if intent == "existing_cardholder":
-        return f"{banking}_credit_existing_cardholder"
-    return "all_products"
+        return get_credit_card_collection(banking, "existing_cardholder")
+    return get_all_products_collection()
 
 
 def run(

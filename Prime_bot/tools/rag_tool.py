@@ -5,6 +5,7 @@ from sentence_transformers import SentenceTransformer
 from pydantic import BaseModel, Field
 from typing import Optional
 from crewai.tools import BaseTool
+from kb_config import get_all_products_collection
 from logging_utils import log_event
 
 try:
@@ -328,7 +329,7 @@ def list_all_products(
     exclude_services: bool = True,
 ) -> list[dict]:
     try:
-        col = _client.get_collection("all_products")
+        col = _client.get_collection(get_all_products_collection())
     except Exception:
         return []
 

@@ -1,5 +1,6 @@
 import re
 
+from kb_config import get_all_products_collection
 from logging_utils import log_event
 from tools.rag_tool import list_all_products, rag_search
 
@@ -73,7 +74,7 @@ def _rag_candidate_bonus(user_message: str, products: list[dict]) -> dict[str, f
     by_id = {p.get("product_id", ""): p for p in products}
     bonuses: dict[str, float] = {}
     try:
-        items = rag_search(user_message, "all_products", top_k=5)
+        items = rag_search(user_message, get_all_products_collection(), top_k=5)
     except Exception:
         return bonuses
 

@@ -1,9 +1,11 @@
 import re
 from typing import Generator
 
+from kb_config import get_all_products_collection
 from llm.ollama_client import chat, chat_stream
 from memory.session_memory import SessionMemory
 from tools.rag_tool import rag_search_multi
+from agents.compliance.common import get_collections
 
 SYSTEM = """You are the Prime Bank Cardholder Services specialist.
 You help existing credit card holders using ONLY the knowledge base chunks provided.
@@ -36,16 +38,8 @@ def _clean_context(context: str) -> str:
 
 def _get_collections(banking: str) -> list[str]:
     if banking == "both":
-        return [
-            "conventional_credit_existing_cardholder",
-            "islami_credit_existing_cardholder",
-            "conventional_credit_i_need_a_credit_card",
-            "islami_credit_i_need_a_credit_card",
-        ]
-    return [
-        f"{banking}_credit_existing_cardholder",
-        f"{banking}_credit_i_need_a_credit_card",
-    ]
+        return get_collections("both", "existing_cardholder") + get_collections("both", "i_need_a_credit_card")
+    return get_collections(banking, "existing_cardholder") + get_collections(banking, "i_need_a_credit_card")
 
 
 def run(
@@ -59,7 +53,7 @@ def run(
     context = rag_search_multi(user_message, collections, top_k=5)
 
     if context.startswith("[NO RESULTS]"):
-        fallback_context = rag_search_multi(user_message, collections + ["all_products"], top_k=4)
+        fallback_context = rag_search_multi(user_message, collections + [get_all_products_collection()], top_k=4)
         if fallback_context.startswith("[NO RESULTS]"):
             return "Please call **16218** (local) or **+88022222222** (international) or visit your nearest Prime Bank branch for assistance with your card."
         context = fallback_context
@@ -98,7 +92,7 @@ def run_stream(
 
     context = rag_search_multi(user_message, collections, top_k=5)
     if context.startswith("[NO RESULTS]"):
-        fallback_context = rag_search_multi(user_message, collections + ["all_products"], top_k=4)
+        fallback_context = rag_search_multi(user_message, collections + [get_all_products_collection()], top_k=4)
         if fallback_context.startswith("[NO RESULTS]"):
             yield "Please call **16218** (local) or **+88022222222** (international) or visit your nearest Prime Bank branch for assistance with your card."
             return

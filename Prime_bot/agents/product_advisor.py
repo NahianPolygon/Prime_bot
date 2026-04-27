@@ -1,6 +1,8 @@
 import re
 from typing import Generator
 
+from kb_config import get_all_products_collection
+from agents.compliance.common import get_collections
 from llm.ollama_client import chat, chat_stream
 from memory.session_memory import SessionMemory
 from tools.rag_tool import rag_search_multi, rag_search_multi_queries
@@ -55,15 +57,9 @@ def _clean_context(context: str) -> str:
 
 def _get_collections(banking: str) -> list[str]:
     if banking == "both":
-        return [
-            "conventional_credit_i_need_a_credit_card",
-            "islami_credit_i_need_a_credit_card",
-        ]
+        return get_collections("both", "i_need_a_credit_card")
     other = "islami" if banking == "conventional" else "conventional"
-    return [
-        f"{banking}_credit_i_need_a_credit_card",
-        f"{other}_credit_i_need_a_credit_card",
-    ]
+    return get_collections(banking, "i_need_a_credit_card") + get_collections(other, "i_need_a_credit_card")
 
 
 def _fetch_context(search_q: str, collections: list[str], top_k: int = 6) -> str | None:
@@ -72,7 +68,7 @@ def _fetch_context(search_q: str, collections: list[str], top_k: int = 6) -> str
         return _clean_context(context)
 
     broader_q = " ".join(search_q.split()[:4]) if len(search_q.split()) > 4 else search_q
-    fallback = rag_search_multi(broader_q, collections + ["all_products"], top_k=top_k)
+    fallback = rag_search_multi(broader_q, collections + [get_all_products_collection()], top_k=top_k)
     if not fallback.startswith("[NO RESULTS]"):
         return _clean_context(fallback)
 
@@ -194,7 +190,7 @@ def run_details(
     banking = routing["banking_type"]
     search_q = routing.get("search_query", user_message)
     collections = _get_collections(banking)
-    collections.append("all_products")
+    collections.append(get_all_products_collection())
     collections = list(dict.fromkeys(collections))
 
     context = _fetch_expanded_context(
@@ -238,7 +234,7 @@ def run_details_stream(
     banking = routing["banking_type"]
     search_q = routing.get("search_query", user_message)
     collections = _get_collections(banking)
-    collections.append("all_products")
+    collections.append(get_all_products_collection())
     collections = list(dict.fromkeys(collections))
 
     context = _fetch_expanded_context(

@@ -1,5 +1,6 @@
 from typing import Generator
 
+from kb_config import get_all_products_collection
 from llm.ollama_client import chat, chat_stream
 from memory.session_memory import SessionMemory
 from tools.rag_tool import rag_search_multi, rag_search_multi_queries
@@ -25,7 +26,7 @@ def _build_context(user_message: str, routing: dict) -> str:
 
     collections = get_collections(banking, "i_need_a_credit_card")
     collections += get_collections(banking, "existing_cardholder")
-    collections.append("all_products")
+    collections.append(get_all_products_collection())
     collections = list(dict.fromkeys(collections))
 
     context = rag_search_multi_queries(

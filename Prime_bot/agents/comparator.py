@@ -1,6 +1,8 @@
 import re
 from typing import Generator
 
+from kb_config import get_all_products_collection
+from agents.compliance.common import get_collections
 from llm.ollama_client import chat, chat_stream
 from memory.session_memory import SessionMemory
 from tools.rag_tool import rag_search_multi
@@ -64,21 +66,11 @@ def _get_context(user_message: str, routing: dict) -> str:
         search_q = " ".join(active_cards + [search_q])
 
     if banking_type == "conventional":
-        collections = [
-            "conventional_credit_i_need_a_credit_card",
-            "all_products",
-        ]
+        collections = get_collections("conventional", "i_need_a_credit_card") + [get_all_products_collection()]
     elif banking_type == "islami":
-        collections = [
-            "islami_credit_i_need_a_credit_card",
-            "all_products",
-        ]
+        collections = get_collections("islami", "i_need_a_credit_card") + [get_all_products_collection()]
     else:
-        collections = [
-            "conventional_credit_i_need_a_credit_card",
-            "islami_credit_i_need_a_credit_card",
-            "all_products",
-        ]
+        collections = get_collections("both", "i_need_a_credit_card") + [get_all_products_collection()]
 
     topic_context = rag_search_multi(search_q, collections, top_k=5, max_context_chars=3200)
     if topic_context.startswith("[NO RESULTS]"):

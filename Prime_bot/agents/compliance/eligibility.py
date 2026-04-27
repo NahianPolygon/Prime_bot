@@ -2,7 +2,7 @@ import re
 
 from llm.ollama_client import chat
 from memory.session_memory import SessionMemory
-from .common import clean_context, safe_int
+from .common import clean_context, safe_int, get_collections
 from .matching import extract_recommended_card_names
 from .schemas import ELIGIBILITY_SCHEMA
 from tools.rag_tool import rag_search_multi, rag_search_multi_queries
@@ -327,10 +327,7 @@ def run_eligibility(
     if not isinstance(recommended_cards, list):
         recommended_cards = []
 
-    collections = [
-        "conventional_credit_i_need_a_credit_card",
-        "islami_credit_i_need_a_credit_card",
-    ]
+    collections = get_collections("both", "i_need_a_credit_card")
 
     eligibility_terms = "eligibility requirements age income employment duration etin documents"
     if target:

@@ -8,6 +8,7 @@ import agents.comparator as comparator
 import agents.compliance_faq as compliance_faq
 import agents.product_advisor as product_advisor
 from classifier.intent_classifier import _parse_json, classify
+from kb_config import get_all_products_collection, get_credit_card_collection
 from logging_utils import log_event
 from memory.session_memory import SessionMemory
 from streaming_utils import iter_text_stream
@@ -220,7 +221,7 @@ def _form_data_summary(form_data: dict) -> str:
 
 def _build_routing(user_message: str, classifier_output: dict) -> dict:
     banking_type = classifier_output["banking_type"]
-    collection = "all_products" if banking_type == "both" else f"{banking_type}_credit_i_need_a_credit_card"
+    collection = get_all_products_collection() if banking_type == "both" else get_credit_card_collection(banking_type, "i_need_a_credit_card")
     return {
         "intent": classifier_output["intent"],
         "banking_type": banking_type,
