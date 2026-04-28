@@ -378,3 +378,55 @@ def list_all_products(
             }
         )
     return products
+
+
+def get_product_documents(
+    product_name: str,
+    collections: Optional[list[str]] = None,
+    banking_type_filter: Optional[str] = None,
+) -> list[dict]:
+    product_name = (product_name or "").strip()
+    if not product_name:
+        return []
+
+    collection_names = collections or [get_all_products_collection()]
+    documents: list[dict] = []
+    seen = set()
+
+    for collection_name in collection_names:
+        try:
+            col = _client.get_collection(collection_name)
+        except Exception:
+            continue
+
+        try:
+            results = col.get(
+                where={"product_name": product_name},
+                include=["documents", "metadatas"],
+            )
+        except Exception as e:
+            log_event("rag_error", collection=collection_name, stage="get_product_documents", error=str(e))
+            continue
+
+        for doc_id, document, meta in zip(
+            results.get("ids", []),
+            results.get("documents", []),
+            results.get("metadatas", []),
+        ):
+            if banking_type_filter and meta.get("banking_type") != banking_type_filter:
+                continue
+
+            key = (collection_name, doc_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            documents.append(
+                {
+                    "id": doc_id,
+                    "text": document or "",
+                    "metadata": meta or {},
+                    "collection": collection_name,
+                }
+            )
+
+    return documents

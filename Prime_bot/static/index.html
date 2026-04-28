@@ -119,6 +119,10 @@
     .calc-field label { display: block; font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
     .calc-input { font-family: var(--font); font-size: 13px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-primary); outline: none; transition: border-color 0.15s; }
     .calc-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(26,79,156,0.08); }
+    .calc-context { font-size: 12px; line-height: 1.45; color: var(--text-secondary); background: var(--accent-light); border: 1px solid rgba(26,79,156,0.12); border-radius: 6px; padding: 8px 10px; }
+    .calc-context strong { color: var(--accent); font-weight: 600; }
+    .calc-select { font-family: var(--font); font-size: 13px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-primary); outline: none; }
+    .calc-select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(26,79,156,0.08); }
     .tenure-row { display: flex; gap: 6px; }
     .t-btn { font-family: var(--font); font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text-secondary); cursor: pointer; transition: all 0.15s; flex: 1; }
     .t-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
@@ -130,6 +134,8 @@
     .calc-row-val { font-size: 13px; font-weight: 600; color: var(--text-primary); }
     .calc-row:first-child .calc-row-val { color: var(--accent); font-size: 14px; }
     .calc-note { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+    .calc-warning { display: none; font-size: 11px; line-height: 1.4; color: var(--error); background: #fff2f2; border: 1px solid rgba(220,38,38,0.18); border-radius: 6px; padding: 7px 9px; }
+    .calc-warning.visible { display: block; }
     /* Scroll FAB */
     .scroll-fab { position: fixed; bottom: 90px; right: calc(50% - 430px + 16px); width: 36px; height: 36px; border-radius: 50%; background: var(--accent); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); opacity: 0; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; z-index: 100; pointer-events: none; }
     .scroll-fab.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
@@ -362,6 +368,8 @@
   var activeBubble = null, activeThinkId = null, fullText = "";
   var activeFormId = null, thinkTimer = null, thinkStart = 0;
   var emiTenure = 12;
+  var activeEMICalcConfig = null;
+  var activeEMICardIndex = 0;
 
   /* ── DOM refs ── */
   var messagesEl = document.getElementById("messages");
@@ -470,7 +478,7 @@
       case "done":
         if (activeBubble) {
           appendFollowupChips(data.intent || "general");
-          if (data.calculator === "emi") createEMICalcBubble();
+          if (data.calculator === "emi") createEMICalcBubble(data.calculator_config);
           else if (data.calculator === "rewards") createRewardsCalcBubble();
         }
         activeBubble = null; fullText = ""; finishLoading(); break;
@@ -608,6 +616,12 @@
   /* ── Markdown rendering ── */
   function fixMarkdown(raw) {
     var t = (raw || "").replace(/\r\n/g, "\n");
+    t = t
+      .replace(/([^\n])\s+(#{1,3}\s)/g, "$1\n\n$2")
+      .replace(/([^\n])\s+(\d+\.\s+\*\*)/g, "$1\n\n$2")
+      .replace(/\s+[–-]\s+(Network:|Tier:|Banking:)/g, "\n   - $1")
+      .replace(/([^\n])\n(\d+\.\s+\*\*)/g, "$1\n\n$2")
+      .replace(/(#{1,3}[^\n]*)\n(\d+\.\s+\*\*)/g, "$1\n\n$2");
     var lines = t.split("\n"), result = [], inTable = false, headerSepSeen = false;
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i], trimmed = line.trim();
@@ -635,7 +649,10 @@
         result.push(line);
       }
     }
-    t = result.join("\n").replace(/\n{3,}/g, "\n\n").replace(/([^\n])\n(#{1,3}\s)/g, "$1\n\n$2");
+    t = result.join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/([^\n])\n(#{1,3}\s)/g, "$1\n\n$2")
+      .replace(/([^\n])\n(\d+\.\s+\*\*)/g, "$1\n\n$2");
     return t.trim();
   }
 
@@ -703,7 +720,112 @@
 
   /* ── Calculators ── */
 
-  function createEMICalcBubble() {
+  function formatPercent(value) {
+    var n = parseFloat(value);
+    if (isNaN(n)) return "0";
+    return Number.isInteger(n) ? String(n) : String(n);
+  }
+
+  function formatBDT(value) {
+    if (value === null || value === undefined || value === "") return "";
+    var n = parseInt(value, 10);
+    if (isNaN(n)) return "";
+    return "BDT " + n.toLocaleString();
+  }
+
+  function normalizeEMITerms(raw) {
+    raw = raw || {};
+    var tenures = Array.isArray(raw.tenures) ? raw.tenures : [12, 24, 36];
+    tenures = tenures.map(function(value) { return parseInt(value, 10); })
+      .filter(function(value, idx, arr) { return value > 0 && arr.indexOf(value) === idx; });
+    if (!tenures.length) tenures = [12, 24, 36];
+
+    var feePercent = parseFloat(raw.fee_percent);
+    if (isNaN(feePercent)) feePercent = 1;
+
+    var interestRate = parseFloat(raw.interest_rate_percent);
+    if (isNaN(interestRate)) interestRate = 0;
+
+    var minAmount = raw.min_amount === null || raw.min_amount === undefined || raw.min_amount === ""
+      ? null
+      : parseInt(raw.min_amount, 10);
+    if (isNaN(minAmount)) minAmount = null;
+
+    return {
+      card_name: raw.card_name || "",
+      tenures: tenures,
+      fee_percent: feePercent,
+      interest_rate_percent: interestRate,
+      min_amount: minAmount,
+      fee_label: raw.fee_label || "Conversion Fee",
+      note: raw.note || "0% interest at partner stores; 1% one-time conversion fee applies."
+    };
+  }
+
+  function normalizeEMIConfig(config) {
+    var fallback = normalizeEMITerms((config || {}).default || {});
+    var cards = Array.isArray((config || {}).cards) ? config.cards : [];
+    cards = cards.map(normalizeEMITerms);
+    if (!cards.length) cards = [fallback];
+
+    var selected = 0;
+    var selectedCard = (config || {}).selected_card || "";
+    if (selectedCard) {
+      cards.forEach(function(card, idx) {
+        if (card.card_name === selectedCard) selected = idx;
+      });
+    }
+
+    return { cards: cards, selectedIndex: selected };
+  }
+
+  function getActiveEMITerms() {
+    if (!activeEMICalcConfig || !activeEMICalcConfig.cards.length) {
+      return normalizeEMITerms({});
+    }
+    return activeEMICalcConfig.cards[activeEMICardIndex] || activeEMICalcConfig.cards[0];
+  }
+
+  function renderTenureButtonsHTML(terms) {
+    return terms.tenures.map(function(months) {
+      var active = months === emiTenure ? " active" : "";
+      return '<button class="t-btn' + active + '" data-m="' + months + '" onclick="pickTenure(this)">' + months + ' mo</button>';
+    }).join("");
+  }
+
+  function syncEMIDisplayTerms() {
+    var terms = getActiveEMITerms();
+    var feePct = formatPercent(terms.fee_percent);
+    var feeLabel = document.getElementById("emi_fee_label");
+    var note = document.getElementById("emi_note");
+    var context = document.getElementById("emi_context");
+
+    if (feeLabel) feeLabel.textContent = terms.fee_label + " (" + feePct + "%)";
+    if (note) note.textContent = terms.note;
+    if (context) {
+      var label = terms.card_name ? terms.card_name : "General Prime Bank EMI terms";
+      context.innerHTML = "Using <strong>" + escapeHtml(label) + "</strong>";
+      if (terms.min_amount) {
+        context.innerHTML += " - minimum purchase " + escapeHtml(formatBDT(terms.min_amount));
+      }
+    }
+  }
+
+  function createEMICalcBubble(config) {
+    activeEMICalcConfig = normalizeEMIConfig(config);
+    activeEMICardIndex = activeEMICalcConfig.selectedIndex;
+    var terms = getActiveEMITerms();
+    emiTenure = terms.tenures.indexOf(12) >= 0 ? 12 : terms.tenures[0];
+
+    var cardPicker = "";
+    if (activeEMICalcConfig.cards.length > 1) {
+      var options = activeEMICalcConfig.cards.map(function(card, idx) {
+        var selected = idx === activeEMICardIndex ? " selected" : "";
+        return '<option value="' + idx + '"' + selected + '>' + escapeHtml(card.card_name || "General EMI") + '</option>';
+      }).join("");
+      cardPicker = '<div class="calc-field"><label>Card</label><select class="calc-select" id="emi_card" onchange="pickEMICard(this)">' + options + '</select></div>';
+    }
+
     var group = document.createElement("div"); group.className = "msg-group";
     var row   = document.createElement("div"); row.className   = "message-row bot";
     var av    = document.createElement("div"); av.className    = "avatar bot"; av.textContent = "P";
@@ -712,30 +834,54 @@
     bub.innerHTML =
       '<div class="calc-hdr"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>0% EMI Calculator</div>' +
       '<div class="calc-body">' +
+        '<div class="calc-context" id="emi_context"></div>' +
+        cardPicker +
         '<div class="calc-field"><label>Purchase Amount (BDT)</label><input type="number" class="calc-input" id="emi_amt" placeholder="e.g. 100,000" min="0" oninput="calcEMI()" /></div>' +
-        '<div class="calc-field"><label>Tenure</label><div class="tenure-row"><button class="t-btn active" data-m="12" onclick="pickTenure(this)">12 mo</button><button class="t-btn" data-m="24" onclick="pickTenure(this)">24 mo</button><button class="t-btn" data-m="36" onclick="pickTenure(this)">36 mo</button></div></div>' +
-        '<div class="calc-results"><div class="calc-row"><span class="calc-row-label">Monthly EMI</span><span class="calc-row-val" id="emi_monthly">BDT \u2014</span></div><div class="calc-row"><span class="calc-row-label">Total Amount</span><span class="calc-row-val" id="emi_total">\u2014</span></div><div class="calc-row"><span class="calc-row-label">Conversion Fee (1%)</span><span class="calc-row-val" id="emi_fee">\u2014</span></div></div>' +
-        '<p class="calc-note">0% interest at partner stores \xB7 1% one-time conversion fee applies</p>' +
+        '<div class="calc-warning" id="emi_warning"></div>' +
+        '<div class="calc-field"><label>Tenure</label><div class="tenure-row" id="emi_tenures">' + renderTenureButtonsHTML(terms) + '</div></div>' +
+        '<div class="calc-results"><div class="calc-row"><span class="calc-row-label">Monthly EMI</span><span class="calc-row-val" id="emi_monthly">BDT \u2014</span></div><div class="calc-row"><span class="calc-row-label">Total Payable</span><span class="calc-row-val" id="emi_total">\u2014</span></div><div class="calc-row"><span class="calc-row-label" id="emi_fee_label">Conversion Fee (1%)</span><span class="calc-row-val" id="emi_fee">\u2014</span></div></div>' +
+        '<p class="calc-note" id="emi_note"></p>' +
       '</div>';
     wrap.appendChild(bub); row.appendChild(av); row.appendChild(wrap);
     group.appendChild(row); appendTimestamp(group, false);
     messagesEl.appendChild(group); scrollToBottom();
+    syncEMIDisplayTerms();
+  }
+
+  function pickEMICard(select) {
+    activeEMICardIndex = parseInt(select.value, 10) || 0;
+    var terms = getActiveEMITerms();
+    if (terms.tenures.indexOf(emiTenure) < 0) {
+      emiTenure = terms.tenures.indexOf(12) >= 0 ? 12 : terms.tenures[0];
+    }
+    var tenureRow = document.getElementById("emi_tenures");
+    if (tenureRow) tenureRow.innerHTML = renderTenureButtonsHTML(terms);
+    syncEMIDisplayTerms();
+    calcEMI();
   }
 
   function pickTenure(btn) {
-    document.querySelectorAll(".t-btn").forEach(function(b) { b.classList.remove("active"); });
+    (btn.parentNode || document).querySelectorAll(".t-btn").forEach(function(b) { b.classList.remove("active"); });
     btn.classList.add("active"); emiTenure = parseInt(btn.dataset.m); calcEMI();
   }
   function calcEMI() {
+    var terms = getActiveEMITerms();
     var amt = parseFloat((document.getElementById("emi_amt") || {}).value || 0);
+    var warning = document.getElementById("emi_warning");
+    if (warning) { warning.textContent = ""; warning.classList.remove("visible"); }
     if (!amt || amt <= 0) {
       document.getElementById("emi_monthly").textContent = "BDT \u2014";
       document.getElementById("emi_total").textContent   = "\u2014";
       document.getElementById("emi_fee").textContent     = "\u2014"; return;
     }
+    if (warning && terms.min_amount && amt < terms.min_amount) {
+      warning.textContent = "This card's EMI terms mention a minimum purchase of " + formatBDT(terms.min_amount) + ".";
+      warning.classList.add("visible");
+    }
+    var fee = Math.ceil(amt * (terms.fee_percent || 0) / 100);
     document.getElementById("emi_monthly").textContent = "BDT " + Math.ceil(amt / emiTenure).toLocaleString();
-    document.getElementById("emi_total").textContent   = "BDT " + Math.ceil(amt).toLocaleString();
-    document.getElementById("emi_fee").textContent     = "BDT " + Math.ceil(amt * 0.01).toLocaleString();
+    document.getElementById("emi_total").textContent   = "BDT " + Math.ceil(amt + fee).toLocaleString();
+    document.getElementById("emi_fee").textContent     = "BDT " + fee.toLocaleString();
   }
 
   function createRewardsCalcBubble() {

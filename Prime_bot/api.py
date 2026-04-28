@@ -279,6 +279,7 @@ async def websocket_chat(websocket: WebSocket):
             try:
                 done_intent = ""
                 done_calculator = ""
+                done_calculator_config = None
                 for token in build_crew_stream(message, session, request_id=request_id):
                     if token.startswith('{"__preference_form_signal__"'):
                         try:
@@ -309,6 +310,7 @@ async def websocket_chat(websocket: WebSocket):
                             sig = json.loads(token)
                             done_intent = sig.get("intent", "")
                             done_calculator = sig.get("calculator", "")
+                            done_calculator_config = sig.get("calculator_config")
                         except json.JSONDecodeError:
                             pass
                         continue
@@ -316,7 +318,10 @@ async def websocket_chat(websocket: WebSocket):
                     await websocket.send_text(json.dumps({"type": "token", "token": token}))
 
                 _record_latency((time.perf_counter() - req_start) * 1000)
-                await websocket.send_text(json.dumps({"type": "done", "intent": done_intent, "calculator": done_calculator}))
+                done_payload = {"type": "done", "intent": done_intent, "calculator": done_calculator}
+                if done_calculator_config:
+                    done_payload["calculator_config"] = done_calculator_config
+                await websocket.send_text(json.dumps(done_payload))
                 log_event("ws_chat_complete", request_id=request_id, session_id=session_id)
 
             except Exception as e:

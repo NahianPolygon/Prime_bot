@@ -7,6 +7,7 @@ import agents.cardholder_svc as cardholder_svc
 import agents.comparator as comparator
 import agents.compliance_faq as compliance_faq
 import agents.product_advisor as product_advisor
+from agents.compliance.emi import build_emi_calculator_config
 from classifier.intent_classifier import _parse_json, classify
 from kb_config import get_all_products_collection, get_credit_card_collection
 from logging_utils import log_event
@@ -374,6 +375,19 @@ def _clarify_candidate_cards(intent: str, candidate_cards: list[str]) -> str:
     return ""
 
 
+def _done_signal(
+    intent: str,
+    calculator_type: str,
+    user_message: str,
+    session: SessionMemory,
+    classifier_output: dict,
+) -> str:
+    payload = {"__done_signal__": True, "intent": intent, "calculator": calculator_type}
+    if calculator_type == "emi":
+        payload["calculator_config"] = build_emi_calculator_config(user_message, session, classifier_output)
+    return json.dumps(payload)
+
+
 def build_crew_stream(
     user_message: str,
     session: SessionMemory,
@@ -415,7 +429,7 @@ def build_crew_stream(
         session.add(user_message, clean)
         for token in _stream_text(clean):
             yield token
-        yield json.dumps({"__done_signal__": True, "intent": intent, "calculator": calculator_type})
+        yield _done_signal(intent, calculator_type, user_message, session, classifier_output)
         return
 
     direct = _direct_response(intent)
@@ -424,7 +438,7 @@ def build_crew_stream(
         session.add(user_message, clean)
         for token in _stream_text(clean):
             yield token
-        yield json.dumps({"__done_signal__": True, "intent": intent, "calculator": calculator_type})
+        yield _done_signal(intent, calculator_type, user_message, session, classifier_output)
         return
 
     routing = _build_routing(user_message, classifier_output)
@@ -501,7 +515,7 @@ def build_crew_stream(
         _remember_active_cards(session, mentioned_cards, routing.get("banking_type", ""))
     session.set_last_intent(intent)
 
-    yield json.dumps({"__done_signal__": True, "intent": intent, "calculator": calculator_type})
+    yield _done_signal(intent, calculator_type, user_message, session, classifier_output)
     log_event(
         "pipeline_complete_stream",
         request_id=request_id,

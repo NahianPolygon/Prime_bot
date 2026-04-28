@@ -23,7 +23,7 @@ You MUST NOT:
 def _build_catalog_summary() -> str | None:
     all_products = list_all_products()
     if not all_products:
-        return None
+        return "[NO RESULTS] No products found in catalog."
 
     conventional = [p for p in all_products if p["banking_type"] == "conventional"]
     islami = [p for p in all_products if p["banking_type"] == "islami"]
