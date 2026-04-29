@@ -25,6 +25,7 @@ services:
       - "8001:8000"
     volumes:
       - ./:/app
+      - ./banks:/app/banks
     environment:
       - PYTHONUNBUFFERED=1
     command: uvicorn api:app --host 0.0.0.0 --port 8000 --workers 1 --reload

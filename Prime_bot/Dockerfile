@@ -15,7 +15,7 @@ COPY . .
 
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')"
 
-VOLUME ["/app/chroma_db", "/app/knowledge_base"]
+VOLUME ["/app/chroma_db"]
 
 EXPOSE 8000
 

@@ -1,6 +1,7 @@
 import yaml
 import chromadb
 from sentence_transformers import SentenceTransformer
+from kb_config import get_all_products_collection, get_credit_card_collection
 
 
 with open("config.yaml") as f:
@@ -12,17 +13,17 @@ client = chromadb.PersistentClient(path=cfg["chroma"]["persist_dir"])
 QUERY = "Compare the two master cards prime bank offers"
 
 ALL_COLLECTIONS = [
-    "conventional_credit_i_need_a_credit_card",
-    "islami_credit_i_need_a_credit_card",
-    "conventional_credit_existing_cardholder",
-    "islami_credit_existing_cardholder",
-    "all_products",
+    get_credit_card_collection("conventional", "i_need_a_credit_card"),
+    get_credit_card_collection("islami", "i_need_a_credit_card"),
+    get_credit_card_collection("conventional", "existing_cardholder"),
+    get_credit_card_collection("islami", "existing_cardholder"),
+    get_all_products_collection(),
 ]
 
 SLIM_COLLECTIONS = [
-    "conventional_credit_i_need_a_credit_card",
-    "islami_credit_i_need_a_credit_card",
-    "all_products",
+    get_credit_card_collection("conventional", "i_need_a_credit_card"),
+    get_credit_card_collection("islami", "i_need_a_credit_card"),
+    get_all_products_collection(),
 ]
 
 embedding = model.encode(QUERY).tolist()

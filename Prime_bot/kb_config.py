@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 
 import yaml
 
 
-_DEFAULT_COLLECTIONS = {
+_DEFAULT_COLLECTION_SUFFIXES = {
     "all_products": "all_products",
     "conventional_i_need_a_credit_card": "conventional_credit_i_need_a_credit_card",
     "conventional_existing_cardholder": "conventional_credit_existing_cardholder",
@@ -23,11 +24,21 @@ def load_config() -> dict:
         return yaml.safe_load(f) or {}
 
 
+def _slugify(value: str, fallback: str = "prime_bank") -> str:
+    cleaned = re.sub(r"[^a-z0-9]+", "_", (value or "").strip().lower()).strip("_")
+    return cleaned or fallback
+
+
+def _default_collection_map(cfg: dict) -> dict[str, str]:
+    bank_slug = _slugify(str((cfg.get("knowledge_base") or {}).get("active_company") or "prime_bank"))
+    return {key: f"{bank_slug}_{suffix}" for key, suffix in _DEFAULT_COLLECTION_SUFFIXES.items()}
+
+
 @lru_cache(maxsize=1)
 def get_collection_map() -> dict[str, str]:
     cfg = load_config()
     configured = ((cfg.get("knowledge_base") or {}).get("collections") or {})
-    merged = dict(_DEFAULT_COLLECTIONS)
+    merged = _default_collection_map(cfg)
     for key, value in configured.items():
         if value:
             merged[str(key)] = str(value)

@@ -12,13 +12,13 @@ chroma:
   persist_dir: /app/chroma_db
 
 knowledge_base:
-  active_company: primebank
+  active_company: prime_bank
   collections:
-    all_products: all_products
-    conventional_i_need_a_credit_card: conventional_credit_i_need_a_credit_card
-    conventional_existing_cardholder: conventional_credit_existing_cardholder
-    islami_i_need_a_credit_card: islami_credit_i_need_a_credit_card
-    islami_existing_cardholder: islami_credit_existing_cardholder
+    all_products: prime_bank_all_products
+    conventional_i_need_a_credit_card: prime_bank_conventional_credit_i_need_a_credit_card
+    conventional_existing_cardholder: prime_bank_conventional_credit_existing_cardholder
+    islami_i_need_a_credit_card: prime_bank_islami_credit_i_need_a_credit_card
+    islami_existing_cardholder: prime_bank_islami_credit_existing_cardholder
 
 server:
   host: 0.0.0.0

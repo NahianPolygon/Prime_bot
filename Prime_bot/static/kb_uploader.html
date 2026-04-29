@@ -198,6 +198,28 @@
       color: var(--muted);
       line-height: 1.55;
     }
+    .advanced-panel {
+      grid-column: 1 / -1;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel-alt);
+      padding: 12px 14px 14px;
+    }
+    .advanced-panel summary {
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+      color: #43392f;
+    }
+    .advanced-panel summary::marker {
+      color: var(--accent);
+    }
+    .advanced-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      padding-top: 14px;
+    }
     .inline-row {
       display: flex;
       gap: 10px;
@@ -424,7 +446,8 @@
       }
       .form-grid,
       .result-grid,
-      .helper-grid {
+      .helper-grid,
+      .advanced-grid {
         grid-template-columns: 1fr;
       }
       .actions {
@@ -441,15 +464,20 @@
   <div class="shell">
     <aside class="panel sidebar">
       <div>
-        <div class="eyebrow">Future Company KB</div>
-        <h1>Upload raw credit card knowledge into new Chroma collections.</h1>
+        <div class="eyebrow">Bank Knowledge Base</div>
+        <h1>Create bank markdown files and ingest them into Chroma.</h1>
       </div>
-      <p class="lede">This uploader stages company-specific credit card documents without modifying the current Prime Bank collections. Each upload is chunked, embedded, and written into company-prefixed collections.</p>
+      <p class="lede">This uploader writes raw bank knowledge into <span class="kbd">banks/</span> as markdown, then automatically chunks, embeds, and ingests the saved file into bank-prefixed Chroma collections.</p>
       <div class="tip-card">
         <h2>Collection pattern</h2>
-        <div class="kbd">company_conventional_credit_i_need_a_credit_card</div>
-        <div class="kbd">company_islami_credit_existing_cardholder</div>
-        <div class="kbd">company_all_products</div>
+        <div class="kbd">prime_bank_conventional_credit_i_need_a_credit_card</div>
+        <div class="kbd">prime_bank_islami_credit_existing_cardholder</div>
+        <div class="kbd">prime_bank_all_products</div>
+      </div>
+      <div class="tip-card">
+        <h2>Markdown path</h2>
+        <div class="kbd">banks/prime_bank/conventional/credit/i_need_a_credit_card/card.md</div>
+        <div class="kbd">banks/prime_bank/islami/credit/existing_cardholder/services.md</div>
       </div>
       <div class="sidebar-stack">
         <div class="tip-card">
@@ -457,7 +485,7 @@
           <ul class="tip-list">
             <li>Use one card or one support topic per upload.</li>
             <li>Pasting raw text for a single card is perfectly fine.</li>
-            <li>Add product name, banking type, and use cases when known.</li>
+            <li>Optional metadata can stay hidden unless you need to override the automatic inference.</li>
           </ul>
         </div>
         <div class="tip-card">
@@ -480,7 +508,7 @@
 
     <main class="panel main">
       <div class="topbar">
-        <p>Admin uploader for future credit-card tenants.</p>
+        <p>Admin uploader for bank credit-card markdown knowledge.</p>
         <a class="link" href="/">Back to assistant</a>
       </div>
 
@@ -488,17 +516,17 @@
         <section class="helper-card">
           <h2>How to use this page</h2>
           <ul class="helper-list">
-            <li><strong>Company Name</strong>: the bank namespace, like <strong>EBL</strong> or <strong>Eastern Bank</strong>.</li>
+            <li><strong>Bank Directory</strong>: the bank namespace under <span class="kbd">banks/</span>, like <strong>prime_bank</strong>, <strong>ebl</strong>, or <strong>eastern_bank</strong>.</li>
             <li><strong>Document Title</strong>: the customer-facing title of this card or service article.</li>
             <li><strong>Raw Text</strong>: paste the actual card/service content exactly as you received it.</li>
-            <li><strong>Replace same document key</strong>: keep checked when you are updating the same uploaded article.</li>
+            <li><strong>Replace same markdown file</strong>: keep checked when you are updating the same article.</li>
           </ul>
         </section>
 
         <section class="helper-card">
           <h2>Live collection preview</h2>
-          <div id="slugPreview" class="slug-preview">Company slug: <code>company</code></div>
-          <p id="selectionSummary">This upload will go into company-prefixed Chroma collections based on the current document type and banking type.</p>
+          <div id="slugPreview" class="slug-preview">Bank slug: <code>bank</code></div>
+          <p id="selectionSummary">This upload will create markdown under banks/ and ingest into bank-prefixed Chroma collections.</p>
           <ul id="previewCollections" class="preview-list"></ul>
         </section>
       </div>
@@ -506,9 +534,9 @@
       <form id="uploadForm">
         <div class="form-grid">
           <div class="field">
-            <label for="companyName">Company Name</label>
-            <input id="companyName" name="companyName" type="text" placeholder="Acme Bank" required />
-            <p class="field-hint">Example: <strong>EBL</strong>, <strong>Eastern Bank PLC</strong>, or <strong>Acme Bank</strong>.</p>
+            <label for="companyName">Bank Directory</label>
+            <input id="companyName" name="companyName" type="text" placeholder="prime_bank" required />
+            <p class="field-hint">This becomes the folder under <strong>banks/</strong>. Example: <strong>prime_bank</strong>, <strong>ebl</strong>, or <strong>eastern_bank</strong>.</p>
           </div>
 
           <div class="field">
@@ -536,41 +564,46 @@
             <p id="bankingTypeHint" class="field-hint"></p>
           </div>
 
-          <div class="field">
-            <label for="productName">Product Name</label>
-            <input id="productName" name="productName" type="text" placeholder="Optional if same as title" />
-            <p class="field-hint">Fill this when the product/card name differs from the document title.</p>
-          </div>
+          <details class="advanced-panel">
+            <summary>Advanced metadata overrides</summary>
+            <div class="advanced-grid">
+              <div class="field">
+                <label for="productName">Product Name</label>
+                <input id="productName" name="productName" type="text" placeholder="Optional if same as title" />
+                <p class="field-hint">Fill this only when the product/card name differs from the document title.</p>
+              </div>
 
-          <div class="field">
-            <label for="source">Source Label</label>
-            <input id="source" name="source" type="text" placeholder="policy-doc-v1 or uploaded:email-brief" />
-            <p class="field-hint">Any traceable label is fine: website page, PDF name, or admin note.</p>
-          </div>
+              <div class="field">
+                <label for="source">Source Label</label>
+                <input id="source" name="source" type="text" placeholder="policy-doc-v1 or uploaded:email-brief" />
+                <p class="field-hint">Optional trace label: website page, PDF name, or admin note.</p>
+              </div>
 
-          <div class="field">
-            <label for="cardNetwork">Card Network</label>
-            <input id="cardNetwork" name="cardNetwork" type="text" placeholder="Visa, Mastercard, JCB" />
-            <p class="field-hint">Use for actual card products. Leave blank for generic support articles.</p>
-          </div>
+              <div class="field">
+                <label for="cardNetwork">Card Network</label>
+                <input id="cardNetwork" name="cardNetwork" type="text" placeholder="Visa, Mastercard, JCB" />
+                <p class="field-hint">Leave blank to infer from the raw text when present.</p>
+              </div>
 
-          <div class="field">
-            <label for="tier">Tier</label>
-            <input id="tier" name="tier" type="text" placeholder="gold, platinum, world" />
-            <p class="field-hint">Useful for product-detail and comparison grounding.</p>
-          </div>
+              <div class="field">
+                <label for="tier">Tier</label>
+                <input id="tier" name="tier" type="text" placeholder="gold, platinum, world" />
+                <p class="field-hint">Leave blank to infer from words like gold, platinum, signature, or world.</p>
+              </div>
 
-          <div class="field">
-            <label for="useCases">Use Cases</label>
-            <input id="useCases" name="useCases" type="text" placeholder="travel, rewards_earning, shopping" />
-            <p class="field-hint">Comma separated. Example: <strong>travel, rewards_earning, shopping</strong>.</p>
-          </div>
+              <div class="field">
+                <label for="useCases">Use Cases</label>
+                <input id="useCases" name="useCases" type="text" placeholder="travel, rewards_earning, shopping" />
+                <p class="field-hint">Comma separated. Leave blank to infer only obvious cases from the text.</p>
+              </div>
 
-          <div class="field">
-            <label for="employmentSuitable">Employment Suitable</label>
-            <input id="employmentSuitable" name="employmentSuitable" type="text" placeholder="salaried, business_owner" />
-            <p class="field-hint">Comma separated. Use only when the content clearly suggests target customer type.</p>
-          </div>
+              <div class="field">
+                <label for="employmentSuitable">Employment Suitable</label>
+                <input id="employmentSuitable" name="employmentSuitable" type="text" placeholder="salaried, business_owner" />
+                <p class="field-hint">Comma separated. Leave blank unless the text clearly targets a customer type.</p>
+              </div>
+            </div>
+          </details>
 
           <div class="field-wide">
             <label for="rawText">Raw Text</label>
@@ -582,18 +615,18 @@
           <div class="field-wide inline-row">
             <label class="toggle" for="replaceExisting">
               <input id="replaceExisting" name="replaceExisting" type="checkbox" checked />
-              Replace same document key on re-upload
+              Replace same markdown file on re-upload
             </label>
             <div class="tag-row">
-              <span class="mini-chip">Safe staging flow</span>
-              <span class="mini-chip">Does not overwrite Prime Bank collections</span>
+              <span class="mini-chip">Markdown first</span>
+              <span class="mini-chip">Bank-prefixed collections</span>
             </div>
           </div>
         </div>
 
         <div class="actions">
           <div id="status" class="status"></div>
-          <button id="submitBtn" class="button button-primary" type="submit">Ingest Into Chroma</button>
+          <button id="submitBtn" class="button button-primary" type="submit">Create Markdown & Ingest</button>
         </div>
       </form>
 
@@ -615,6 +648,10 @@
           </div>
         </div>
         <div>
+          <span class="metric-label">Markdown Files</span>
+          <ul id="markdownPathsList" class="collections"></ul>
+        </div>
+        <div>
           <span class="metric-label">Collections</span>
           <ul id="collectionsList" class="collections"></ul>
         </div>
@@ -633,6 +670,7 @@
     const documentKeyValue = document.getElementById("documentKeyValue");
     const chunkCountValue = document.getElementById("chunkCountValue");
     const collectionsList = document.getElementById("collectionsList");
+    const markdownPathsList = document.getElementById("markdownPathsList");
     const companyNameEl = document.getElementById("companyName");
     const documentTypeEl = document.getElementById("documentType");
     const bankingTypeEl = document.getElementById("bankingType");
@@ -648,7 +686,7 @@
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "_")
         .replace(/^_+|_+$/g, "");
-      return cleaned || "company";
+      return cleaned || "bank";
     }
 
     function parseCsv(value) {
@@ -689,11 +727,11 @@
             ? "Use this only for Shariah-based / Hasanah card content."
             : "Use this for regular conventional credit card content.";
 
-      slugPreviewEl.innerHTML = `Company slug: <code>${preview.slug}</code>`;
+      slugPreviewEl.innerHTML = `Bank slug: <code>${preview.slug}</code>`;
       selectionSummaryEl.textContent =
         bankingType === "both"
-          ? "This upload will write one shared all-products collection plus separate conventional and islami collections for the selected document type."
-          : `This upload will write one shared all-products collection plus one ${bankingType} collection for ${documentType}.`;
+          ? "This upload will create two markdown files, one conventional and one islami, then ingest both into a shared all-products collection plus separate document-type collections."
+          : `This upload will create one markdown file under banks/${preview.slug}/${bankingType}/credit/${documentType}/ and ingest it into bank-prefixed collections.`;
 
       previewCollectionsEl.innerHTML = "";
       for (const name of preview.names) {
@@ -715,12 +753,12 @@
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      setStatus("Uploading and embedding document...");
+      setStatus("Creating markdown and ingesting document...");
       submitBtn.disabled = true;
       resultCard.classList.remove("visible");
 
       const payload = {
-        company_name: document.getElementById("companyName").value.trim(),
+        bank_name: document.getElementById("companyName").value.trim(),
         document_title: document.getElementById("documentTitle").value.trim(),
         raw_text: document.getElementById("rawText").value.trim(),
         document_type: document.getElementById("documentType").value,
@@ -746,11 +784,17 @@
           throw new Error(data.detail || "Upload failed.");
         }
 
-        companyChip.textContent = data.company_slug;
+        companyChip.textContent = data.bank_slug || data.company_slug;
         documentTypeChip.textContent = data.document_type;
         bankingTypeChip.textContent = data.banking_type;
         documentKeyValue.textContent = data.document_key;
         chunkCountValue.textContent = String(data.chunk_count);
+        markdownPathsList.innerHTML = "";
+        for (const path of data.markdown_paths || []) {
+          const li = document.createElement("li");
+          li.innerHTML = `<code>${path}</code>`;
+          markdownPathsList.appendChild(li);
+        }
         collectionsList.innerHTML = "";
         for (const name of data.collections || []) {
           const li = document.createElement("li");
@@ -758,7 +802,7 @@
           collectionsList.appendChild(li);
         }
         resultCard.classList.add("visible");
-        setStatus("Document ingested successfully.", "success");
+        setStatus("Markdown created and document ingested successfully.", "success");
       } catch (error) {
         setStatus(error.message || "Upload failed.", "error");
       } finally {

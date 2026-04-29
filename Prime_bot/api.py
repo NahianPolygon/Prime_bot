@@ -8,7 +8,7 @@ import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from logging_utils import log_event
 from streaming_utils import iter_text_stream
 from ingestion.company_ingest import BANKING_TYPES, DOCUMENT_TYPES, ingest_company_text
@@ -112,7 +112,8 @@ class ClearRequest(BaseModel):
 
 
 class KnowledgeBaseUploadRequest(BaseModel):
-    company_name: str
+    company_name: str = ""
+    bank_name: str = ""
     document_title: str
     raw_text: str
     document_type: str
@@ -121,8 +122,8 @@ class KnowledgeBaseUploadRequest(BaseModel):
     card_network: str = ""
     tier: str = ""
     source: str = ""
-    use_cases: list[str] = []
-    employment_suitable: list[str] = []
+    use_cases: list[str] = Field(default_factory=list)
+    employment_suitable: list[str] = Field(default_factory=list)
     replace_existing: bool = True
 
 
@@ -365,9 +366,10 @@ async def kb_options():
 
 @app.post("/admin/kb/ingest-text")
 async def kb_ingest_text(payload: KnowledgeBaseUploadRequest):
+    bank_name = payload.bank_name or payload.company_name
     try:
         result = ingest_company_text(
-            company_name=payload.company_name,
+            company_name=bank_name,
             document_title=payload.document_title,
             raw_text=payload.raw_text,
             document_type=payload.document_type,
@@ -388,11 +390,12 @@ async def kb_ingest_text(payload: KnowledgeBaseUploadRequest):
 
     log_event(
         "kb_ingest_complete",
-        company=result["company_slug"],
+        bank=result.get("bank_slug") or result["company_slug"],
         document_type=result["document_type"],
         banking_type=result["banking_type"],
         chunk_count=result["chunk_count"],
         collections=result["collections"],
+        markdown_paths=result.get("markdown_paths", []),
     )
     return result
 
