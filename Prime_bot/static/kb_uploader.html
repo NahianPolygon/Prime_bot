@@ -9,21 +9,22 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #f4f1ea;
-      --panel: #fffdf8;
-      --panel-alt: #f9f5ee;
-      --text: #1d1a16;
-      --muted: #6f6558;
-      --border: #ddd3c5;
-      --accent: #185adb;
-      --accent-strong: #0d3b8f;
-      --accent-soft: #e8f0ff;
+      --bg: #edf3f0;
+      --panel: #fffef9;
+      --panel-alt: #f6faf7;
+      --text: #10201d;
+      --muted: #51615d;
+      --border: #d9e0da;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --accent-soft: #e7f4f1;
+      --accent-blue: #1a4f9c;
       --success: #136f3a;
       --success-bg: #e8f8ee;
       --error: #9f1d22;
       --error-bg: #fdeeee;
-      --shadow: 0 20px 60px rgba(41, 32, 19, 0.08);
-      --radius: 18px;
+      --shadow: 0 28px 80px rgba(17, 32, 29, 0.14);
+      --radius: 8px;
       --font: "Manrope", sans-serif;
       --mono: "IBM Plex Mono", monospace;
     }
@@ -33,41 +34,49 @@
       font-family: var(--font);
       color: var(--text);
       background:
-        radial-gradient(circle at top left, rgba(24, 90, 219, 0.08), transparent 30%),
-        linear-gradient(180deg, #f8f4ee 0%, var(--bg) 100%);
+        linear-gradient(rgba(15, 118, 110, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 118, 110, 0.035) 1px, transparent 1px),
+        linear-gradient(135deg, #edf4f1 0%, #f8f5ed 52%, #eef3f7 100%);
+      background-size: 30px 30px, 30px 30px, auto;
       min-height: 100vh;
     }
     .shell {
-      width: min(1120px, calc(100vw - 32px));
-      margin: 28px auto;
+      width: min(1180px, calc(100vw - 32px));
+      margin: 20px auto;
       display: grid;
-      grid-template-columns: 360px minmax(0, 1fr);
-      gap: 20px;
+      grid-template-columns: 350px minmax(0, 1fr);
+      gap: 18px;
     }
     .panel {
-      background: var(--panel);
-      border: 1px solid var(--border);
+      background: rgba(255, 254, 249, 0.96);
+      border: 1px solid rgba(16, 32, 29, 0.12);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
+      overflow: hidden;
     }
     .sidebar {
-      padding: 28px 24px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
-      gap: 22px;
+      gap: 18px;
+      position: sticky;
+      top: 20px;
+      align-self: start;
+      max-height: calc(100vh - 40px);
+      overflow: auto;
     }
     .eyebrow {
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.14em;
       color: var(--accent);
-      font-weight: 700;
+      font-weight: 800;
     }
     h1 {
       margin: 8px 0 0;
-      font-size: 30px;
-      line-height: 1.02;
-      letter-spacing: -0.04em;
+      font-size: 34px;
+      line-height: 1;
+      letter-spacing: -0.035em;
     }
     .lede {
       margin: 0;
@@ -76,13 +85,14 @@
       color: var(--muted);
     }
     .tip-card {
-      background: var(--panel-alt);
+      background: rgba(255, 255, 255, 0.72);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 16px;
+      border-radius: 8px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
       gap: 10px;
+      box-shadow: 0 12px 28px rgba(17, 32, 29, 0.05);
     }
     .tip-card h2,
     .result-card h2 {
@@ -99,14 +109,14 @@
     }
     .kbd {
       font-family: var(--mono);
-      background: #f0ebdf;
-      border: 1px solid #d8cebf;
+      background: #f2f7f5;
+      border: 1px solid #d1ddd7;
       border-radius: 8px;
       display: block;
       width: 100%;
-      padding: 4px 8px;
+      padding: 5px 8px;
       font-size: 12px;
-      color: #473a2d;
+      color: #24423c;
       white-space: normal;
       overflow-wrap: anywhere;
       word-break: break-word;
@@ -117,7 +127,7 @@
       gap: 14px;
     }
     .main {
-      padding: 28px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
       gap: 18px;
@@ -127,6 +137,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+      padding-bottom: 4px;
     }
     .topbar p {
       margin: 0;
@@ -134,11 +145,20 @@
       font-size: 13px;
     }
     .link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
       text-decoration: none;
       color: var(--accent);
-      font-weight: 700;
+      background: #ffffff;
+      border: 1px solid rgba(15, 118, 110, 0.2);
+      border-radius: 8px;
+      padding: 0 12px;
+      font-weight: 800;
       font-size: 13px;
+      box-shadow: 0 8px 20px rgba(17, 32, 29, 0.05);
     }
+    .link:hover { background: var(--accent-soft); }
     .form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -164,13 +184,14 @@
     textarea {
       width: 100%;
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 8px;
       background: #fff;
       color: var(--text);
       font: inherit;
       padding: 12px 14px;
       outline: none;
       transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+      box-shadow: 0 8px 20px rgba(17, 32, 29, 0.04);
     }
     textarea {
       min-height: 220px;
@@ -181,7 +202,7 @@
     select:focus,
     textarea:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 4px rgba(24, 90, 219, 0.1);
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
     }
     .field-hint {
       margin: 0;
@@ -201,8 +222,8 @@
     .advanced-panel {
       grid-column: 1 / -1;
       border: 1px solid var(--border);
-      border-radius: 14px;
-      background: var(--panel-alt);
+      border-radius: 8px;
+      background: rgba(246, 250, 247, 0.9);
       padding: 12px 14px 14px;
     }
     .advanced-panel summary {
@@ -231,12 +252,12 @@
       align-items: center;
       gap: 10px;
       padding: 10px 12px;
-      border-radius: 12px;
+      border-radius: 8px;
       border: 1px solid var(--border);
-      background: var(--panel-alt);
-      color: #43392f;
+      background: #ffffff;
+      color: #24423c;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
     }
     .toggle input {
       width: 16px;
@@ -268,12 +289,13 @@
     }
     .helper-card {
       border: 1px solid var(--border);
-      border-radius: 16px;
-      background: var(--panel-alt);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
       padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 10px;
+      box-shadow: 0 12px 28px rgba(17, 32, 29, 0.05);
     }
     .helper-card h2 {
       margin: 0;
@@ -321,11 +343,11 @@
       gap: 8px;
       flex-wrap: wrap;
       padding: 8px 10px;
-      border-radius: 12px;
-      border: 1px dashed #c7b9a4;
-      background: #fffaf1;
+      border-radius: 8px;
+      border: 1px dashed rgba(15, 118, 110, 0.35);
+      background: #f2f7f5;
       font-size: 12px;
-      color: #54463a;
+      color: #24423c;
     }
     .slug-preview code {
       font-family: var(--mono);
@@ -348,11 +370,11 @@
     }
     .button {
       border: 0;
-      border-radius: 999px;
+      border-radius: 8px;
       padding: 12px 18px;
       font: inherit;
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
       transition: transform 0.15s, background 0.15s, opacity 0.15s;
     }
@@ -361,9 +383,10 @@
       opacity: 0.55;
     }
     .button-primary {
-      background: var(--accent);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-blue) 100%);
       color: #fff;
-      min-width: 180px;
+      min-width: 190px;
+      box-shadow: 0 14px 28px rgba(15, 118, 110, 0.22);
     }
     .button-primary:hover:not(:disabled) {
       background: var(--accent-strong);
@@ -371,8 +394,8 @@
     }
     .result-card {
       border: 1px solid var(--border);
-      border-radius: 16px;
-      background: var(--panel-alt);
+      border-radius: 8px;
+      background: rgba(232, 248, 238, 0.78);
       padding: 18px;
       display: none;
       flex-direction: column;
@@ -388,12 +411,12 @@
     }
     .chip {
       background: var(--accent-soft);
-      border: 1px solid rgba(24, 90, 219, 0.12);
+      border: 1px solid rgba(15, 118, 110, 0.18);
       color: var(--accent-strong);
       border-radius: 999px;
       padding: 8px 12px;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
     }
     .result-grid {
       display: grid;
@@ -402,7 +425,7 @@
     }
     .metric {
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 8px;
       background: #fff;
       padding: 12px 14px;
     }
@@ -465,7 +488,7 @@
     <aside class="panel sidebar">
       <div>
         <div class="eyebrow">Bank Knowledge Base</div>
-        <h1>Create bank markdown files and ingest them into Chroma.</h1>
+        <h1>KB Studio for bank markdown.</h1>
       </div>
       <p class="lede">This uploader writes raw bank knowledge into <span class="kbd">banks/</span> as markdown, then automatically chunks, embeds, and ingests the saved file into bank-prefixed Chroma collections.</p>
       <div class="tip-card">
