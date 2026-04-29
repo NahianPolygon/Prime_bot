@@ -75,6 +75,7 @@
     .bubble { border-radius: var(--radius); font-size: 14px; line-height: 1.65; box-shadow: var(--shadow-sm); }
     .bubble.user { background: var(--user-bg); color: var(--user-text); padding: 12px 16px; border-top-right-radius: 4px; }
     .bubble.bot  { background: rgba(255, 255, 255, 0.96); color: var(--text-primary); border: 1px solid var(--border); border-top-left-radius: 4px; padding: 12px 16px; overflow: hidden; }
+    .bubble.bot.streaming { white-space: pre-wrap; }
     .bubble.bot.has-table { padding: 0; }
     .bubble-text   { padding: 12px 16px 8px; }
     .bubble-footer { padding: 8px 16px 12px; }
@@ -494,10 +495,11 @@
           activeBubble = createBotBubble(); fullText = "";
         }
         fullText += data.token;
-        renderBotBubble(activeBubble, fullText);
+        renderStreamingBubble(activeBubble, fullText);
         scrollToBottom(); break;
       case "done":
         if (activeBubble) {
+          renderBotBubble(activeBubble, fullText);
           appendFollowupChips(data.intent || "general");
           if (data.calculator === "emi") createEMICalcBubble(data.calculator_config);
           else if (data.calculator === "rewards") createRewardsCalcBubble();
@@ -638,6 +640,7 @@
   function fixMarkdown(raw) {
     var t = (raw || "").replace(/\r\n/g, "\n");
     t = t
+      .replace(/\|\s+(Would you like to check your eligibility[^|]*)$/i, "|\n\n$1")
       .replace(/([^\n])\s+(#{1,3}\s)/g, "$1\n\n$2")
       .replace(/([^\n])\s+(\d+\.\s+\*\*)/g, "$1\n\n$2")
       .replace(/\s+[–-]\s+(Network:|Tier:|Banking:)/g, "\n   - $1")
@@ -677,17 +680,140 @@
     return t.trim();
   }
 
+  function renderStreamingBubble(bubble, rawText) {
+    bubble.classList.remove("has-table");
+    bubble.classList.add("streaming");
+    bubble.textContent = rawText || "";
+  }
+
+  function isPipeTableLine(line) {
+    var trimmed = (line || "").trim();
+    return trimmed.indexOf("|") >= 0 && (trimmed.match(/\|/g) || []).length >= 2;
+  }
+
+  function isPipeSeparatorLine(line) {
+    var trimmed = (line || "").trim();
+    return /^\|?[\s:|-]+\|[\s:|-]*$/.test(trimmed) && trimmed.indexOf("-") >= 0;
+  }
+
+  function normalizePipeRow(line) {
+    var row = (line || "").trim();
+    if (!row.startsWith("|")) row = "| " + row;
+    if (!row.endsWith("|")) row += " |";
+    return row;
+  }
+
+  function pipeCells(line) {
+    var row = normalizePipeRow(line);
+    return row.slice(1, -1).split("|").map(function(cell) {
+      return cell.trim();
+    });
+  }
+
+  function buildFallbackTable(rawText) {
+    var text = fixMarkdown(rawText);
+    var lines = text.split("\n");
+    var start = -1;
+    for (var i = 0; i < lines.length; i++) {
+      if (isPipeTableLine(lines[i]) && !isPipeSeparatorLine(lines[i])) {
+        start = i;
+        break;
+      }
+    }
+    if (start < 0) return null;
+
+    var header = pipeCells(lines[start]);
+    if (header.length < 2) return null;
+
+    var before = lines.slice(0, start).join("\n").trim();
+    var afterStart = lines.length;
+    var dataCells = [];
+    for (var j = start + 1; j < lines.length; j++) {
+      var line = lines[j].trim();
+      if (!line) {
+        afterStart = j + 1;
+        break;
+      }
+      if (!isPipeTableLine(line)) {
+        afterStart = j;
+        break;
+      }
+      if (isPipeSeparatorLine(line)) continue;
+      dataCells = dataCells.concat(pipeCells(line).filter(function(cell) { return cell !== ""; }));
+    }
+
+    var width = header.length;
+    var rows = [];
+    while (dataCells.length >= width) {
+      rows.push(dataCells.slice(0, width));
+      dataCells = dataCells.slice(width);
+    }
+    if (dataCells.length && rows.length) {
+      rows[rows.length - 1][width - 1] = (rows[rows.length - 1][width - 1] + " " + dataCells.join(" ")).trim();
+    }
+    if (!rows.length) return null;
+
+    return {
+      before: before,
+      after: lines.slice(afterStart).join("\n").trim(),
+      header: header,
+      rows: rows
+    };
+  }
+
+  function fallbackTableToHtml(tableParts) {
+    var head = "<thead><tr>" + tableParts.header.map(function(cell) {
+      return "<th>" + escapeHtml(cell) + "</th>";
+    }).join("") + "</tr></thead>";
+    var body = "<tbody>" + tableParts.rows.map(function(row) {
+      return "<tr>" + row.map(function(cell) {
+        return "<td>" + escapeHtml(cell) + "</td>";
+      }).join("") + "</tr>";
+    }).join("") + "</tbody>";
+    return "<table>" + head + body + "</table>";
+  }
+
+  function renderTableBubble(bubble, beforeHtml, tableHtml, afterHtml) {
+    bubble.classList.remove("streaming");
+    bubble.classList.add("has-table"); bubble.innerHTML = "";
+    if (beforeHtml) { var d1 = document.createElement("div"); d1.className = "bubble-text"; d1.innerHTML = beforeHtml; bubble.appendChild(d1); }
+    var tw = document.createElement("div"); tw.className = "table-wrapper"; tw.innerHTML = tableHtml; bubble.appendChild(tw);
+    if (afterHtml) { var d2 = document.createElement("div"); d2.className = "bubble-footer"; d2.innerHTML = afterHtml; bubble.appendChild(d2); }
+  }
+
   function renderBotBubble(bubble, rawText) {
     var md = fixMarkdown(rawText), html = marked.parse(md);
-    if (!/<table[\s>]/i.test(html)) { bubble.innerHTML = html; return; }
-    bubble.classList.add("has-table"); bubble.innerHTML = "";
+    if (!/<table[\s>]/i.test(html)) {
+      var fallbackTable = buildFallbackTable(rawText);
+      if (fallbackTable) {
+        renderTableBubble(
+          bubble,
+          fallbackTable.before ? marked.parse(fallbackTable.before) : "",
+          fallbackTableToHtml(fallbackTable),
+          fallbackTable.after ? marked.parse(fallbackTable.after) : ""
+        );
+        return;
+      }
+      bubble.classList.remove("has-table");
+      bubble.classList.remove("streaming");
+      bubble.innerHTML = html;
+      return;
+    }
+    var fallbackForWeakTable = buildFallbackTable(rawText);
+    if (fallbackForWeakTable && !/<td[\s>]/i.test(html)) {
+      renderTableBubble(
+        bubble,
+        fallbackForWeakTable.before ? marked.parse(fallbackForWeakTable.before) : "",
+        fallbackTableToHtml(fallbackForWeakTable),
+        fallbackForWeakTable.after ? marked.parse(fallbackForWeakTable.after) : ""
+      );
+      return;
+    }
     var tStart = html.search(/<table[\s>]/i);
     var tEndIdx = html.lastIndexOf("</table>");
     var tEnd = tEndIdx >= 0 ? tEndIdx + "</table>".length : html.length;
     var before = html.slice(0, tStart).trim(), table = html.slice(tStart, tEnd).trim(), after = html.slice(tEnd).trim();
-    if (before) { var d1 = document.createElement("div"); d1.className = "bubble-text";   d1.innerHTML = before; bubble.appendChild(d1); }
-    var tw = document.createElement("div"); tw.className = "table-wrapper"; tw.innerHTML = table; bubble.appendChild(tw);
-    if (after)  { var d2 = document.createElement("div"); d2.className = "bubble-footer"; d2.innerHTML = after;  bubble.appendChild(d2); }
+    renderTableBubble(bubble, before, table, after);
   }
 
   /* ── Thinking ── */

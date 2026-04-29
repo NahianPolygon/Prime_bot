@@ -334,18 +334,26 @@ def _stream_or_chunk(
     *args,
 ) -> Generator[str, None, None]:
     collected: list[str] = []
+    suppress_stream = False
 
     if stream_fn:
         for token in stream_fn(*args):
+            if not collected and (
+                token.startswith("[ERROR]") or token.startswith("[NO RESULTS]")
+            ):
+                suppress_stream = True
             collected.append(token)
+            if not suppress_stream:
+                yield token
 
     full_response = "".join(collected)
     if not full_response.strip() and fallback_fn:
         full_response = fallback_fn(*args)
 
     clean = _guardrails(full_response)
-    for token in _stream_text(clean):
-        yield token
+    if not collected or suppress_stream:
+        for token in _stream_text(clean):
+            yield token
     session.add(user_message, clean)
 
 
