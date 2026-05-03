@@ -109,20 +109,49 @@ def _infer_card_network(text: str) -> str:
     return ", ".join(networks)
 
 
-def _infer_tier(text: str) -> str:
+_CARD_TIER_LABELS = (
+    "world elite",
+    "world",
+    "signature",
+    "infinite",
+    "titanium",
+    "platinum",
+    "gold",
+    "classic",
+    "standard",
+)
+
+
+def _tier_word_pattern(tier: str) -> str:
+    return r"\b" + re.escape(tier).replace(r"\ ", r"\s+") + r"\b"
+
+
+def _infer_tier_from_title(text: str) -> str:
     lower = (text or "").lower()
-    checks = (
-        ("world", ("world",)),
-        ("signature", ("signature",)),
-        ("platinum", ("platinum",)),
-        ("gold", ("gold",)),
-        ("classic", ("classic",)),
-        ("standard", ("standard",)),
-    )
-    for label, needles in checks:
-        if any(needle in lower for needle in needles):
-            return label
+    for tier in _CARD_TIER_LABELS:
+        if re.search(_tier_word_pattern(tier), lower):
+            return tier
     return ""
+
+
+def _infer_tier_from_body(text: str) -> str:
+    lower = (text or "").lower()
+    network = r"(?:visa|mastercard|master\s*card|jcb|amex|american\s+express)"
+    card_tail = r"(?:credit\s+)?card(?:holder|holders|s)?"
+
+    for tier in _CARD_TIER_LABELS:
+        tier_pattern = _tier_word_pattern(tier)
+        patterns = (
+            rf"{network}[^\n]{{0,80}}{tier_pattern}[^\n]{{0,40}}{card_tail}",
+            rf"{tier_pattern}[^\n]{{0,60}}{card_tail}",
+        )
+        if any(re.search(pattern, lower) for pattern in patterns):
+            return tier
+    return ""
+
+
+def _infer_tier(text: str, title_text: str = "") -> str:
+    return _infer_tier_from_title(title_text) or _infer_tier_from_body(text)
 
 
 def _infer_use_cases(text: str) -> list[str]:
@@ -306,7 +335,8 @@ def ingest_company_text(
     embedder = embedder or get_embedder()
     infer_text = " ".join([document_title, product_name, raw_text])
     inferred_card_network = card_network.strip() or _infer_card_network(infer_text)
-    inferred_tier = tier.strip() or _infer_tier(infer_text)
+    title_text = " ".join([document_title, product_name])
+    inferred_tier = tier.strip() or _infer_tier(infer_text, title_text)
     inferred_use_cases = _normalize_list(use_cases) or _infer_use_cases(infer_text)
     inferred_employment_suitable = _normalize_list(employment_suitable) or _infer_employment_suitable(infer_text)
 
