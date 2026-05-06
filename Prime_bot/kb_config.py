@@ -4,6 +4,7 @@ import re
 from functools import lru_cache
 
 import yaml
+from kb_runtime import get_runtime_collection_map
 
 
 _DEFAULT_COLLECTION_SUFFIXES = {
@@ -36,13 +37,11 @@ def _default_collection_map(cfg: dict) -> dict[str, str]:
 
 @lru_cache(maxsize=1)
 def get_collection_map() -> dict[str, str]:
-    cfg = load_config()
-    configured = ((cfg.get("knowledge_base") or {}).get("collections") or {})
-    merged = _default_collection_map(cfg)
-    for key, value in configured.items():
-        if value:
-            merged[str(key)] = str(value)
-    return merged
+    return get_runtime_collection_map()
+
+
+def refresh_collection_map() -> None:
+    get_collection_map.cache_clear()
 
 
 def get_collection(name: str) -> str:

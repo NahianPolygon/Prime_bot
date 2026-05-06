@@ -3,15 +3,25 @@ import uuid
 import yaml
 import time
 import json
+import secrets
 import threading
 import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from pathlib import Path
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from logging_utils import log_event
 from streaming_utils import iter_text_stream
-from ingestion.company_ingest import BANKING_TYPES, DOCUMENT_TYPES, ingest_company_text
+from ingestion.company_ingest import BANKING_TYPES, DOCUMENT_TYPES, ingest_company_text, ingest_markdown_path
+from kb_runtime import (
+    BANKING_TYPES as RUNTIME_BANKING_TYPES,
+    build_collection_map,
+    get_active_bank,
+    load_runtime_state,
+    save_runtime_state,
+    slugify_bank,
+)
 
 _stats_lock = threading.Lock()
 _stats = {
@@ -29,6 +39,15 @@ async def _send_text_stream(websocket: WebSocket, text: str, chunk_chars: int = 
         await websocket.send_text(json.dumps({"type": "token", "token": chunk}))
         if delay_ms > 0:
             await asyncio.sleep(delay_ms / 1000)
+
+
+async def _send_progress(websocket: WebSocket, message: str, stage: str = ""):
+    await websocket.send_text(json.dumps({
+        "type": "progress",
+        "message": message,
+        "stage": stage,
+    }))
+    await asyncio.sleep(0.02)
 
 
 def _infer_eligibility_outcome(text: str) -> str:
@@ -127,6 +146,99 @@ class KnowledgeBaseUploadRequest(BaseModel):
     replace_existing: bool = True
 
 
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class RuntimeKnowledgeBaseStateRequest(BaseModel):
+    active_bank: str
+
+
+class BankCreateRequest(BaseModel):
+    bank_name: str
+
+
+class MarkdownUpdateRequest(BaseModel):
+    path: str
+    content: str
+
+
+ADMIN_USERNAME = "NahianPolygon"
+ADMIN_PASSWORD = "123456"
+ADMIN_TOKEN = "primebot-admin-token"
+PROJECT_ROOT = Path(".").resolve()
+BANKS_ROOT = (PROJECT_ROOT / "banks").resolve()
+
+
+def _require_admin(authorization: str = Header(default="")) -> None:
+    expected = f"Bearer {ADMIN_TOKEN}"
+    if not secrets.compare_digest(authorization, expected):
+        raise HTTPException(status_code=401, detail="Admin authentication required.")
+
+
+def _ensure_active_bank_dirs(bank_slug: str) -> None:
+    for banking_type in ("conventional", "islami"):
+        for document_type in DOCUMENT_TYPES:
+            (Path("banks") / bank_slug / banking_type / "credit" / document_type).mkdir(parents=True, exist_ok=True)
+
+
+def _list_bank_dirs() -> list[str]:
+    root = Path("banks")
+    if not root.exists():
+        return []
+    return sorted(
+        path.name
+        for path in root.iterdir()
+        if path.is_dir() and not path.name.startswith(".")
+    )
+
+
+def _relative_markdown_path(path: Path) -> str:
+    return str(path.relative_to(PROJECT_ROOT))
+
+
+def _resolve_active_markdown_path(path_value: str) -> Path:
+    active_root = (BANKS_ROOT / get_active_bank()).resolve()
+    candidate = (PROJECT_ROOT / path_value).resolve()
+    if candidate.suffix != ".md":
+        raise HTTPException(status_code=400, detail="Only markdown files can be edited.")
+    try:
+        candidate.relative_to(active_root)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="File is outside the active bank workspace.") from exc
+    if not candidate.exists():
+        raise HTTPException(status_code=404, detail="Markdown file not found.")
+    return Path(_relative_markdown_path(candidate))
+
+
+def _list_active_markdown_files() -> list[dict]:
+    active_bank = get_active_bank()
+    root = Path("banks") / active_bank
+    files = []
+    if not root.exists():
+        return files
+    for path in sorted(root.rglob("*.md")):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            text = ""
+        parts = path.parts
+        banking_type = parts[2] if len(parts) > 2 else ""
+        document_type = parts[4] if len(parts) > 4 else ""
+        heading = next((line.lstrip("# ").strip() for line in text.splitlines() if line.startswith("#")), path.stem)
+        files.append({
+            "path": str(path),
+            "name": path.name,
+            "title": heading or path.stem,
+            "banking_type": banking_type,
+            "document_type": document_type,
+            "size": path.stat().st_size,
+            "updated_at": path.stat().st_mtime,
+        })
+    return files
+
+
 @app.on_event("startup")
 async def startup_event():
     if _cfg.get("llm", {}).get("warmup_on_start", True):
@@ -187,9 +299,11 @@ async def websocket_chat(websocket: WebSocket):
                     "type": "session_id",
                     "session_id": session_id,
                 }))
+                await _send_progress(websocket, "Finding suitable cards", "preference_form")
 
                 try:
                     result = handle_preference_form(form_data, session, request_id=request_id)
+                    await _send_progress(websocket, "Preparing answer", "response")
                     await _send_text_stream(websocket, result)
                     await websocket.send_text(json.dumps({"type": "done", "intent": "i_need_a_credit_card", "calculator": ""}))
                     log_event("ws_preference_complete", request_id=request_id, session_id=session_id)
@@ -221,6 +335,7 @@ async def websocket_chat(websocket: WebSocket):
                     "type": "session_id",
                     "session_id": session_id,
                 }))
+                await _send_progress(websocket, "Checking eligibility details", "eligibility_form")
 
                 try:
                     result = handle_eligibility_form(form_data, session, request_id=request_id)
@@ -235,6 +350,7 @@ async def websocket_chat(websocket: WebSocket):
                         }))
                     else:
                         elig_outcome = _infer_eligibility_outcome(result)
+                        await _send_progress(websocket, "Preparing answer", "response")
                         await _send_text_stream(websocket, result)
                     await websocket.send_text(json.dumps({"type": "done", "intent": elig_outcome, "calculator": ""}))
                     log_event(
@@ -278,10 +394,24 @@ async def websocket_chat(websocket: WebSocket):
 
             req_start = time.perf_counter()
             try:
+                await _send_progress(websocket, "Understanding your request", "classify")
                 done_intent = ""
                 done_calculator = ""
                 done_calculator_config = None
                 for token in build_crew_stream(message, session, request_id=request_id):
+                    if token.startswith('{"__progress_signal__"'):
+                        try:
+                            signal = json.loads(token)
+                            if signal.get("__progress_signal__"):
+                                await _send_progress(
+                                    websocket,
+                                    signal.get("message", "Preparing answer"),
+                                    signal.get("stage", ""),
+                                )
+                                continue
+                        except json.JSONDecodeError:
+                            pass
+
                     if token.startswith('{"__preference_form_signal__"'):
                         try:
                             signal = json.loads(token)
@@ -356,24 +486,125 @@ async def health():
     return {"status": "ok", "model": _cfg["llm"]["model"]}
 
 
+@app.post("/admin/login")
+async def admin_login(payload: AdminLoginRequest):
+    if not secrets.compare_digest(payload.username, ADMIN_USERNAME) or not secrets.compare_digest(payload.password, ADMIN_PASSWORD):
+        raise HTTPException(status_code=401, detail="Invalid admin credentials.")
+    return {"token": ADMIN_TOKEN}
+
+
+@app.get("/admin/kb/state")
+async def admin_kb_state(authorization: str = Header(default="")):
+    _require_admin(authorization)
+    return {
+        **load_runtime_state(),
+        "banks": _list_bank_dirs(),
+        "document_types": sorted(DOCUMENT_TYPES),
+        "banking_types": sorted(RUNTIME_BANKING_TYPES),
+        "files": _list_active_markdown_files(),
+    }
+
+
+@app.post("/admin/kb/state")
+async def update_admin_kb_state(
+    payload: RuntimeKnowledgeBaseStateRequest,
+    authorization: str = Header(default=""),
+):
+    _require_admin(authorization)
+    bank_slug = slugify_bank(payload.active_bank)
+    state = save_runtime_state({
+        "active_bank": bank_slug,
+        "collections": build_collection_map(bank_slug),
+    })
+    _ensure_active_bank_dirs(bank_slug)
+    try:
+        from kb_config import refresh_collection_map
+        refresh_collection_map()
+    except Exception:
+        pass
+    log_event("kb_runtime_state_updated", bank=bank_slug)
+    return {
+        **state,
+        "banks": _list_bank_dirs(),
+        "files": _list_active_markdown_files(),
+    }
+
+
+@app.post("/admin/kb/banks")
+async def create_admin_bank(
+    payload: BankCreateRequest,
+    authorization: str = Header(default=""),
+):
+    _require_admin(authorization)
+    if not (payload.bank_name or "").strip():
+        raise HTTPException(status_code=400, detail="Bank name is required.")
+    bank_slug = slugify_bank(payload.bank_name)
+    _ensure_active_bank_dirs(bank_slug)
+    log_event("kb_bank_created", bank=bank_slug)
+    return {
+        "bank": bank_slug,
+        "banks": _list_bank_dirs(),
+    }
+
+
+@app.get("/kb/studio/context")
+async def kb_studio_context():
+    return {
+        **load_runtime_state(),
+        "document_types": sorted(DOCUMENT_TYPES),
+        "banking_types": sorted(RUNTIME_BANKING_TYPES),
+        "files": _list_active_markdown_files(),
+    }
+
+
+@app.get("/kb/studio/file")
+async def kb_studio_file(path: str):
+    md_path = _resolve_active_markdown_path(path)
+    return {
+        "path": str(md_path),
+        "content": md_path.read_text(encoding="utf-8"),
+    }
+
+
+@app.put("/kb/studio/file")
+async def update_kb_studio_file(payload: MarkdownUpdateRequest):
+    md_path = _resolve_active_markdown_path(payload.path)
+    md_path.write_text(payload.content, encoding="utf-8")
+    try:
+        ingest_result = ingest_markdown_path(md_path, replace_existing=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        log_event("kb_markdown_update_error", level="error", path=str(md_path), error=str(exc))
+        raise HTTPException(status_code=500, detail="Markdown saved, but ingestion failed.") from exc
+    log_event("kb_markdown_updated", path=str(md_path), collections=ingest_result.get("collections", []))
+    return {
+        "path": str(md_path),
+        "ingestion": ingest_result,
+        "files": _list_active_markdown_files(),
+    }
+
+
 @app.get("/admin/kb/options")
 async def kb_options():
     return {
         "document_types": sorted(DOCUMENT_TYPES),
         "banking_types": sorted(BANKING_TYPES),
+        "active_bank": get_active_bank(),
     }
 
 
 @app.post("/admin/kb/ingest-text")
 async def kb_ingest_text(payload: KnowledgeBaseUploadRequest):
-    bank_name = payload.bank_name or payload.company_name
+    bank_name = get_active_bank()
+    banking_type = payload.banking_type
     try:
         result = ingest_company_text(
             company_name=bank_name,
             document_title=payload.document_title,
             raw_text=payload.raw_text,
             document_type=payload.document_type,
-            banking_type=payload.banking_type,
+            banking_type=banking_type,
             product_name=payload.product_name,
             card_network=payload.card_network,
             tier=payload.tier,
@@ -407,7 +638,17 @@ async def serve_ui():
 
 @app.get("/kb-uploader")
 async def serve_kb_uploader():
-    return FileResponse("static/kb_uploader.html")
+    return FileResponse("static/kb_studio.html")
+
+
+@app.get("/kb-studio")
+async def serve_kb_studio():
+    return FileResponse("static/kb_studio.html")
+
+
+@app.get("/admin")
+async def serve_admin():
+    return FileResponse("static/admin.html")
 
 
 if os.path.exists("static"):

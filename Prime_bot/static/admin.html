@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeBot Admin</title>
+  <style>
+    :root {
+      --bg: #f4f7f6;
+      --panel: #fffdfa;
+      --text: #10201d;
+      --muted: #64716d;
+      --border: #d8e1dd;
+      --accent: #0f766e;
+      --blue: #174a7c;
+      --soft: #e8f5f2;
+      --error: #a4202a;
+      --ok: #13733d;
+      --shadow: 0 22px 60px rgba(16, 32, 29, 0.12);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        linear-gradient(rgba(15, 118, 110, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 118, 110, 0.045) 1px, transparent 1px),
+        linear-gradient(135deg, #edf7f4 0%, #fff9ec 52%, #eef4fb 100%);
+      background-size: 28px 28px, 28px 28px, auto;
+    }
+    .shell { width: min(1120px, calc(100vw - 28px)); margin: 20px auto; display: grid; grid-template-columns: 360px 1fr; gap: 16px; }
+    .panel { background: rgba(255, 253, 250, 0.96); border: 1px solid rgba(16,32,29,0.12); border-radius: 8px; box-shadow: var(--shadow); overflow: hidden; }
+    .side, .main { padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+    .eyebrow { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; font-weight: 900; }
+    h1 { margin: 8px 0 0; font-size: 32px; line-height: 1.04; }
+    h2 { margin: 0; font-size: 15px; }
+    p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .card { border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.74); padding: 15px; display: flex; flex-direction: column; gap: 11px; }
+    label { font-size: 12px; font-weight: 900; color: #3a423f; }
+    input, select, textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; font: inherit; background: #fff; outline: none; }
+    textarea { min-height: 520px; resize: vertical; font-family: var(--mono); font-size: 13px; line-height: 1.55; }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(15,118,110,0.12); }
+    .field { display: flex; flex-direction: column; gap: 7px; }
+    button, .link {
+      min-height: 38px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      padding: 0 13px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    button.primary { background: linear-gradient(135deg, var(--accent), var(--blue)); color: #fff; border: 0; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .status { min-height: 20px; font-size: 13px; color: var(--muted); }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--error); }
+    .kv { display: grid; grid-template-columns: 120px 1fr; gap: 8px; font-size: 13px; }
+    .kv span:nth-child(odd) { color: var(--muted); }
+    code { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+    .list { display: flex; flex-direction: column; gap: 8px; }
+    .row { border: 1px solid var(--border); border-radius: 8px; padding: 10px 11px; background: #fff; text-align: left; }
+    .row strong { display: block; font-size: 13px; margin-bottom: 5px; line-height: 1.3; overflow-wrap: anywhere; }
+    .row small { display: block; color: var(--muted); font-family: var(--mono); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; }
+    button.row { width: 100%; cursor: pointer; }
+    .row.active { border-color: var(--accent); background: var(--soft); }
+    .hidden { display: none !important; }
+    .pill { display: inline-flex; border: 1px solid rgba(15,118,110,0.2); background: var(--soft); color: var(--accent); border-radius: 999px; padding: 7px 10px; font-size: 12px; font-weight: 900; }
+    @media (max-width: 900px) { .shell { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="panel side">
+      <div>
+        <div class="eyebrow">Admin Portal</div>
+        <h1>Control active bank routing.</h1>
+      </div>
+      <p>Admin chooses which bank workspace the bot should use. Banks manage upload details inside KB Studio.</p>
+      <div class="card">
+        <h2>Navigation</h2>
+        <div class="actions">
+          <a class="link" href="/kb-uploader">KB Studio</a>
+          <a class="link" href="/">Assistant</a>
+        </div>
+      </div>
+      <div id="stateCard" class="card hidden">
+        <h2>Current state</h2>
+        <div class="kv">
+          <span>Bank</span><code id="currentBank"></code>
+        </div>
+      </div>
+    </aside>
+
+    <main class="panel main">
+      <section id="loginPanel" class="card">
+        <h2>Admin login</h2>
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" autocomplete="username" />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" />
+        </div>
+        <div class="actions">
+          <div id="loginStatus" class="status"></div>
+          <button id="loginBtn" class="primary">Login</button>
+        </div>
+      </section>
+
+      <section id="adminPanel" class="card hidden">
+        <div class="topbar">
+          <div>
+            <h2>Bank and collection control</h2>
+            <p>Changing this updates the runtime collection map used by the bot.</p>
+          </div>
+          <span class="pill">runtime_kb_config.json</span>
+        </div>
+        <div class="field">
+          <label for="activeBank">Active Bank Directory</label>
+          <select id="activeBank"></select>
+        </div>
+        <div class="actions">
+          <div id="saveStatus" class="status"></div>
+          <button id="saveStateBtn" class="primary">Save Active Settings</button>
+        </div>
+      </section>
+
+      <section id="createBankPanel" class="card hidden">
+        <h2>Create new bank</h2>
+        <p>Create the folder structure first, then select it as active above.</p>
+        <div class="field">
+          <label for="newBank">New Bank Directory</label>
+          <input id="newBank" placeholder="city_bank" />
+        </div>
+        <div class="actions">
+          <div id="createBankStatus" class="status"></div>
+          <button id="createBankBtn" class="primary">Create Bank</button>
+        </div>
+      </section>
+
+      <section id="collectionsPanel" class="card hidden">
+        <h2>Active collections</h2>
+        <div id="collections" class="list"></div>
+      </section>
+
+      <section id="filesPanel" class="card hidden">
+        <h2>Markdown files in active bank</h2>
+        <div id="files" class="list"></div>
+      </section>
+
+      <section id="editorPanel" class="card hidden">
+        <div class="topbar">
+          <div>
+            <h2>Admin markdown editor</h2>
+            <p id="editorPath">Select a markdown file above.</p>
+          </div>
+          <button id="saveFileBtn" class="primary" disabled>Save and Re-ingest</button>
+        </div>
+        <textarea id="markdownEditor" disabled placeholder="Markdown content will appear here"></textarea>
+        <div id="editorStatus" class="status"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const tokenKey = "primebot_admin_token";
+    const loginPanel = document.getElementById("loginPanel");
+    const adminPanel = document.getElementById("adminPanel");
+    const createBankPanel = document.getElementById("createBankPanel");
+    const collectionsPanel = document.getElementById("collectionsPanel");
+    const filesPanel = document.getElementById("filesPanel");
+    const editorPanel = document.getElementById("editorPanel");
+    const stateCard = document.getElementById("stateCard");
+    const loginStatus = document.getElementById("loginStatus");
+    const saveStatus = document.getElementById("saveStatus");
+    const createBankStatus = document.getElementById("createBankStatus");
+    const editorStatus = document.getElementById("editorStatus");
+    const collectionsEl = document.getElementById("collections");
+    const filesEl = document.getElementById("files");
+    const activeBankEl = document.getElementById("activeBank");
+    const currentBankEl = document.getElementById("currentBank");
+    const editor = document.getElementById("markdownEditor");
+    const editorPath = document.getElementById("editorPath");
+    const saveFileBtn = document.getElementById("saveFileBtn");
+    let currentPath = "";
+
+    function token() { return localStorage.getItem(tokenKey) || ""; }
+    function authHeaders() { return { Authorization: "Bearer " + token() }; }
+    function status(el, message, kind) { el.textContent = message || ""; el.className = "status" + (kind ? " " + kind : ""); }
+    function showAdmin() {
+      loginPanel.classList.add("hidden");
+      adminPanel.classList.remove("hidden");
+      createBankPanel.classList.remove("hidden");
+      collectionsPanel.classList.remove("hidden");
+      filesPanel.classList.remove("hidden");
+      editorPanel.classList.remove("hidden");
+      stateCard.classList.remove("hidden");
+    }
+    function renderState(data) {
+      activeBankEl.innerHTML = "";
+      (data.banks || []).forEach(bank => {
+        const opt = document.createElement("option");
+        opt.value = bank;
+        opt.textContent = bank;
+        activeBankEl.appendChild(opt);
+      });
+      activeBankEl.value = data.active_bank || "";
+      currentBankEl.textContent = data.active_bank || "";
+      collectionsEl.innerHTML = "";
+      Object.entries(data.collections || {}).forEach(([key, value]) => {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = `<strong>${key}</strong><small>${value}</small>`;
+        collectionsEl.appendChild(row);
+      });
+      filesEl.innerHTML = "";
+      const files = data.files || [];
+      if (!files.length) {
+        filesEl.innerHTML = "<p>No markdown files in this active bank yet.</p>";
+      }
+      files.forEach(file => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "row";
+        if (file.path === currentPath) row.classList.add("active");
+        row.innerHTML = `<strong>${file.title || file.name}</strong><small>${file.path}</small><small>${file.banking_type} / ${file.document_type}</small>`;
+        row.onclick = () => openFile(file.path);
+        filesEl.appendChild(row);
+      });
+    }
+    async function openFile(path) {
+      currentPath = path;
+      status(editorStatus, "Loading markdown...");
+      const res = await fetch("/kb/studio/file?path=" + encodeURIComponent(path));
+      if (!res.ok) {
+        status(editorStatus, "Could not open markdown file.", "err");
+        return;
+      }
+      const data = await res.json();
+      editor.disabled = false;
+      saveFileBtn.disabled = false;
+      editor.value = data.content || "";
+      editorPath.textContent = data.path;
+      status(editorStatus, "");
+      await loadState();
+    }
+    async function loadState() {
+      const res = await fetch("/admin/kb/state", { headers: authHeaders() });
+      if (!res.ok) {
+        localStorage.removeItem(tokenKey);
+        loginPanel.classList.remove("hidden");
+        return;
+      }
+      showAdmin();
+      renderState(await res.json());
+    }
+    document.getElementById("loginBtn").onclick = async () => {
+      status(loginStatus, "Checking credentials...");
+      const res = await fetch("/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: document.getElementById("username").value,
+          password: document.getElementById("password").value,
+        }),
+      });
+      if (!res.ok) {
+        status(loginStatus, "Invalid credentials.", "err");
+        return;
+      }
+      const data = await res.json();
+      localStorage.setItem(tokenKey, data.token);
+      status(loginStatus, "");
+      await loadState();
+    };
+    document.getElementById("saveStateBtn").onclick = async () => {
+      status(saveStatus, "Saving runtime settings...");
+      const res = await fetch("/admin/kb/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          active_bank: activeBankEl.value,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        status(saveStatus, err.detail || "Could not save settings.", "err");
+        return;
+      }
+      renderState(await res.json());
+      status(saveStatus, "Saved. Bot collection map is updated.", "ok");
+      currentPath = "";
+      editor.value = "";
+      editor.disabled = true;
+      saveFileBtn.disabled = true;
+      editorPath.textContent = "Select a markdown file above.";
+    };
+    document.getElementById("createBankBtn").onclick = async () => {
+      status(createBankStatus, "Creating bank workspace...");
+      const res = await fetch("/admin/kb/banks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ bank_name: document.getElementById("newBank").value }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        status(createBankStatus, err.detail || "Could not create bank.", "err");
+        return;
+      }
+      const data = await res.json();
+      document.getElementById("newBank").value = "";
+      const activateRes = await fetch("/admin/kb/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ active_bank: data.bank }),
+      });
+      if (!activateRes.ok) {
+        status(createBankStatus, `Created ${data.bank}. Select it above and save active settings.`, "ok");
+        await loadState();
+        activeBankEl.value = data.bank;
+        return;
+      }
+      renderState(await activateRes.json());
+      status(createBankStatus, `Created and activated ${data.bank}.`, "ok");
+    };
+    saveFileBtn.onclick = async () => {
+      if (!currentPath) return;
+      saveFileBtn.disabled = true;
+      status(editorStatus, "Saving markdown and re-ingesting...");
+      const res = await fetch("/kb/studio/file", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: currentPath, content: editor.value }),
+      });
+      saveFileBtn.disabled = false;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        status(editorStatus, err.detail || "Save failed.", "err");
+        return;
+      }
+      const data = await res.json();
+      status(editorStatus, `Saved and re-ingested ${data.ingestion.chunk_count} chunks.`, "ok");
+      await loadState();
+    };
+    if (token()) loadState();
+  </script>
+</body>
+</html>

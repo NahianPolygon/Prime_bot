@@ -114,14 +114,22 @@
     .table-wrapper tbody tr:nth-child(even) { background: #f7f9ff; }
     .table-wrapper tbody tr:hover { background: #eef3fd; }
     /* Thinking indicator */
-    .thinking-indicator { display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
-    .thinking-text { font-size: 13px; color: var(--text-muted); font-style: italic; }
+    .thinking-indicator { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; min-width: 220px; }
+    .thinking-head { display: flex; align-items: center; gap: 8px; }
+    .thinking-text { font-size: 13px; color: var(--text-primary); font-weight: 600; }
     .thinking-dots { display: flex; gap: 4px; }
     .thinking-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0.4; animation: thinking-pulse 1.4s infinite; }
     .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
     .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
     @keyframes thinking-pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
     .thinking-elapsed { font-size: 11px; color: var(--text-muted); min-width: 20px; }
+    .thinking-steps { display: flex; flex-direction: column; gap: 5px; }
+    .thinking-step { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-secondary); }
+    .thinking-step::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--border); flex: 0 0 auto; }
+    .thinking-step.active { color: var(--accent); font-weight: 600; }
+    .thinking-step.active::before { background: var(--accent); box-shadow: 0 0 0 3px rgba(0, 128, 128, 0.12); }
+    .thinking-step.done { color: var(--text-muted); }
+    .thinking-step.done::before { background: #22c55e; }
     /* EMI / Rewards calculator */
     .calc-bubble { padding: 0 !important; min-width: 280px; max-width: 340px; }
     .calc-hdr { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; color: var(--accent); }
@@ -489,6 +497,10 @@
         activeBubble = null; fullText = "";
         appendEligibilityVerdicts(data);
         break;
+      case "progress":
+        if (!activeThinkId) { activeThinkId = showThinking(); }
+        updateThinkingProgress(activeThinkId, data.message || "Preparing answer");
+        scrollToBottom(); break;
       case "token":
         if (!activeBubble) {
           if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
@@ -827,9 +839,12 @@
         '<div class="bubble-wrap">' +
           '<div class="bubble bot" style="padding:0;">' +
             '<div class="thinking-indicator">' +
-              '<span class="thinking-text">' + thinkingLabel + '</span>' +
-              '<div class="thinking-dots"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>' +
-              '<span class="thinking-elapsed" id="' + id + '_elapsed"></span>' +
+              '<div class="thinking-head">' +
+                '<span class="thinking-text">' + thinkingLabel + '</span>' +
+                '<div class="thinking-dots"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>' +
+                '<span class="thinking-elapsed" id="' + id + '_elapsed"></span>' +
+              '</div>' +
+              '<div class="thinking-steps" id="' + id + '_steps"></div>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -842,6 +857,25 @@
     }, 1000);
     scrollToBottom();
     return id;
+  }
+
+  function updateThinkingProgress(id, message) {
+    var stepsEl = document.getElementById(id + "_steps");
+    if (!stepsEl || !message) return;
+    var existing = Array.prototype.slice.call(stepsEl.querySelectorAll(".thinking-step"));
+    var found = existing.find(function(el) { return el.textContent === message; });
+    existing.forEach(function(el) {
+      el.classList.remove("active");
+      el.classList.add("done");
+    });
+    if (!found) {
+      found = document.createElement("div");
+      found.className = "thinking-step";
+      found.textContent = message;
+      stepsEl.appendChild(found);
+    }
+    found.classList.remove("done");
+    found.classList.add("active");
   }
 
   function removeThinking(id) {

@@ -94,6 +94,27 @@ def _markdown_path(bank_slug: str, banking_type: str, document_type: str, file_s
     return BANKS_ROOT / bank_slug / banking_type / "credit" / document_type / f"{file_stem}.md"
 
 
+def parse_markdown_location(md_file: Path) -> tuple[str, str, str]:
+    path = Path(md_file)
+    try:
+        relative = path.relative_to(BANKS_ROOT)
+    except ValueError as exc:
+        raise ValueError(f"Markdown file must be under {BANKS_ROOT}/") from exc
+
+    parts = relative.parts
+    if len(parts) != 5 or parts[2] != "credit":
+        raise ValueError("Markdown path must match banks/<bank>/<banking_type>/credit/<document_type>/<file>.md")
+
+    bank_slug, banking_type, _, document_type, filename = parts
+    if not filename.endswith(".md"):
+        raise ValueError("Markdown file must end with .md")
+    if banking_type not in {"conventional", "islami"}:
+        raise ValueError("Markdown banking type must be conventional or islami")
+    if document_type not in DOCUMENT_TYPES:
+        raise ValueError(f"document_type must be one of: {', '.join(sorted(DOCUMENT_TYPES))}")
+    return bank_slug, banking_type, document_type
+
+
 def _infer_card_network(text: str) -> str:
     lower = (text or "").lower()
     networks = []
@@ -402,3 +423,25 @@ def ingest_company_text(
         "markdown_paths": [item["markdown_path"] for item in documents],
         "documents": documents,
     }
+
+
+def ingest_markdown_path(
+    md_file: str | Path,
+    *,
+    replace_existing: bool = True,
+    client: chromadb.PersistentClient | None = None,
+    embedder: SentenceTransformer | None = None,
+) -> dict:
+    path = Path(md_file)
+    if not path.exists():
+        raise ValueError(f"Markdown file does not exist: {path}")
+    bank_slug, banking_type, document_type = parse_markdown_location(path)
+    return _ingest_markdown_file(
+        path,
+        bank_slug=bank_slug,
+        banking_type=banking_type,
+        document_type=document_type,
+        replace_existing=replace_existing,
+        client=client or get_client(),
+        embedder=embedder or get_embedder(),
+    )

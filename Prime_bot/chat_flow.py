@@ -206,6 +206,25 @@ def _build_preference_form_signal(user_message: str, session: SessionMemory, cla
     return json.dumps({"__preference_form_signal__": True, "type": "show_preference_form", "schema": schema})
 
 
+def _progress_signal(message: str, stage: str = "") -> str:
+    return json.dumps({"__progress_signal__": True, "message": message, "stage": stage})
+
+
+def _progress_for_intent(intent: str) -> str:
+    labels = {
+        "catalog_query": "Finding available cards",
+        "comparison": "Comparing matching cards",
+        "how_to_apply": "Checking application steps",
+        "product_details": "Reviewing card details",
+        "existing_cardholder": "Checking service details",
+        "eligibility_check": "Preparing eligibility questions",
+        "i_need_a_credit_card": "Finding suitable cards",
+        "greeting": "Preparing answer",
+        "off_topic": "Preparing answer",
+    }
+    return labels.get(intent, "Checking card details")
+
+
 def _form_data_summary(form_data: dict) -> str:
     parts = []
     if form_data.get("target_card"):
@@ -422,17 +441,20 @@ def build_crew_stream(
     calculator_type = classifier_output.get("calculator_type", "")
 
     if classifier_output.get("needs_preference_form"):
+        yield _progress_signal("Preparing a few quick questions", "preference_form")
         yield _build_preference_form_signal(user_message, session, classifier_output)
         yield json.dumps({"__done_signal__": True, "intent": "", "calculator": ""})
         return
 
     if classifier_output.get("needs_eligibility_form"):
+        yield _progress_signal("Preparing eligibility questions", "eligibility_form")
         yield _build_eligibility_form_signal(user_message, session)
         yield json.dumps({"__done_signal__": True, "intent": "", "calculator": ""})
         return
 
     clarify = _clarify_candidate_cards(intent, classifier_output.get("candidate_cards") or [])
     if clarify:
+        yield _progress_signal("Preparing answer", "response")
         clean = _guardrails(clarify)
         session.add(user_message, clean)
         for token in _stream_text(clean):
@@ -442,6 +464,7 @@ def build_crew_stream(
 
     direct = _direct_response(intent)
     if direct:
+        yield _progress_signal("Preparing answer", "response")
         clean = _guardrails(direct)
         session.add(user_message, clean)
         for token in _stream_text(clean):
@@ -450,6 +473,9 @@ def build_crew_stream(
         return
 
     routing = _build_routing(user_message, classifier_output)
+    yield _progress_signal("Searching card details", "search")
+    yield _progress_signal(_progress_for_intent(intent), intent)
+    yield _progress_signal("Preparing answer", "response")
     yield "Let me check that for you.\n\n"
 
     if intent == "catalog_query":
