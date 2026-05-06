@@ -159,8 +159,51 @@
       </section>
 
       <section id="filesPanel" class="card hidden">
-        <h2>Markdown files in active bank</h2>
+        <div class="topbar">
+          <div>
+            <h2>Markdown files in active bank</h2>
+            <p>Search by title, path, banking type, or document type.</p>
+          </div>
+        </div>
+        <div class="field">
+          <label for="fileSearch">Search markdown files</label>
+          <input id="fileSearch" placeholder="Search files" />
+        </div>
         <div id="files" class="list"></div>
+      </section>
+
+      <section id="uploadPanel" class="card hidden">
+        <div class="topbar">
+          <div>
+            <h2>Admin raw text upload</h2>
+            <p>Create markdown directly in the active bank workspace.</p>
+          </div>
+          <span class="pill">LLM normalization + auto-ingest</span>
+        </div>
+        <form id="uploadForm">
+          <div class="field">
+            <label for="documentTitle">Document Name</label>
+            <input id="documentTitle" required placeholder="Visa Platinum Credit Card" />
+          </div>
+          <div class="actions">
+            <div class="field" style="flex:1 1 240px;">
+              <label for="documentType">Document Type</label>
+              <select id="documentType" required></select>
+            </div>
+            <div class="field" style="flex:1 1 240px;">
+              <label for="bankingType">Upload Scope</label>
+              <select id="bankingType" required></select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="rawText">Raw Text</label>
+            <textarea id="rawText" style="min-height:260px;" required placeholder="Paste the bank-provided raw text here"></textarea>
+          </div>
+          <div class="actions">
+            <div id="uploadStatus" class="status"></div>
+            <button id="uploadBtn" class="primary" type="submit">Upload and Ingest</button>
+          </div>
+        </form>
       </section>
 
       <section id="editorPanel" class="card hidden">
@@ -184,19 +227,26 @@
     const createBankPanel = document.getElementById("createBankPanel");
     const collectionsPanel = document.getElementById("collectionsPanel");
     const filesPanel = document.getElementById("filesPanel");
+    const uploadPanel = document.getElementById("uploadPanel");
     const editorPanel = document.getElementById("editorPanel");
     const stateCard = document.getElementById("stateCard");
     const loginStatus = document.getElementById("loginStatus");
     const saveStatus = document.getElementById("saveStatus");
     const createBankStatus = document.getElementById("createBankStatus");
+    const uploadStatus = document.getElementById("uploadStatus");
     const editorStatus = document.getElementById("editorStatus");
     const collectionsEl = document.getElementById("collections");
     const filesEl = document.getElementById("files");
     const activeBankEl = document.getElementById("activeBank");
     const currentBankEl = document.getElementById("currentBank");
+    const documentTypeEl = document.getElementById("documentType");
+    const bankingTypeEl = document.getElementById("bankingType");
     const editor = document.getElementById("markdownEditor");
     const editorPath = document.getElementById("editorPath");
     const saveFileBtn = document.getElementById("saveFileBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const uploadForm = document.getElementById("uploadForm");
+    let allFiles = [];
     let currentPath = "";
 
     function token() { return localStorage.getItem(tokenKey) || ""; }
@@ -208,8 +258,38 @@
       createBankPanel.classList.remove("hidden");
       collectionsPanel.classList.remove("hidden");
       filesPanel.classList.remove("hidden");
+      uploadPanel.classList.remove("hidden");
       editorPanel.classList.remove("hidden");
       stateCard.classList.remove("hidden");
+    }
+    function renderFiles(files) {
+      const query = (document.getElementById("fileSearch")?.value || "").trim().toLowerCase();
+      filesEl.innerHTML = "";
+      const filtered = !query
+        ? files
+        : files.filter(file => {
+            const haystack = [
+              file.title,
+              file.name,
+              file.path,
+              file.banking_type,
+              file.document_type,
+            ].join(" ").toLowerCase();
+            return haystack.includes(query);
+          });
+      if (!filtered.length) {
+        filesEl.innerHTML = `<p>${query ? "No markdown files match this search." : "No markdown files in this active bank yet."}</p>`;
+        return;
+      }
+      filtered.forEach(file => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "row";
+        if (file.path === currentPath) row.classList.add("active");
+        row.innerHTML = `<strong>${file.title || file.name}</strong><small>${file.path}</small><small>${file.banking_type} / ${file.document_type}</small>`;
+        row.onclick = () => openFile(file.path);
+        filesEl.appendChild(row);
+      });
     }
     function renderState(data) {
       activeBankEl.innerHTML = "";
@@ -221,6 +301,23 @@
       });
       activeBankEl.value = data.active_bank || "";
       currentBankEl.textContent = data.active_bank || "";
+      documentTypeEl.innerHTML = "";
+      (data.document_types || []).forEach(type => {
+        const opt = document.createElement("option");
+        opt.value = type;
+        opt.textContent = type;
+        documentTypeEl.appendChild(opt);
+      });
+      bankingTypeEl.innerHTML = "";
+      (data.banking_types || []).forEach(type => {
+        const opt = document.createElement("option");
+        opt.value = type;
+        opt.textContent = type;
+        bankingTypeEl.appendChild(opt);
+      });
+      if ([...bankingTypeEl.options].some(opt => opt.value === "both")) {
+        bankingTypeEl.value = "both";
+      }
       collectionsEl.innerHTML = "";
       Object.entries(data.collections || {}).forEach(([key, value]) => {
         const row = document.createElement("div");
@@ -228,20 +325,8 @@
         row.innerHTML = `<strong>${key}</strong><small>${value}</small>`;
         collectionsEl.appendChild(row);
       });
-      filesEl.innerHTML = "";
-      const files = data.files || [];
-      if (!files.length) {
-        filesEl.innerHTML = "<p>No markdown files in this active bank yet.</p>";
-      }
-      files.forEach(file => {
-        const row = document.createElement("button");
-        row.type = "button";
-        row.className = "row";
-        if (file.path === currentPath) row.classList.add("active");
-        row.innerHTML = `<strong>${file.title || file.name}</strong><small>${file.path}</small><small>${file.banking_type} / ${file.document_type}</small>`;
-        row.onclick = () => openFile(file.path);
-        filesEl.appendChild(row);
-      });
+      allFiles = data.files || [];
+      renderFiles(allFiles);
     }
     async function openFile(path) {
       currentPath = path;
@@ -337,6 +422,36 @@
       }
       renderState(await activateRes.json());
       status(createBankStatus, `Created and activated ${data.bank}.`, "ok");
+    };
+    document.getElementById("fileSearch").addEventListener("input", () => renderFiles(allFiles));
+    uploadForm.onsubmit = async event => {
+      event.preventDefault();
+      uploadBtn.disabled = true;
+      status(uploadStatus, "Creating markdown and ingesting...");
+      const payload = {
+        document_title: document.getElementById("documentTitle").value.trim(),
+        document_type: documentTypeEl.value,
+        banking_type: bankingTypeEl.value,
+        raw_text: document.getElementById("rawText").value.trim(),
+      };
+      const res = await fetch("/admin/kb/ingest-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      uploadBtn.disabled = false;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        status(uploadStatus, err.detail || "Upload failed.", "err");
+        return;
+      }
+      const data = await res.json();
+      status(uploadStatus, `Uploaded ${data.markdown_paths.length} markdown file(s), ${data.chunk_count} chunks.`, "ok");
+      uploadForm.reset();
+      if ([...bankingTypeEl.options].some(opt => opt.value === "both")) {
+        bankingTypeEl.value = "both";
+      }
+      await loadState();
     };
     saveFileBtn.onclick = async () => {
       if (!currentPath) return;

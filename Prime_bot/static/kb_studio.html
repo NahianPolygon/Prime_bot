@@ -137,7 +137,10 @@
         </div>
       </div>
       <div class="card">
-        <h2>Available markdown files</h2>
+        <div class="field">
+          <h2>Available markdown files</h2>
+          <input id="fileSearch" placeholder="Search markdown files" />
+        </div>
         <div id="files" class="files"></div>
       </div>
     </aside>
@@ -209,6 +212,8 @@
     const editorPath = document.getElementById("editorPath");
     const editorStatus = document.getElementById("editorStatus");
     const saveBtn = document.getElementById("saveBtn");
+    const fileSearchEl = document.getElementById("fileSearch");
+    let allFiles = [];
     let currentPath = "";
 
     function setStatus(el, message, kind) {
@@ -225,12 +230,25 @@
     }
 
     function renderFiles(files) {
+      const query = (fileSearchEl.value || "").trim().toLowerCase();
       filesEl.innerHTML = "";
-      if (!files.length) {
-        filesEl.innerHTML = "<p>No markdown files yet.</p>";
+      const filtered = !query
+        ? files
+        : files.filter(file => {
+            const haystack = [
+              file.title,
+              file.name,
+              file.path,
+              file.banking_type,
+              file.document_type,
+            ].join(" ").toLowerCase();
+            return haystack.includes(query);
+          });
+      if (!filtered.length) {
+        filesEl.innerHTML = `<p>${query ? "No markdown files match this search." : "No markdown files yet."}</p>`;
         return;
       }
-      files.forEach(file => {
+      filtered.forEach(file => {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "file" + (file.path === currentPath ? " active" : "");
@@ -262,7 +280,8 @@
         bankingTypeEl.appendChild(opt);
       });
       bankingTypeEl.value = "both";
-      renderFiles(data.files || []);
+      allFiles = data.files || [];
+      renderFiles(allFiles);
     }
 
     async function openFile(path) {
@@ -326,9 +345,11 @@
       }
       const data = await res.json();
       setStatus(editorStatus, `Saved and re-ingested ${data.ingestion.chunk_count} chunks.`, "ok");
-      renderFiles(data.files || []);
+      allFiles = data.files || [];
+      renderFiles(allFiles);
     });
 
+    fileSearchEl.addEventListener("input", () => renderFiles(allFiles));
     loadContext().catch(() => setStatus(uploadStatus, "Could not load KB Studio context.", "err"));
   </script>
 </body>
