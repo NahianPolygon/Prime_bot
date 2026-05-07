@@ -398,6 +398,8 @@ async def websocket_chat(websocket: WebSocket):
                 done_intent = ""
                 done_calculator = ""
                 done_calculator_config = None
+                done_cards = []
+                done_banking_type = ""
                 for token in build_crew_stream(message, session, request_id=request_id):
                     if token.startswith('{"__progress_signal__"'):
                         try:
@@ -442,6 +444,8 @@ async def websocket_chat(websocket: WebSocket):
                             done_intent = sig.get("intent", "")
                             done_calculator = sig.get("calculator", "")
                             done_calculator_config = sig.get("calculator_config")
+                            done_cards = sig.get("cards") or []
+                            done_banking_type = sig.get("banking_type", "")
                         except json.JSONDecodeError:
                             pass
                         continue
@@ -449,7 +453,13 @@ async def websocket_chat(websocket: WebSocket):
                     await websocket.send_text(json.dumps({"type": "token", "token": token}))
 
                 _record_latency((time.perf_counter() - req_start) * 1000)
-                done_payload = {"type": "done", "intent": done_intent, "calculator": done_calculator}
+                done_payload = {
+                    "type": "done",
+                    "intent": done_intent,
+                    "calculator": done_calculator,
+                    "cards": done_cards,
+                    "banking_type": done_banking_type,
+                }
                 if done_calculator_config:
                     done_payload["calculator_config"] = done_calculator_config
                 await websocket.send_text(json.dumps(done_payload))

@@ -225,6 +225,37 @@ def _progress_for_intent(intent: str) -> str:
     return labels.get(intent, "Checking card details")
 
 
+def _response_lead_in(intent: str, classifier_output: dict, session: SessionMemory) -> str:
+    target_card = classifier_output.get("target_card", "").strip()
+    cards = classifier_output.get("active_cards") or _get_context_cards(session)
+    if not isinstance(cards, list):
+        cards = []
+
+    if intent == "comparison":
+        if len(cards) >= 2:
+            return f"I’m comparing {', '.join(cards[:3])} for you.\n\n"
+        return "I’m comparing the most relevant cards for you.\n\n"
+    if intent == "product_details":
+        if target_card:
+            return f"I’m pulling together the key details for **{target_card}**.\n\n"
+        if len(cards) == 1:
+            return f"I’m pulling together the key details for **{cards[0]}**.\n\n"
+        return "I’m pulling together the key card details for you.\n\n"
+    if intent == "how_to_apply":
+        if target_card:
+            return f"I’m checking how to apply for **{target_card}**.\n\n"
+        return "I’m checking the application steps for you.\n\n"
+    if intent == "existing_cardholder":
+        return "I’m checking the cardholder service details for you.\n\n"
+    if intent == "catalog_query":
+        return "I’m looking through the available cards for you.\n\n"
+    if intent == "i_need_a_credit_card":
+        return "I’m finding the strongest card options for you.\n\n"
+    if intent == "eligibility_check":
+        return "I’m checking the eligibility details for you.\n\n"
+    return "I’m checking that for you.\n\n"
+
+
 def _form_data_summary(form_data: dict) -> str:
     parts = []
     if form_data.get("target_card"):
@@ -409,7 +440,13 @@ def _done_signal(
     session: SessionMemory,
     classifier_output: dict,
 ) -> str:
-    payload = {"__done_signal__": True, "intent": intent, "calculator": calculator_type}
+    payload = {
+        "__done_signal__": True,
+        "intent": intent,
+        "calculator": calculator_type,
+        "cards": _get_context_cards(session),
+        "banking_type": classifier_output.get("banking_type", ""),
+    }
     if calculator_type == "emi":
         payload["calculator_config"] = build_emi_calculator_config(user_message, session, classifier_output)
     return json.dumps(payload)
@@ -476,7 +513,7 @@ def build_crew_stream(
     yield _progress_signal("Searching card details", "search")
     yield _progress_signal(_progress_for_intent(intent), intent)
     yield _progress_signal("Preparing answer", "response")
-    yield "Let me check that for you.\n\n"
+    yield _response_lead_in(intent, classifier_output, session)
 
     if intent == "catalog_query":
         log_event("specialist_start", request_id=request_id, session_id=session_id, specialist="catalog")
