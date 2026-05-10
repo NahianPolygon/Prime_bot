@@ -33,6 +33,38 @@ _stats = {
     "unique_sessions": set(),
 }
 
+MODEL_CONTEXT_LIMIT = 4096
+CONTEXT_OVERHEAD_TOKENS = 900
+
+
+def _estimate_tokens(text: str) -> int:
+    clean = (text or "").strip()
+    if not clean:
+        return 0
+    # Approximate for dashboard visibility. Ollama/Qwen tokenization is not
+    # available here, so use a conservative character-based estimate.
+    return max(1, round(len(clean) / 4))
+
+
+def _context_budget_payload(session, current_message: str = "") -> dict:
+    history = session.get_history_str(max_chars=12000)
+    profile = session.get_profile_str()
+    estimated_used = (
+        _estimate_tokens(history)
+        + _estimate_tokens(profile)
+        + _estimate_tokens(current_message)
+        + CONTEXT_OVERHEAD_TOKENS
+    )
+    estimated_used = min(estimated_used, MODEL_CONTEXT_LIMIT)
+    remaining = max(MODEL_CONTEXT_LIMIT - estimated_used, 0)
+    return {
+        "limit": MODEL_CONTEXT_LIMIT,
+        "used": estimated_used,
+        "remaining": remaining,
+        "percent": round((estimated_used / MODEL_CONTEXT_LIMIT) * 100, 1),
+        "label": "Approx context",
+    }
+
 
 async def _send_text_stream(websocket: WebSocket, text: str, chunk_chars: int = 24, delay_ms: int = 14):
     for chunk in iter_text_stream(text, chunk_chars=chunk_chars):
@@ -305,7 +337,12 @@ async def websocket_chat(websocket: WebSocket):
                     result = handle_preference_form(form_data, session, request_id=request_id)
                     await _send_progress(websocket, "Preparing answer", "response")
                     await _send_text_stream(websocket, result)
-                    await websocket.send_text(json.dumps({"type": "done", "intent": "i_need_a_credit_card", "calculator": ""}))
+                    await websocket.send_text(json.dumps({
+                        "type": "done",
+                        "intent": "i_need_a_credit_card",
+                        "calculator": "",
+                        "token_budget": _context_budget_payload(session),
+                    }))
                     log_event("ws_preference_complete", request_id=request_id, session_id=session_id)
                 except Exception as e:
                     log_event("ws_preference_error", request_id=request_id, session_id=session_id, error=str(e))
@@ -352,7 +389,12 @@ async def websocket_chat(websocket: WebSocket):
                         elig_outcome = _infer_eligibility_outcome(result)
                         await _send_progress(websocket, "Preparing answer", "response")
                         await _send_text_stream(websocket, result)
-                    await websocket.send_text(json.dumps({"type": "done", "intent": elig_outcome, "calculator": ""}))
+                    await websocket.send_text(json.dumps({
+                        "type": "done",
+                        "intent": elig_outcome,
+                        "calculator": "",
+                        "token_budget": _context_budget_payload(session),
+                    }))
                     log_event(
                         "ws_eligibility_complete",
                         request_id=request_id,
@@ -459,6 +501,7 @@ async def websocket_chat(websocket: WebSocket):
                     "calculator": done_calculator,
                     "cards": done_cards,
                     "banking_type": done_banking_type,
+                    "token_budget": _context_budget_payload(session, message),
                 }
                 if done_calculator_config:
                     done_payload["calculator_config"] = done_calculator_config

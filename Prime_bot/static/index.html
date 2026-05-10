@@ -38,6 +38,14 @@
     .admin-link { height: 32px; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: var(--accent); background: #ffffff; border: 1px solid rgba(15, 118, 110, 0.22); border-radius: 8px; padding: 0 11px; font-size: 12px; font-weight: 700; box-shadow: 0 8px 18px rgba(17, 32, 29, 0.06); transition: transform 0.15s, border-color 0.15s, background 0.15s; }
     .admin-link svg { width: 15px; height: 15px; fill: currentColor; flex-shrink: 0; }
     .admin-link:hover { transform: translateY(-1px); border-color: rgba(15, 118, 110, 0.45); background: var(--accent-light); }
+    .token-meter { width: 176px; display: flex; flex-direction: column; gap: 4px; padding: 7px 9px; background: #ffffff; border: 1px solid rgba(15, 118, 110, 0.18); border-radius: 8px; box-shadow: 0 8px 18px rgba(17, 32, 29, 0.05); }
+    .token-meter-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; line-height: 1.1; }
+    .token-meter-label { color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+    .token-meter-count { color: var(--text-muted); font-family: var(--font-mono); white-space: nowrap; }
+    .token-meter-track { height: 5px; border-radius: 999px; background: rgba(15, 118, 110, 0.12); overflow: hidden; }
+    .token-meter-fill { width: 0%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.25s ease, background 0.25s ease; }
+    .token-meter.is-warm .token-meter-fill { background: linear-gradient(90deg, var(--warning), #d97706); }
+    .token-meter.is-hot .token-meter-fill { background: linear-gradient(90deg, var(--error), #b91c1c); }
     .lang-btn { font-family: var(--font); font-size: 11px; font-weight: 700; color: var(--text-secondary); background: #ffffff; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; cursor: pointer; transition: all 0.15s; letter-spacing: 0.01em; }
     .lang-btn:hover { background: var(--accent-light); color: var(--accent); border-color: rgba(15,118,110,0.25); }
     .lang-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
@@ -106,17 +114,6 @@
     .follow-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-left: 42px; }
     .follow-chip { font-family: var(--font); font-size: 12px; color: var(--accent); background: var(--accent-light); border: 1px solid rgba(26,79,156,0.15); border-radius: 16px; padding: 5px 13px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
     .follow-chip:hover { background: var(--accent); color: white; border-color: var(--accent); }
-    .response-meta { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px 0; }
-    .meta-pill { display: inline-flex; align-items: center; min-height: 24px; border-radius: 999px; padding: 0 10px; font-size: 11px; font-weight: 700; border: 1px solid rgba(15, 118, 110, 0.16); background: #f8fcfb; color: var(--text-secondary); }
-    .meta-pill.intent { color: var(--accent); background: var(--accent-light); }
-    .card-pill-strip { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px 0; }
-    .card-pill { display: inline-flex; align-items: center; min-height: 26px; border-radius: 999px; padding: 0 10px; font-size: 11px; font-weight: 700; border: 1px solid rgba(26,79,156,0.16); background: #f3f7ff; color: var(--accent-2); }
-    .summary-block { padding: 12px 16px 4px; }
-    .summary-block p:last-child { margin-bottom: 0; }
-    .details-toggle { margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(248, 250, 252, 0.8); overflow: hidden; }
-    .details-toggle summary { list-style: none; cursor: pointer; padding: 10px 12px; font-size: 12px; font-weight: 700; color: var(--accent); }
-    .details-toggle summary::-webkit-details-marker { display: none; }
-    .details-toggle-body { padding: 0 12px 12px; }
     /* Table */
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
     .table-wrapper table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 13px; margin: 0; background: white; }
@@ -267,6 +264,7 @@
       .app { height: 100vh; margin: 0; border-radius: 0; border: 0; }
       .header { padding: 12px; align-items: flex-start; }
       .header-logo { width: 36px; height: 36px; }
+      .token-meter { order: 4; width: 100%; max-width: 260px; }
       .admin-link-text { display: none; }
       .admin-link { padding: 0 9px; }
       .messages { padding: 18px 14px; }
@@ -302,6 +300,15 @@
       </div>
     </div>
     <div class="header-actions">
+      <div class="token-meter" id="tokenMeter" title="Approximate context used by this chat">
+        <div class="token-meter-top">
+          <span class="token-meter-label" id="tokenMeterLabel">Context</span>
+          <span class="token-meter-count" id="tokenMeterCount">0 / 4096</span>
+        </div>
+        <div class="token-meter-track">
+          <div class="token-meter-fill" id="tokenMeterFill"></div>
+        </div>
+      </div>
       <a class="admin-link" href="/kb-uploader" title="Open KB uploader" aria-label="Open KB uploader">
         <svg viewBox="0 0 24 24"><path d="M10 4l2 2h8c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2L2.01 6c0-1.1.89-2 1.99-2h6z"/></svg>
         <span class="admin-link-text">KB Studio</span>
@@ -349,11 +356,6 @@
       placeholder: "Ask about credit cards, eligibility, fees...",
       hint: 'Press <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Enter</kbd> to send \xB7 <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Shift+Enter</kbd> for new line',
       newChat: "New chat", thinking: "Thinking",
-      moreDetails: "More details",
-      sourceCurrent: "Based on current card details",
-      sourceVaries: "Some details may vary by card type",
-      sourceService: "Based on current service information",
-      sourceEligibility: "Based on your current details and card rules",
       welcomeTitle: "How can I help you today?",
       welcomeDesc: "I can help you find the right Prime Bank credit card, check your eligibility, compare products, or assist with your existing card.",
       chips: [
@@ -372,11 +374,6 @@
       placeholder: "\u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1, \u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE, \u09AB\u09BF \u09B8\u09AE\u09CD\u09AA\u09B0\u09CD\u0995\u09C7 \u099C\u09BF\u099C\u09CD\u099E\u09C7\u09B8 \u0995\u09B0\u09C1\u09A8...",
       hint: '\u09AA\u09BE\u09A0\u09BE\u09A4\u09C7 <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Enter</kbd> \xB7 \u09A8\u09A4\u09C1\u09A8 \u09B2\u09BE\u0987\u09A8\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Shift+Enter</kbd>',
       newChat: "\u09A8\u09A4\u09C1\u09A8 \u099A\u09CD\u09AF\u09BE\u099F", thinking: "\u09AD\u09BE\u09AC\u099B\u09BF",
-      moreDetails: "\u0986\u09B0\u0993 \u09AC\u09BF\u09B8\u09CD\u09A4\u09BE\u09B0\u09BF\u09A4",
-      sourceCurrent: "\u09AC\u09B0\u09CD\u09A4\u09AE\u09BE\u09A8 \u0995\u09BE\u09B0\u09CD\u09A1 \u09A4\u09A5\u09CD\u09AF\u09C7\u09B0 \u09AD\u09BF\u09A4\u09CD\u09A4\u09BF\u09A4\u09C7",
-      sourceVaries: "\u0995\u09BF\u099B\u09C1 \u09A4\u09A5\u09CD\u09AF \u0995\u09BE\u09B0\u09CD\u09A1\u09AD\u09C7\u09A6\u09C7 \u09AD\u09BF\u09A8\u09CD\u09A8 \u09B9\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7",
-      sourceService: "\u09AC\u09B0\u09CD\u09A4\u09AE\u09BE\u09A8 \u09B8\u09BE\u09B0\u09CD\u09AD\u09BF\u09B8 \u09A4\u09A5\u09CD\u09AF\u09C7\u09B0 \u09AD\u09BF\u09A4\u09CD\u09A4\u09BF\u09A4\u09C7",
-      sourceEligibility: "\u0986\u09AA\u09A8\u09BE\u09B0 \u09A4\u09A5\u09CD\u09AF \u0993 \u0995\u09BE\u09B0\u09CD\u09A1 \u09A8\u09C0\u09A4\u09BF\u09B0 \u09AD\u09BF\u09A4\u09CD\u09A4\u09BF\u09A4\u09C7",
       welcomeTitle: "\u0986\u099C \u0995\u09C0\u09AD\u09BE\u09AC\u09C7 \u09B8\u09BE\u09B9\u09BE\u09AF\u09CD\u09AF \u0995\u09B0\u09A4\u09C7 \u09AA\u09BE\u09B0\u09BF?",
       welcomeDesc: "\u0986\u09AE\u09BF \u0986\u09AA\u09A8\u09BE\u0995\u09C7 \u09B8\u09A0\u09BF\u0995 \u09AA\u09CD\u09B0\u09BE\u0987\u09AE \u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1 \u0996\u09C1\u0981\u099C\u09C7 \u09AA\u09C7\u09A4\u09C7, \u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE \u09AF\u09BE\u099A\u09BE\u0987 \u0995\u09B0\u09A4\u09C7, \u09AA\u09A3\u09CD\u09AF \u09A4\u09C1\u09B2\u09A8\u09BE \u0995\u09B0\u09A4\u09C7 \u09AC\u09BE \u09AC\u09BF\u09A6\u09CD\u09AF\u09AE\u09BE\u09A8 \u0995\u09BE\u09B0\u09CD\u09A1\u09C7 \u09B8\u09BE\u09B9\u09BE\u09AF\u09CD\u09AF \u0995\u09B0\u09A4\u09C7 \u09AA\u09BE\u09B0\u09BF\u0964",
       chips: [
@@ -425,9 +422,10 @@
   var sessionId = null, isLoading = false;
   var ws = null, wsReady = false, reconnectDelay = 1000;
   var reconnectTimer = null, pingInterval = null;
-  var activeBubble = null, activeThinkId = null, fullText = "";
+  var activeBubble = null, activeThinkId = null, fullText = "", renderedText = "";
   var activeFormId = null, thinkTimer = null, thinkStart = 0;
-  var streamQueue = "", streamFlushTimer = null, lastDoneMeta = null;
+  var streamQueue = "", streamFlushTimer = null, streamRenderTicker = null, lastDoneMeta = null;
+  var pendingDoneMeta = null, pendingDoneBubble = null;
   var emiTenure = 12;
   var activeEMICalcConfig = null;
   var activeEMICardIndex = 0;
@@ -439,6 +437,10 @@
   var sendBtnEl  = document.getElementById("sendBtn");
   var statusDot  = document.getElementById("statusDot");
   var statusText = document.getElementById("statusText");
+  var tokenMeter = document.getElementById("tokenMeter");
+  var tokenMeterLabel = document.getElementById("tokenMeterLabel");
+  var tokenMeterCount = document.getElementById("tokenMeterCount");
+  var tokenMeterFill = document.getElementById("tokenMeterFill");
   var scrollFab  = document.getElementById("scrollFab");
   var langBtn    = document.getElementById("langBtn");
   var btnClear   = document.getElementById("btnClear");
@@ -518,29 +520,6 @@
       }
     };
     return (labels[lang] && labels[lang][key]) || (labels.en && labels.en[key]) || key;
-  }
-
-  function intentLabel(intent) {
-    var labels = {
-      comparison: { en: "Comparison", bn: "\u09A4\u09C1\u09B2\u09A8\u09BE" },
-      product_details: { en: "Card details", bn: "\u0995\u09BE\u09B0\u09CD\u09A1 \u09A4\u09A5\u09CD\u09AF" },
-      how_to_apply: { en: "Application", bn: "\u0986\u09AC\u09C7\u09A6\u09A8" },
-      existing_cardholder: { en: "Cardholder service", bn: "\u0995\u09BE\u09B0\u09CD\u09A1\u09B9\u09CB\u09B2\u09CD\u09A1\u09BE\u09B0 \u09B8\u09BE\u09B0\u09CD\u09AD\u09BF\u09B8" },
-      i_need_a_credit_card: { en: "Recommendation", bn: "\u09B0\u09C7\u0995\u09AE\u09C7\u09A8\u09CD\u09A1\u09C7\u09B6\u09A8" },
-      catalog_query: { en: "Card catalog", bn: "\u0995\u09BE\u09B0\u09CD\u09A1 \u0995\u09CD\u09AF\u09BE\u099F\u09BE\u09B2\u0997" },
-      eligibility_check: { en: "Eligibility", bn: "\u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE" },
-    };
-    var label = labels[intent];
-    return label ? label[lang] : (lang === "bn" ? "\u09AA\u09CD\u09B0\u09A4\u09BF\u0995\u09CD\u09B0\u09BF\u09AF\u09BC\u09BE" : "Response");
-  }
-
-  function sourceConfidenceText(meta) {
-    var t = UI[lang];
-    if (!meta || !meta.intent) return t.sourceCurrent;
-    if (meta.intent === "existing_cardholder" || meta.intent === "how_to_apply") return t.sourceService;
-    if (meta.intent === "eligibility_check") return t.sourceEligibility;
-    if ((meta.cards || []).length > 1 || meta.banking_type === "both") return t.sourceVaries;
-    return t.sourceCurrent;
   }
 
   function buildFollowupActions(meta) {
@@ -625,15 +604,18 @@
       case "session_id": sessionId = data.session_id; break;
       case "show_preference_form":
         if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
-        activeBubble = null; fullText = ""; streamQueue = "";
+        activeBubble = null; fullText = ""; renderedText = ""; streamQueue = "";
+        pendingDoneMeta = null; pendingDoneBubble = null;
         renderPreferenceForm(data.schema); finishLoading(); break;
       case "show_eligibility_form":
         if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
-        activeBubble = null; fullText = ""; streamQueue = "";
+        activeBubble = null; fullText = ""; renderedText = ""; streamQueue = "";
+        pendingDoneMeta = null; pendingDoneBubble = null;
         renderEligibilityForm(data.schema); finishLoading(); break;
       case "eligibility_verdicts":
         if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
-        activeBubble = null; fullText = ""; streamQueue = "";
+        activeBubble = null; fullText = ""; renderedText = ""; streamQueue = "";
+        pendingDoneMeta = null; pendingDoneBubble = null;
         appendEligibilityVerdicts(data);
         break;
       case "progress":
@@ -643,26 +625,28 @@
       case "token":
         if (!activeBubble) {
           if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
-          activeBubble = createBotBubble(); fullText = "";
+          activeBubble = createBotBubble(); fullText = ""; renderedText = "";
         }
         fullText += data.token;
         queueStreamRender(activeBubble, data.token);
         scrollToBottom(); break;
       case "done":
+        updateTokenBudget(data.token_budget);
         if (activeBubble) {
-          flushStreamQueue(activeBubble, true);
-          lastDoneMeta = data;
-          renderBotBubble(activeBubble, fullText, data);
-          appendFollowupChips(data);
-          inputEl.placeholder = contextualPlaceholder(data);
-          if (data.calculator === "emi") createEMICalcBubble(data.calculator_config);
-          else if (data.calculator === "rewards") createRewardsCalcBubble();
+          pendingDoneMeta = data;
+          pendingDoneBubble = activeBubble;
+          flushStreamQueue(activeBubble, false);
+          if (!streamRenderTicker) startStreamTicker(activeBubble);
+          finishStreamIfReady();
+        } else {
+          finishLoading();
         }
-        activeBubble = null; fullText = ""; streamQueue = ""; finishLoading(); break;
+        break;
       case "cleared": sessionId = null; break;
       case "error":
         if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
-        activeBubble = null; fullText = ""; streamQueue = "";
+        activeBubble = null; fullText = ""; renderedText = ""; streamQueue = "";
+        pendingDoneMeta = null; pendingDoneBubble = null;
         appendBotBubble("Sorry, something went wrong. Please try again or call **16218**.");
         finishLoading(); break;
       case "pong": break;
@@ -671,10 +655,29 @@
 
   function queueStreamRender(bubble, token) {
     streamQueue += token || "";
+    if (!streamRenderTicker) startStreamTicker(bubble);
     if (streamFlushTimer) return;
     streamFlushTimer = setTimeout(function() {
       flushStreamQueue(bubble, false);
-    }, 48);
+    }, 180);
+  }
+
+  function startStreamTicker(bubble) {
+    if (streamRenderTicker) return;
+    streamRenderTicker = setInterval(function() {
+      if (!bubble) return;
+      if (renderedText.length >= fullText.length) {
+        if (!streamQueue) {
+          clearInterval(streamRenderTicker);
+          streamRenderTicker = null;
+          finishStreamIfReady();
+        }
+        return;
+      }
+      renderedText = fullText.slice(0, renderedText.length + 1);
+      renderStreamingBubble(bubble, renderedText);
+      finishStreamIfReady();
+    }, 20);
   }
 
   function flushStreamQueue(bubble, force) {
@@ -684,8 +687,36 @@
     }
     if (!bubble) return;
     if (!streamQueue && !force) return;
-    renderStreamingBubble(bubble, fullText);
     streamQueue = "";
+    if (force) {
+      renderedText = fullText;
+      renderStreamingBubble(bubble, renderedText);
+      if (streamRenderTicker) {
+        clearInterval(streamRenderTicker);
+        streamRenderTicker = null;
+      }
+    } else if (!streamRenderTicker) {
+      startStreamTicker(bubble);
+    }
+  }
+
+  function finishStreamIfReady() {
+    if (!pendingDoneMeta || !pendingDoneBubble) return;
+    if (renderedText.length < fullText.length) return;
+    lastDoneMeta = pendingDoneMeta;
+    updateTokenBudget(pendingDoneMeta.token_budget);
+    renderBotBubble(pendingDoneBubble, fullText, pendingDoneMeta);
+    appendFollowupChips(pendingDoneMeta);
+    inputEl.placeholder = contextualPlaceholder(pendingDoneMeta);
+    if (pendingDoneMeta.calculator === "emi") createEMICalcBubble(pendingDoneMeta.calculator_config);
+    else if (pendingDoneMeta.calculator === "rewards") createRewardsCalcBubble();
+    pendingDoneMeta = null;
+    pendingDoneBubble = null;
+    activeBubble = null;
+    fullText = "";
+    renderedText = "";
+    streamQueue = "";
+    finishLoading();
   }
 
   /* ── Message helpers ── */
@@ -703,17 +734,39 @@
     var btn = document.createElement("button");
     btn.className = "copy-btn"; btn.title = "Copy";
     btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+    function markCopied() {
+      btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>';
+      btn.classList.add("copied");
+      setTimeout(function() {
+        btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+        btn.classList.remove("copied");
+      }, 1500);
+    }
+    function fallbackCopy(text) {
+      var probe = document.createElement("textarea");
+      probe.value = text;
+      probe.setAttribute("readonly", "");
+      probe.style.position = "absolute";
+      probe.style.left = "-9999px";
+      document.body.appendChild(probe);
+      probe.select();
+      probe.setSelectionRange(0, probe.value.length);
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      document.body.removeChild(probe);
+      return ok;
+    }
     btn.onclick = function(e) {
       e.stopPropagation();
-      var text = bubbleEl.innerText || "";
-      navigator.clipboard.writeText(text).then(function() {
-        btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>';
-        btn.classList.add("copied");
-        setTimeout(function() {
-          btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
-          btn.classList.remove("copied");
-        }, 1500);
-      }).catch(function() {});
+      var text = (bubbleEl.innerText || bubbleEl.textContent || "").trim();
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(markCopied).catch(function() {
+          if (fallbackCopy(text)) markCopied();
+        });
+        return;
+      }
+      if (fallbackCopy(text)) markCopied();
     };
     return btn;
   }
@@ -954,60 +1007,6 @@
     if (afterHtml) { var d2 = document.createElement("div"); d2.className = "bubble-footer"; d2.innerHTML = afterHtml; bubble.appendChild(d2); }
   }
 
-  function buildStructuredResponseHtml(html) {
-    var wrapper = document.createElement("div");
-    wrapper.innerHTML = html;
-    var blocks = Array.prototype.slice.call(wrapper.children || []);
-    var textLength = (wrapper.textContent || "").trim().length;
-    if (blocks.length < 5 && textLength < 900) return html;
-
-    var splitIndex = -1;
-    var visibleBlocks = 0;
-    for (var i = 0; i < blocks.length; i++) {
-      var tag = (blocks[i].tagName || "").toLowerCase();
-      if (tag === "h2" && visibleBlocks >= 2) {
-        splitIndex = i;
-        break;
-      }
-      visibleBlocks += 1;
-      if (visibleBlocks >= 4 && splitIndex < 0) splitIndex = i + 1;
-    }
-    if (splitIndex <= 0 || splitIndex >= blocks.length) return html;
-
-    var summaryHtml = blocks.slice(0, splitIndex).map(function(node) { return node.outerHTML; }).join("");
-    var detailsHtml = blocks.slice(splitIndex).map(function(node) { return node.outerHTML; }).join("");
-    return (
-      '<div class="summary-block">' + summaryHtml + '</div>' +
-      '<details class="details-toggle">' +
-        '<summary>' + UI[lang].moreDetails + '</summary>' +
-        '<div class="details-toggle-body">' + detailsHtml + '</div>' +
-      '</details>'
-    );
-  }
-
-  function addResponseChrome(bubble, meta) {
-    if (!meta || !meta.intent) return;
-    var metaWrap = document.createElement("div");
-    metaWrap.className = "response-meta";
-    metaWrap.innerHTML =
-      '<span class="meta-pill intent">' + escapeHtml(intentLabel(meta.intent)) + '</span>' +
-      '<span class="meta-pill confidence">' + escapeHtml(sourceConfidenceText(meta)) + '</span>';
-    bubble.insertBefore(metaWrap, bubble.firstChild);
-
-    var cards = Array.isArray(meta.cards) ? meta.cards.filter(Boolean) : [];
-    if (cards.length) {
-      var strip = document.createElement("div");
-      strip.className = "card-pill-strip";
-      cards.slice(0, 4).forEach(function(card) {
-        var pill = document.createElement("span");
-        pill.className = "card-pill";
-        pill.textContent = card;
-        strip.appendChild(pill);
-      });
-      bubble.insertBefore(strip, metaWrap.nextSibling);
-    }
-  }
-
   function renderBotBubble(bubble, rawText, meta) {
     var md = fixMarkdown(rawText), html = marked.parse(md);
     if (!/<table[\s>]/i.test(html)) {
@@ -1019,13 +1018,11 @@
           fallbackTableToHtml(fallbackTable),
           fallbackTable.after ? marked.parse(fallbackTable.after) : ""
         );
-        addResponseChrome(bubble, meta);
         return;
       }
       bubble.classList.remove("has-table");
       bubble.classList.remove("streaming");
-      bubble.innerHTML = buildStructuredResponseHtml(html);
-      addResponseChrome(bubble, meta);
+      bubble.innerHTML = html;
       return;
     }
     var fallbackForWeakTable = buildFallbackTable(rawText);
@@ -1036,7 +1033,6 @@
         fallbackTableToHtml(fallbackForWeakTable),
         fallbackForWeakTable.after ? marked.parse(fallbackForWeakTable.after) : ""
       );
-      addResponseChrome(bubble, meta);
       return;
     }
     var tStart = html.search(/<table[\s>]/i);
@@ -1044,7 +1040,6 @@
     var tEnd = tEndIdx >= 0 ? tEndIdx + "</table>".length : html.length;
     var before = html.slice(0, tStart).trim(), table = html.slice(tStart, tEnd).trim(), after = html.slice(tEnd).trim();
     renderTableBubble(bubble, before, table, after);
-    addResponseChrome(bubble, meta);
   }
 
   /* ── Thinking ── */
@@ -1253,7 +1248,7 @@
         '<div class="calc-results"><div class="calc-row"><span class="calc-row-label">Monthly EMI</span><span class="calc-row-val" id="emi_monthly">BDT \u2014</span></div><div class="calc-row"><span class="calc-row-label">Total Payable</span><span class="calc-row-val" id="emi_total">\u2014</span></div><div class="calc-row"><span class="calc-row-label" id="emi_fee_label">Conversion Fee (1%)</span><span class="calc-row-val" id="emi_fee">\u2014</span></div></div>' +
         '<p class="calc-note" id="emi_note"></p>' +
       '</div>';
-    wrap.appendChild(bub); row.appendChild(av); row.appendChild(wrap);
+    wrap.appendChild(bub); wrap.appendChild(makeCopyBtn(bub)); row.appendChild(av); row.appendChild(wrap);
     group.appendChild(row); appendTimestamp(group, false);
     messagesEl.appendChild(group); scrollToBottom();
     syncEMIDisplayTerms();
@@ -1308,7 +1303,7 @@
         '<div class="calc-results"><div class="calc-row"><span class="calc-row-label">Points / Month</span><span class="calc-row-val" id="rwd_month">\u2014</span></div><div class="calc-row"><span class="calc-row-label">Points / Year</span><span class="calc-row-val" id="rwd_year">\u2014</span></div><div class="calc-row"><span class="calc-row-label">Est. Redemption Value</span><span class="calc-row-val" id="rwd_value">\u2014</span></div></div>' +
         '<p class="calc-note">1 point per BDT 50 on POS & e-commerce \xB7 excludes cash advances & fees \xB7 500 pts \u2248 BDT 250</p>' +
       '</div>';
-    wrap.appendChild(bub); row.appendChild(av); row.appendChild(wrap);
+    wrap.appendChild(bub); wrap.appendChild(makeCopyBtn(bub)); row.appendChild(av); row.appendChild(wrap);
     group.appendChild(row); appendTimestamp(group, false);
     messagesEl.appendChild(group); scrollToBottom();
   }
@@ -1386,7 +1381,7 @@
         '</div>' +
       '</div>';
 
-    wrap.appendChild(bubble); row.appendChild(avatar); row.appendChild(wrap);
+    wrap.appendChild(bubble); wrap.appendChild(makeCopyBtn(bubble)); row.appendChild(avatar); row.appendChild(wrap);
     group.appendChild(row); appendTimestamp(group, false);
     messagesEl.appendChild(group); scrollToBottom();
   }
@@ -1484,7 +1479,7 @@
     submitBtn.textContent = "Get Recommendations"; submitBtn.onclick = function() { submitPrefForm(formId); };
     actions.appendChild(cancelBtn); actions.appendChild(submitBtn); outer.appendChild(actions);
 
-    bubble.appendChild(outer); wrap.appendChild(bubble); row.appendChild(avatar); row.appendChild(wrap);
+    bubble.appendChild(outer); wrap.appendChild(bubble); wrap.appendChild(makeCopyBtn(bubble)); row.appendChild(avatar); row.appendChild(wrap);
     group.appendChild(row); appendTimestamp(group, false);
     messagesEl.appendChild(group); scrollToBottom();
   }
@@ -1545,7 +1540,9 @@
     if (welcomeEl) welcomeEl.style.display = "none";
     appendUserBubble(text);
     inputEl.value = ""; inputEl.style.height = "auto"; updateSendBtn();
-    streamQueue = "";
+    streamQueue = ""; renderedText = "";
+    pendingDoneMeta = null; pendingDoneBubble = null;
+    if (streamRenderTicker) { clearInterval(streamRenderTicker); streamRenderTicker = null; }
     activeThinkId = showThinking(); startLoading();
     ws.send(JSON.stringify({ type: "message", message: text + getBengaliSuffix(), session_id: sessionId }));
   }
@@ -1566,13 +1563,29 @@
     statusDot.style.background = cfg.color; statusDot.style.animation = cfg.anim; statusText.textContent = cfg.label;
   }
 
+  function updateTokenBudget(budget) {
+    if (!tokenMeter || !tokenMeterFill || !tokenMeterCount || !tokenMeterLabel) return;
+    var limit = Number(budget && budget.limit) || 4096;
+    var used = Math.max(0, Number(budget && budget.used) || 0);
+    var remaining = Math.max(0, Number(budget && budget.remaining) || Math.max(limit - used, 0));
+    var percent = Math.min(100, Math.max(0, Number(budget && budget.percent) || (used / limit) * 100));
+    tokenMeterLabel.textContent = budget && budget.label ? budget.label : "Context";
+    tokenMeterCount.textContent = Math.round(used) + " / " + Math.round(limit) + " (" + Math.round(remaining) + " left)";
+    tokenMeterFill.style.width = percent.toFixed(1) + "%";
+    tokenMeter.classList.toggle("is-warm", percent >= 70 && percent < 90);
+    tokenMeter.classList.toggle("is-hot", percent >= 90);
+  }
+
   function clearConversation() {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "clear", session_id: sessionId }));
-    sessionId = null; activeBubble = null; fullText = ""; activeFormId = null; streamQueue = ""; lastDoneMeta = null;
+    sessionId = null; activeBubble = null; fullText = ""; renderedText = ""; activeFormId = null; streamQueue = ""; lastDoneMeta = null;
+    pendingDoneMeta = null; pendingDoneBubble = null;
+    if (streamRenderTicker) { clearInterval(streamRenderTicker); streamRenderTicker = null; }
     if (activeThinkId) { removeThinking(activeThinkId); activeThinkId = null; }
     messagesEl.querySelectorAll(".msg-group").forEach(function(el) { el.remove(); });
     if (welcomeEl) welcomeEl.style.display = "flex";
     inputEl.placeholder = UI[lang].placeholder;
+    updateTokenBudget({ used: 0, limit: 4096, remaining: 4096, percent: 0, label: "Approx context" });
     if (!isLoading) finishLoading();
   }
 
@@ -1592,6 +1605,7 @@
 
   /* ── Init ── */
   applyUI();
+  updateTokenBudget({ used: 0, limit: 4096, remaining: 4096, percent: 0, label: "Approx context" });
   connect();
 </script>
 </body>
