@@ -116,13 +116,16 @@
     .follow-chip:hover { background: var(--accent); color: white; border-color: var(--accent); }
     /* Table */
     .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-    .table-wrapper table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 13px; margin: 0; background: white; }
+    .table-wrapper table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 13px; margin: 0; background: white; }
     .table-wrapper th { background: #f0f5ff; font-weight: 600; white-space: nowrap; padding: 9px 14px; border: 1px solid var(--border); color: var(--accent); }
-    .table-wrapper td { padding: 8px 14px; border: 1px solid var(--border); vertical-align: top; min-width: 110px; max-width: 260px; word-break: break-word; }
-    .table-wrapper th:first-child, .table-wrapper td:first-child { position: sticky; left: 0; z-index: 1; background: inherit; }
-    .table-wrapper th:first-child { z-index: 2; background: #f0f5ff; }
+    .table-wrapper td { padding: 8px 14px; border: 1px solid var(--border); vertical-align: top; min-width: 110px; max-width: 260px; word-break: break-word; overflow-wrap: anywhere; background: #ffffff; }
+    .table-wrapper th:first-child, .table-wrapper td:first-child { position: sticky; left: 0; z-index: 4; min-width: 160px; max-width: 190px; background: #ffffff; box-shadow: 8px 0 12px rgba(17, 32, 29, 0.08); overflow: hidden; }
+    .table-wrapper th:first-child { z-index: 6; background: #f0f5ff; }
     .table-wrapper tbody tr:nth-child(even) { background: #f7f9ff; }
+    .table-wrapper tbody tr:nth-child(even) td { background: #f7f9ff; }
+    .table-wrapper tbody tr:nth-child(even) td:first-child { background: #f7f9ff; }
     .table-wrapper tbody tr:hover { background: #eef3fd; }
+    .table-wrapper tbody tr:hover td { background: #eef3fd; }
     /* Thinking indicator */
     .thinking-indicator { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; min-width: 220px; }
     .thinking-head { display: flex; align-items: center; gap: 8px; }

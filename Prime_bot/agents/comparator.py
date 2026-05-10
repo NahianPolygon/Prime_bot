@@ -5,7 +5,7 @@ from kb_config import get_all_products_collection
 from agents.compliance.common import get_collections
 from llm.ollama_client import chat, chat_stream
 from memory.session_memory import SessionMemory
-from tools.rag_tool import rag_search_multi
+from tools.rag_tool import rag_search_multi, rag_search_multi_queries
 
 
 SYSTEM = """You are the Prime Bank Credit Card Comparator.
@@ -72,7 +72,17 @@ def _get_context(user_message: str, routing: dict) -> str:
     else:
         collections = get_collections("both", "i_need_a_credit_card") + [get_all_products_collection()]
 
-    topic_context = rag_search_multi(search_q, collections, top_k=5, max_context_chars=3200)
+    if active_cards:
+        card_queries = [search_q]
+        card_queries.extend(f"{card} {_SPEC_QUERY}" for card in active_cards)
+        topic_context = rag_search_multi_queries(
+            card_queries,
+            collections,
+            top_k_per_query=3,
+            max_context_chars=5600,
+        )
+    else:
+        topic_context = rag_search_multi(search_q, collections, top_k=5, max_context_chars=3200)
     if topic_context.startswith("[NO RESULTS]"):
         return "[NO RESULTS]"
 
