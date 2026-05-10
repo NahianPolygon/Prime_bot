@@ -38,11 +38,11 @@
     .admin-link { height: 32px; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: var(--accent); background: #ffffff; border: 1px solid rgba(15, 118, 110, 0.22); border-radius: 8px; padding: 0 11px; font-size: 12px; font-weight: 700; box-shadow: 0 8px 18px rgba(17, 32, 29, 0.06); transition: transform 0.15s, border-color 0.15s, background 0.15s; }
     .admin-link svg { width: 15px; height: 15px; fill: currentColor; flex-shrink: 0; }
     .admin-link:hover { transform: translateY(-1px); border-color: rgba(15, 118, 110, 0.45); background: var(--accent-light); }
-    .token-meter { width: 176px; display: flex; flex-direction: column; gap: 4px; padding: 7px 9px; background: #ffffff; border: 1px solid rgba(15, 118, 110, 0.18); border-radius: 8px; box-shadow: 0 8px 18px rgba(17, 32, 29, 0.05); }
-    .token-meter-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; line-height: 1.1; }
-    .token-meter-label { color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
-    .token-meter-count { color: var(--text-muted); font-family: var(--font-mono); white-space: nowrap; }
-    .token-meter-track { height: 5px; border-radius: 999px; background: rgba(15, 118, 110, 0.12); overflow: hidden; }
+    .token-meter { width: 112px; display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; background: #ffffff; border: 1px solid rgba(15, 118, 110, 0.18); border-radius: 8px; box-shadow: 0 8px 18px rgba(17, 32, 29, 0.05); }
+    .token-meter-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 10px; line-height: 1; }
+    .token-meter-label { color: var(--accent); font-weight: 800; letter-spacing: 0; white-space: nowrap; }
+    .token-meter-count { color: var(--text-muted); font-family: var(--font-mono); white-space: nowrap; font-size: 10px; }
+    .token-meter-track { height: 4px; border-radius: 999px; background: rgba(15, 118, 110, 0.12); overflow: hidden; }
     .token-meter-fill { width: 0%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.25s ease, background 0.25s ease; }
     .token-meter.is-warm .token-meter-fill { background: linear-gradient(90deg, var(--warning), #d97706); }
     .token-meter.is-hot .token-meter-fill { background: linear-gradient(90deg, var(--error), #b91c1c); }
@@ -305,8 +305,8 @@
     <div class="header-actions">
       <div class="token-meter" id="tokenMeter" title="Approximate context used by this chat">
         <div class="token-meter-top">
-          <span class="token-meter-label" id="tokenMeterLabel">Context</span>
-          <span class="token-meter-count" id="tokenMeterCount">0 / 4096</span>
+          <span class="token-meter-label" id="tokenMeterLabel">CTX</span>
+          <span class="token-meter-count" id="tokenMeterCount">0%</span>
         </div>
         <div class="token-meter-track">
           <div class="token-meter-fill" id="tokenMeterFill"></div>
@@ -712,7 +712,7 @@
     appendFollowupChips(pendingDoneMeta);
     inputEl.placeholder = contextualPlaceholder(pendingDoneMeta);
     if (pendingDoneMeta.calculator === "emi") createEMICalcBubble(pendingDoneMeta.calculator_config);
-    else if (pendingDoneMeta.calculator === "rewards") createRewardsCalcBubble();
+    else if (pendingDoneMeta.calculator === "rewards") createRewardsCalcBubble(pendingDoneMeta.calculator_config);
     pendingDoneMeta = null;
     pendingDoneBubble = null;
     activeBubble = null;
@@ -1185,7 +1185,12 @@
       });
     }
 
-    return { cards: cards, selectedIndex: selected };
+    return {
+      cards: cards,
+      selectedIndex: selected,
+      prefillAmount: parseFloat((config || {}).prefill_amount || 0) || 0,
+      prefillTenure: parseInt((config || {}).prefill_tenure || 0, 10) || 0
+    };
   }
 
   function getActiveEMITerms() {
@@ -1224,7 +1229,9 @@
     activeEMICalcConfig = normalizeEMIConfig(config);
     activeEMICardIndex = activeEMICalcConfig.selectedIndex;
     var terms = getActiveEMITerms();
-    emiTenure = terms.tenures.indexOf(12) >= 0 ? 12 : terms.tenures[0];
+    emiTenure = activeEMICalcConfig.prefillTenure && terms.tenures.indexOf(activeEMICalcConfig.prefillTenure) >= 0
+      ? activeEMICalcConfig.prefillTenure
+      : (terms.tenures.indexOf(12) >= 0 ? 12 : terms.tenures[0]);
 
     var cardPicker = "";
     if (activeEMICalcConfig.cards.length > 1) {
@@ -1255,6 +1262,11 @@
     group.appendChild(row); appendTimestamp(group, false);
     messagesEl.appendChild(group); scrollToBottom();
     syncEMIDisplayTerms();
+    if (activeEMICalcConfig.prefillAmount) {
+      var amountInput = document.getElementById("emi_amt");
+      if (amountInput) amountInput.value = activeEMICalcConfig.prefillAmount;
+      calcEMI();
+    }
   }
 
   function pickEMICard(select) {
@@ -1293,7 +1305,20 @@
     document.getElementById("emi_fee").textContent     = "BDT " + fee.toLocaleString();
   }
 
-  function createRewardsCalcBubble() {
+  function normalizeRewardsConfig(config) {
+    var cfg = config || {};
+    var rate = parseFloat(cfg.points_per_bdt_50 || 1);
+    if (!rate || rate < 0) rate = 1;
+    return {
+      cardName: cfg.card_name || "",
+      pointsPerBDT50: rate,
+      prefillMonthlySpend: parseFloat(cfg.prefill_monthly_spend || 0) || 0,
+      note: cfg.note || "1 point per BDT 50 on eligible POS/e-commerce spend; excludes cash advances and fees."
+    };
+  }
+
+  function createRewardsCalcBubble(config) {
+    var rewardsConfig = normalizeRewardsConfig(config);
     var group = document.createElement("div"); group.className = "msg-group";
     var row   = document.createElement("div"); row.className   = "message-row bot";
     var av    = document.createElement("div"); av.className    = "avatar bot"; av.textContent = "P";
@@ -1302,26 +1327,44 @@
     bub.innerHTML =
       '<div class="calc-hdr"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Rewards Calculator</div>' +
       '<div class="calc-body">' +
-        '<div class="calc-field"><label>Monthly Spend (BDT)</label><input type="number" class="calc-input" id="rwd_spend" placeholder="e.g. 50,000" min="0" oninput="calcRewards()" /></div>' +
-        '<div class="calc-results"><div class="calc-row"><span class="calc-row-label">Points / Month</span><span class="calc-row-val" id="rwd_month">\u2014</span></div><div class="calc-row"><span class="calc-row-label">Points / Year</span><span class="calc-row-val" id="rwd_year">\u2014</span></div><div class="calc-row"><span class="calc-row-label">Est. Redemption Value</span><span class="calc-row-val" id="rwd_value">\u2014</span></div></div>' +
-        '<p class="calc-note">1 point per BDT 50 on POS & e-commerce \xB7 excludes cash advances & fees \xB7 500 pts \u2248 BDT 250</p>' +
+        (rewardsConfig.cardName ? '<div class="calc-context">Using <strong>' + escapeHtml(rewardsConfig.cardName) + '</strong></div>' : '') +
+        '<div class="calc-field"><label>Monthly Spend (BDT)</label><input type="number" class="calc-input js-rwd-spend" placeholder="e.g. 50,000" min="0" /></div>' +
+        '<div class="calc-results"><div class="calc-row"><span class="calc-row-label">Points / Month</span><span class="calc-row-val js-rwd-month">\u2014</span></div><div class="calc-row"><span class="calc-row-label">Points / Year</span><span class="calc-row-val js-rwd-year">\u2014</span></div><div class="calc-row"><span class="calc-row-label">Est. Redemption Value</span><span class="calc-row-val js-rwd-value">\u2014</span></div></div>' +
+        '<p class="calc-note js-rwd-note"></p>' +
       '</div>';
     wrap.appendChild(bub); wrap.appendChild(makeCopyBtn(bub)); row.appendChild(av); row.appendChild(wrap);
     group.appendChild(row); appendTimestamp(group, false);
     messagesEl.appendChild(group); scrollToBottom();
+    bub.dataset.pointsPerBdt50 = rewardsConfig.pointsPerBDT50;
+    var note = bub.querySelector(".js-rwd-note");
+    if (note) note.textContent = rewardsConfig.note + " 500 pts \u2248 BDT 250.";
+    var spendInput = bub.querySelector(".js-rwd-spend");
+    if (spendInput) spendInput.addEventListener("input", function () { calcRewards(spendInput); });
+    if (rewardsConfig.prefillMonthlySpend) {
+      if (spendInput) spendInput.value = rewardsConfig.prefillMonthlySpend;
+      calcRewards(spendInput);
+    }
   }
 
-  function calcRewards() {
-    var spend = parseFloat((document.getElementById("rwd_spend") || {}).value || 0);
+  function calcRewards(inputEl) {
+    var spendInput = inputEl || document.querySelector(".calc-bubble .js-rwd-spend");
+    var calcBubble = spendInput ? spendInput.closest(".calc-bubble") : null;
+    if (!calcBubble) return;
+    var monthEl = calcBubble.querySelector(".js-rwd-month");
+    var yearEl = calcBubble.querySelector(".js-rwd-year");
+    var valueEl = calcBubble.querySelector(".js-rwd-value");
+    var spend = parseFloat((spendInput || {}).value || 0);
     if (!spend || spend <= 0) {
-      document.getElementById("rwd_month").textContent = "\u2014";
-      document.getElementById("rwd_year").textContent  = "\u2014";
-      document.getElementById("rwd_value").textContent = "\u2014"; return;
+      if (monthEl) monthEl.textContent = "\u2014";
+      if (yearEl) yearEl.textContent = "\u2014";
+      if (valueEl) valueEl.textContent = "\u2014";
+      return;
     }
-    var ptsMonth = Math.floor(spend / 50), ptsYear = ptsMonth * 12;
-    document.getElementById("rwd_month").textContent = ptsMonth.toLocaleString();
-    document.getElementById("rwd_year").textContent  = ptsYear.toLocaleString();
-    document.getElementById("rwd_value").textContent = "BDT " + Math.floor(ptsYear * 0.5).toLocaleString();
+    var rate = calcBubble ? parseFloat(calcBubble.dataset.pointsPerBdt50 || 1) : 1;
+    var ptsMonth = Math.floor(spend / 50) * rate, ptsYear = ptsMonth * 12;
+    if (monthEl) monthEl.textContent = ptsMonth.toLocaleString();
+    if (yearEl) yearEl.textContent  = ptsYear.toLocaleString();
+    if (valueEl) valueEl.textContent = "BDT " + Math.floor(ptsYear * 0.5).toLocaleString();
   }
 
   /* ── Eligibility form ── */
@@ -1572,8 +1615,9 @@
     var used = Math.max(0, Number(budget && budget.used) || 0);
     var remaining = Math.max(0, Number(budget && budget.remaining) || Math.max(limit - used, 0));
     var percent = Math.min(100, Math.max(0, Number(budget && budget.percent) || (used / limit) * 100));
-    tokenMeterLabel.textContent = budget && budget.label ? budget.label : "Context";
-    tokenMeterCount.textContent = Math.round(used) + " / " + Math.round(limit) + " (" + Math.round(remaining) + " left)";
+    tokenMeterLabel.textContent = "CTX";
+    tokenMeterCount.textContent = Math.round(percent) + "%";
+    tokenMeter.title = "Approx context: " + Math.round(used) + " / " + Math.round(limit) + " tokens used, " + Math.round(remaining) + " left";
     tokenMeterFill.style.width = percent.toFixed(1) + "%";
     tokenMeter.classList.toggle("is-warm", percent >= 70 && percent < 90);
     tokenMeter.classList.toggle("is-hot", percent >= 90);

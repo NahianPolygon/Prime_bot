@@ -8,6 +8,7 @@ import agents.comparator as comparator
 import agents.compliance_faq as compliance_faq
 import agents.product_advisor as product_advisor
 from agents.compliance.emi import build_emi_calculator_config
+from agents.compliance.calculations import build_deterministic_calculation
 from classifier.intent_classifier import _parse_json, classify
 from kb_config import get_all_products_collection, get_credit_card_collection
 from logging_utils import log_event
@@ -282,6 +283,9 @@ def _build_routing(user_message: str, classifier_output: dict) -> dict:
     }
 
 
+_BEST_FOLLOWUP_RE = re.compile(r"\b(best|strongest|top|better|which)\b.*\b(for|lounge|travel|reward|fee|fees|emi|dining|insurance|benefit|benefits)\b", re.IGNORECASE)
+
+
 def _get_context_cards(session: SessionMemory) -> list[str]:
     cards = session.user_profile.get("active_cards") or session.user_profile.get("recommended_cards") or []
     if isinstance(cards, list) and cards:
@@ -341,6 +345,16 @@ def _ground_classifier_output(
 ) -> dict:
     target_card = classifier_output.get("target_card", "").strip()
     candidate_cards = []
+    context_cards = _get_context_cards(session)
+    if context_cards and _BEST_FOLLOWUP_RE.search(user_message):
+        classifier_output["intent"] = "faq"
+        classifier_output["active_cards"] = context_cards
+        classifier_output["use_context_cards"] = True
+        classifier_output["needs_preference_form"] = False
+        classifier_output["needs_eligibility_form"] = False
+        if not classifier_output.get("search_query") or classifier_output.get("search_query") == user_message:
+            classifier_output["search_query"] = " ".join(context_cards + [user_message]).strip()
+
     if target_card:
         resolved_target = compliance_faq.extract_target_card(target_card, "")
         if resolved_target:
@@ -448,7 +462,9 @@ def _done_signal(
         "banking_type": classifier_output.get("banking_type", ""),
     }
     if calculator_type == "emi":
-        payload["calculator_config"] = build_emi_calculator_config(user_message, session, classifier_output)
+        payload["calculator_config"] = classifier_output.get("_calculator_config") or build_emi_calculator_config(user_message, session, classifier_output)
+    elif calculator_type == "rewards" and classifier_output.get("_calculator_config"):
+        payload["calculator_config"] = classifier_output["_calculator_config"]
     return json.dumps(payload)
 
 
@@ -503,6 +519,19 @@ def build_crew_stream(
     if direct:
         yield _progress_signal("Preparing answer", "response")
         clean = _guardrails(direct)
+        session.add(user_message, clean)
+        for token in _stream_text(clean):
+            yield token
+        yield _done_signal(intent, calculator_type, user_message, session, classifier_output)
+        return
+
+    deterministic = build_deterministic_calculation(user_message, session, classifier_output)
+    if deterministic:
+        clean, deterministic_calculator, calculator_config = deterministic
+        calculator_type = deterministic_calculator
+        if calculator_config:
+            classifier_output["_calculator_config"] = calculator_config
+        yield _progress_signal("Calculating from card terms", "calculation")
         session.add(user_message, clean)
         for token in _stream_text(clean):
             yield token

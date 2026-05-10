@@ -23,18 +23,25 @@ If information is missing say: "Please contact Prime Bank at 16218 for the most 
 def _build_context(user_message: str, routing: dict) -> str:
     banking = routing["banking_type"]
     search_q = routing.get("search_query", user_message)
+    active_cards = routing.get("active_cards") or []
+    if isinstance(active_cards, list) and active_cards:
+        search_q = " ".join(active_cards + [search_q]).strip()
 
     collections = get_collections(banking, "i_need_a_credit_card")
     collections += get_collections(banking, "existing_cardholder")
     collections.append(get_all_products_collection())
     collections = list(dict.fromkeys(collections))
 
+    queries = [
+        search_q,
+        f"{search_q} fees charges annual fee fee waiver reward points interest-free period",
+        f"{search_q} application documents eligibility terms conditions",
+    ]
+    if isinstance(active_cards, list):
+        queries.extend(f"{card} {user_message}" for card in active_cards if isinstance(card, str) and card.strip())
+
     context = rag_search_multi_queries(
-        [
-            search_q,
-            f"{search_q} fees charges annual fee fee waiver reward points interest-free period",
-            f"{search_q} application documents eligibility terms conditions",
-        ],
+        queries,
         collections,
         top_k_per_query=3,
         max_context_chars=7000,

@@ -30,6 +30,7 @@ Rules:
 - needs_preference_form = true only when the user wants a recommendation/discovery flow and a form should be shown
 - needs_eligibility_form = true only when the user wants eligibility assessment and a form should be shown
 - If the user asks follow-ups like fees, comparison, eligibility, application, or details for already-discussed cards, prefer using session-context cards instead of restarting discovery
+- If the user asks "best for", "which is best", or asks for the strongest card for one benefit among already-discussed cards, route as faq with use_context_cards=true, not compare
 - If the user mentions a specific card after a prior conversation, route to details/apply/eligibility for that card rather than showing the discovery form
 - If the previous turn was a catalog/browsing answer, short follow-ups like "conventional cards", "Islamic / Halal cards", or "show Islamic cards" are still catalog requests, not discovery/recommendation requests
 - If the user asks about fees, charges, fee waiver, interest-free period, rewards, or benefits of one exact card, prefer details or faq for that single card instead of compare
@@ -43,6 +44,7 @@ Examples:
 "I need a halal credit card" -> {"category":"new_card","sub_intent":"discover","banking_type":"islami","confidence":0.98,"calculator":"","search_query":"halal credit card recommendation","target_card":"","use_context_cards":false,"needs_preference_form":true,"needs_eligibility_form":false}
 "Check my eligibility" with session cards already known -> {"category":"new_card","sub_intent":"eligibility","banking_type":"conventional","confidence":0.96,"calculator":"","search_query":"eligibility for current shortlisted cards","target_card":"","use_context_cards":true,"needs_preference_form":false,"needs_eligibility_form":true}
 "Explain the fees" after a comparison of two cards -> {"category":"new_card","sub_intent":"compare","banking_type":"conventional","confidence":0.94,"calculator":"","search_query":"annual fee fee waiver charges for current comparison cards","target_card":"","use_context_cards":true,"needs_preference_form":false,"needs_eligibility_form":false}
+"Best for lounge access" after a comparison -> {"category":"new_card","sub_intent":"faq","banking_type":"both","confidence":0.94,"calculator":"","search_query":"best lounge access among current comparison cards","target_card":"","use_context_cards":true,"needs_preference_form":false,"needs_eligibility_form":false}
 "I lost my card" -> {"category":"existing_card","sub_intent":"existing_card","banking_type":"both","confidence":0.98,"calculator":"","search_query":"lost card support","target_card":"","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}"""
 
 RECOVERY_ROUTE_SYSTEM = """Route the user's latest Prime Bank credit card message.
@@ -52,6 +54,7 @@ Return ONLY JSON:
 
 Use the provided history and session context.
 If the latest message depends on already discussed cards, set use_context_cards to true.
+If the latest message asks which already-discussed card is best for a benefit, set sub_intent to faq and use_context_cards to true.
 If the latest message is a short catalog refinement after a browsing/catalog answer, keep sub_intent as catalog instead of discover.
 If the latest message asks about fees or benefits of one exact card, keep it single-card with sub_intent details or faq instead of compare.
 If the user wants a recommendation, set sub_intent to discover.
