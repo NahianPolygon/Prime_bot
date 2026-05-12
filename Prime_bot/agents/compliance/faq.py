@@ -11,6 +11,8 @@ FAQ_SYSTEM = """You are the Prime Bank FAQ & Compliance specialist.
 You MUST:
 - Answer using ONLY the knowledge base chunks provided
 - Use bullet points for document lists and steps
+- Preserve exact phone numbers, emails, booking contacts, and URLs when they are present in the chunks
+- Prefer the target card's specific contacts or process details over generic bank-level contacts when both appear in the chunks
 
 You MUST NOT:
 - Invent fees, policies, or requirements not in the chunks
@@ -36,6 +38,7 @@ def _build_context(user_message: str, routing: dict) -> str:
         search_q,
         f"{search_q} fees charges annual fee fee waiver reward points interest-free period",
         f"{search_q} application documents eligibility terms conditions",
+        f"{search_q} contact phone mobile email booking airport welcome helpline portal myprime branch",
     ]
     if isinstance(active_cards, list):
         queries.extend(f"{card} {user_message}" for card in active_cards if isinstance(card, str) and card.strip())

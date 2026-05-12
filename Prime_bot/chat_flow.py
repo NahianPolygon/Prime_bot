@@ -279,6 +279,7 @@ def _build_routing(user_message: str, classifier_output: dict) -> dict:
         "banking_type": banking_type,
         "collection": collection,
         "search_query": classifier_output.get("search_query") or user_message,
+        "target_card": classifier_output.get("target_card", ""),
         "active_cards": classifier_output.get("active_cards") or [],
     }
 

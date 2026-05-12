@@ -4,7 +4,7 @@ from typing import Generator
 from kb_config import get_all_products_collection
 from llm.ollama_client import chat, chat_stream
 from memory.session_memory import SessionMemory
-from tools.rag_tool import rag_search_multi
+from tools.rag_tool import rag_search_multi, rag_search_multi_queries
 from agents.compliance.common import get_collections
 
 SYSTEM = """You are the Prime Bank Cardholder Services specialist.
@@ -19,6 +19,7 @@ You MUST:
 - Be concise and action-oriented
 - Always use the actual card name not internal codes
 - When the chunks include phone numbers, preserve them exactly in the answer
+- When the chunks include multiple payment methods, reporting channels, links, or service options, include the clearly listed options instead of giving only one example
 
 You MUST NOT:
 - Invent any policy, fee, process, or phone number not in the chunks
@@ -42,21 +43,44 @@ def _get_collections(banking: str) -> list[str]:
     return get_collections(banking, "existing_cardholder") + get_collections(banking, "i_need_a_credit_card")
 
 
+def _build_context(user_message: str, routing: dict) -> str:
+    banking = routing["banking_type"]
+    collections = _get_collections(banking)
+    active_cards = routing.get("active_cards") or []
+    target_card = (routing.get("target_card") or "").strip()
+    focus = [target_card] if target_card else [card for card in active_cards if isinstance(card, str) and card.strip()]
+    search_q = routing.get("search_query", user_message)
+    if focus:
+        search_q = " ".join(focus + [search_q]).strip()
+
+    queries = [
+        search_q,
+        f"{search_q} cardholder services bill payment dispute lost card activation pin limit transaction history",
+        f"{search_q} contact center branch internet banking myprime standing instruction auto debit",
+        f"{search_q} report stolen lost damaged card dispute process faq terms conditions",
+    ]
+    queries.extend(f"{card} {user_message}" for card in focus)
+
+    context = rag_search_multi_queries(
+        queries,
+        collections + [get_all_products_collection()],
+        top_k_per_query=3,
+        max_context_chars=9000,
+    )
+
+    if context.startswith("[NO RESULTS]"):
+        context = rag_search_multi(search_q, collections + [get_all_products_collection()], top_k=6)
+    return context
+
+
 def run(
     user_message: str,
     routing: dict,
     session: SessionMemory,
 ) -> str:
-    banking = routing["banking_type"]
-    collections = _get_collections(banking)
-
-    context = rag_search_multi(user_message, collections, top_k=5)
-
+    context = _build_context(user_message, routing)
     if context.startswith("[NO RESULTS]"):
-        fallback_context = rag_search_multi(user_message, collections + [get_all_products_collection()], top_k=4)
-        if fallback_context.startswith("[NO RESULTS]"):
-            return "Please call **16218** (local) or **+88022222222** (international) or visit your nearest Prime Bank branch for assistance with your card."
-        context = fallback_context
+        return "Please call **16218** (local) or **+88022222222** (international) or visit your nearest Prime Bank branch for assistance with your card."
 
     context = _clean_context(context)
     history = session.get_history_str(max_chars=800)
@@ -87,16 +111,10 @@ def run_stream(
     routing: dict,
     session: SessionMemory,
 ) -> Generator[str, None, None]:
-    banking = routing["banking_type"]
-    collections = _get_collections(banking)
-
-    context = rag_search_multi(user_message, collections, top_k=5)
+    context = _build_context(user_message, routing)
     if context.startswith("[NO RESULTS]"):
-        fallback_context = rag_search_multi(user_message, collections + [get_all_products_collection()], top_k=4)
-        if fallback_context.startswith("[NO RESULTS]"):
-            yield "Please call **16218** (local) or **+88022222222** (international) or visit your nearest Prime Bank branch for assistance with your card."
-            return
-        context = fallback_context
+        yield "Please call **16218** (local) or **+88022222222** (international) or visit your nearest Prime Bank branch for assistance with your card."
+        return
 
     context = _clean_context(context)
     history = session.get_history_str(max_chars=800)

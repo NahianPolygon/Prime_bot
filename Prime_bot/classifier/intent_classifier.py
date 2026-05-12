@@ -19,6 +19,7 @@ Rules:
 - compare = compares two or more cards
 - eligibility = asks if they qualify or are eligible
 - apply = asks about process, documents, or how to apply
+- If the user asks for application requirements, required documents, salaried/self-employed requirements, or application timeline for a card, prefer sub_intent = apply rather than eligibility
 - details = asks about one specific card
 - faq = other on-topic credit-card questions
 - banking_type = islami for islamic/halal/hasanah/shariah, conventional for explicit conventional, else both
@@ -37,10 +38,13 @@ Rules:
 - Output JSON only
 
 Examples:
+"Hi" -> {"category":"general","sub_intent":"greeting","banking_type":"both","confidence":0.99,"calculator":"","search_query":"Hi","target_card":"","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}
+"Hello, can you help me with cards?" -> {"category":"general","sub_intent":"greeting","banking_type":"both","confidence":0.99,"calculator":"","search_query":"Hello, can you help me with cards?","target_card":"","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}
 "What credit cards do you offer?" -> {"category":"new_card","sub_intent":"catalog","banking_type":"both","confidence":0.97,"calculator":"","search_query":"credit cards offered","target_card":"","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}
 "Islamic / Halal cards" after a catalog answer -> {"category":"new_card","sub_intent":"catalog","banking_type":"islami","confidence":0.96,"calculator":"","search_query":"Islamic credit cards offered","target_card":"","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}
 "Conventional cards" after a catalog answer -> {"category":"new_card","sub_intent":"catalog","banking_type":"conventional","confidence":0.96,"calculator":"","search_query":"conventional credit cards offered","target_card":"","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}
 "Explain the fees of Mastercard World Credit Card" -> {"category":"new_card","sub_intent":"faq","banking_type":"conventional","confidence":0.96,"calculator":"","search_query":"Mastercard World Credit Card fees annual fee charges fee waiver","target_card":"Mastercard World Credit Card","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}
+"What are the salaried and self-employed requirements for JCB Gold Credit Card application?" -> {"category":"new_card","sub_intent":"apply","banking_type":"conventional","confidence":0.97,"calculator":"","search_query":"JCB Gold Credit Card application requirements salaried self-employed required documents","target_card":"JCB Gold Credit Card","use_context_cards":false,"needs_preference_form":false,"needs_eligibility_form":false}
 "I need a halal credit card" -> {"category":"new_card","sub_intent":"discover","banking_type":"islami","confidence":0.98,"calculator":"","search_query":"halal credit card recommendation","target_card":"","use_context_cards":false,"needs_preference_form":true,"needs_eligibility_form":false}
 "Check my eligibility" with session cards already known -> {"category":"new_card","sub_intent":"eligibility","banking_type":"conventional","confidence":0.96,"calculator":"","search_query":"eligibility for current shortlisted cards","target_card":"","use_context_cards":true,"needs_preference_form":false,"needs_eligibility_form":true}
 "Explain the fees" after a comparison of two cards -> {"category":"new_card","sub_intent":"compare","banking_type":"conventional","confidence":0.94,"calculator":"","search_query":"annual fee fee waiver charges for current comparison cards","target_card":"","use_context_cards":true,"needs_preference_form":false,"needs_eligibility_form":false}
@@ -89,7 +93,6 @@ INTENT_MAP = {
     "faq": "faq",
     "greeting": "greeting",
 }
-
 
 def _as_bool(value) -> bool:
     if isinstance(value, bool):

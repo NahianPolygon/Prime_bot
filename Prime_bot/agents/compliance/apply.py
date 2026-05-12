@@ -12,33 +12,44 @@ You MUST:
 - Explain the application process using ONLY the knowledge base chunks provided
 - List required documents from the chunks
 - Mention any fees or conditions from the chunks
+- When the chunks contain a document list or eligibility list, include the clearly listed items instead of summarizing loosely
+- Prefer the specific target card details over generic wording when a card is identified in the chunks
 
 You MUST NOT:
 - Invent any steps, documents, or fees not in the chunks
 - Display product_id, internal IDs, or system codes to the user
 
-If information is missing say: "Please contact Prime Bank at 16218 for application details."
+If information is missing say: "The provided chunks do not include that application detail."
 """
 
 
 def _build_context(user_message: str, routing: dict) -> str:
     banking = routing["banking_type"]
     search_q = routing.get("search_query", user_message)
+    target_card = (routing.get("target_card") or "").strip()
+    active_cards = routing.get("active_cards") or []
+    focus = [target_card] if target_card else [card for card in active_cards if isinstance(card, str) and card.strip()]
+    if focus:
+        search_q = " ".join(focus + [search_q]).strip()
 
     collections = get_collections(banking, "i_need_a_credit_card")
     collections += get_collections(banking, "existing_cardholder")
     collections.append(get_all_products_collection())
     collections = list(dict.fromkeys(collections))
 
+    queries = [
+        search_q,
+        f"{search_q} application process required documents eligibility how to apply",
+        f"{search_q} documents required financial documents identity income employment E-TIN",
+        f"{search_q} branch submission approval timeline terms conditions schedule of charges",
+    ]
+    queries.extend(f"{card} {user_message}" for card in focus)
+
     context = rag_search_multi_queries(
-        [
-            search_q,
-            f"{search_q} application process documents branch apply online",
-            f"{search_q} schedule of charges terms conditions eligibility documents",
-        ],
+        queries,
         collections,
         top_k_per_query=3,
-        max_context_chars=7000,
+        max_context_chars=9000,
     )
     if context.startswith("[NO RESULTS]"):
         context = rag_search_multi(search_q, collections, top_k=6)
@@ -59,7 +70,9 @@ Conversation so far:
 
 User question: {user_message}
 
-Explain the application process using ONLY the chunks above. Do not display any product_id or internal codes."""
+Answer using ONLY the chunks above.
+If the chunks list eligibility requirements, required documents, financial documents, salaried/self-employed requirements, or application steps, include them clearly and separately instead of compressing them into one vague summary.
+Do not display any product_id or internal codes."""
 
 
 def run_apply(

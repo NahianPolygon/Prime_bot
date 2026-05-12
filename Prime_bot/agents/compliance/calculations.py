@@ -11,7 +11,7 @@ from .matching import extract_target_card, resolve_card_candidates
 
 _AMOUNT_RE = re.compile(r"(?:BDT|Tk\.?|৳)?\s*([\d,]{3,})", re.IGNORECASE)
 _TENURE_RE = re.compile(r"\b(\d{1,2})\s*[- ]?\s*(?:month|months|mo)\b", re.IGNORECASE)
-_POINT_TARGET_RE = re.compile(r"([\d,]{2,})\s*(?:pts|points)\b", re.IGNORECASE)
+_POINT_TARGET_RE = re.compile(r"([\d,]{2,})\s*(?:reward\s+)?(?:pts|points)\b", re.IGNORECASE)
 _MONTH_DAY_RE = re.compile(
     r"\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|"
     r"aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})\b",
@@ -23,6 +23,21 @@ _MONTHS = {
     "apr": 4, "april": 4, "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
     "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
     "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
+}
+_VISIT_WORDS = {
+    "once": 1,
+    "one": 1,
+    "twice": 2,
+    "two": 2,
+    "thrice": 3,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
 }
 
 
@@ -151,6 +166,21 @@ def _target_points(text: str) -> int | None:
     return max(values) if values else None
 
 
+def _monthly_visit_count(text: str) -> int | None:
+    numeric = re.search(r"\b(\d+)\s*(?:times|x)\s*(?:a|per)?\s*month", text or "", re.IGNORECASE)
+    if numeric:
+        return int(numeric.group(1))
+
+    wordy = re.search(
+        r"\b(once|one|twice|two|thrice|three|four|five|six|seven|eight|nine|ten)\b\s*(?:times\s*)?(?:a|per)?\s*month",
+        text or "",
+        re.IGNORECASE,
+    )
+    if wordy:
+        return _VISIT_WORDS.get(wordy.group(1).lower())
+    return None
+
+
 def _format_bdt(amount: int | float) -> str:
     return f"BDT {math.ceil(amount):,}"
 
@@ -180,7 +210,7 @@ def _reward_answer(user_message: str, product: dict, text: str) -> tuple[str, di
         "note": f"{rate} point{'s' if rate != 1 else ''} per BDT 50 on eligible POS/e-commerce spend; excludes cash advances and fees.",
     }
 
-    if target and re.search(r"how many (?:year|years|month|months)|how long|take", lowered):
+    if target and re.search(r"how many (?:year|years|month|months)|how long|take|reach", lowered):
         months = math.ceil(target / points_month) if points_month else 0
         duration = f"{months} month{'s' if months != 1 else ''}" if months < 12 else f"{months / 12:g} years"
         answer = (
@@ -328,11 +358,10 @@ def _bogo_answer(user_message: str, product: dict) -> str | None:
     if "bogo" not in lowered and "buy one" not in lowered:
         return None
     amounts = _amounts(user_message)
-    times_match = re.search(r"\b(\d+)\s*(?:times|x)\s*(?:a|per)?\s*month", user_message, re.IGNORECASE)
-    if not amounts or not times_match:
+    times = _monthly_visit_count(user_message)
+    if not amounts or not times:
         return None
     meal_cost = amounts[-1]
-    times = int(times_match.group(1))
     monthly = meal_cost * times
     annual = monthly * 12
     return (
