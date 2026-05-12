@@ -119,6 +119,7 @@
     .file.active { border-color: var(--accent); background: var(--soft); }
     .actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .pill { display: inline-flex; border: 1px solid rgba(15, 118, 110, 0.2); background: var(--soft); color: var(--accent); border-radius: 999px; padding: 7px 10px; font-size: 12px; font-weight: 800; }
+    .hidden { display: none !important; }
     @media (max-width: 940px) { .shell { grid-template-columns: 1fr; } .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -133,10 +134,10 @@
       <div class="card">
         <h2>Active workspace</h2>
         <div class="meta-grid">
-          <div class="meta"><span>Bank</span><span id="activeBank">loading</span></div>
+          <div class="meta"><span>Bank</span><span id="activeBank">login required</span></div>
         </div>
       </div>
-      <div class="card">
+      <div id="filesCard" class="card hidden">
         <div class="field">
           <h2>Available markdown files</h2>
           <input id="fileSearch" placeholder="Search markdown files" />
@@ -146,15 +147,33 @@
     </aside>
 
     <main class="panel main">
-      <div class="topbar">
+      <section id="loginPanel" class="card">
+        <h2>Bank admin login</h2>
+        <p>Sign in to open this bank workspace.</p>
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" autocomplete="username" />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" />
+        </div>
+        <div class="actions">
+          <div id="loginStatus" class="status"></div>
+          <button id="loginBtn" class="primary" type="button">Login</button>
+        </div>
+      </section>
+
+      <div id="studioTopbar" class="topbar hidden">
         <p>Upload new raw text or edit an existing markdown file.</p>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <a class="link" href="/admin">Admin</a>
+          <a class="link" href="/admin">Super Admin</a>
           <a class="link" href="/">Assistant</a>
+          <button id="logoutBtn" type="button">Logout</button>
         </div>
       </div>
 
-      <section class="card">
+      <section id="createSection" class="card hidden">
         <div class="actions">
           <h2>Create document</h2>
           <span class="pill">Markdown is generated and ingested automatically</span>
@@ -186,7 +205,7 @@
         </form>
       </section>
 
-      <section class="card">
+      <section id="editorSection" class="card hidden">
         <div class="actions">
           <div>
             <h2>Markdown editor</h2>
@@ -201,7 +220,14 @@
   </div>
 
   <script>
+    const tokenKey = "primebot_bank_token";
     const activeBankEl = document.getElementById("activeBank");
+    const loginPanel = document.getElementById("loginPanel");
+    const loginStatus = document.getElementById("loginStatus");
+    const filesCard = document.getElementById("filesCard");
+    const studioTopbar = document.getElementById("studioTopbar");
+    const createSection = document.getElementById("createSection");
+    const editorSection = document.getElementById("editorSection");
     const filesEl = document.getElementById("files");
     const documentTypeEl = document.getElementById("documentType");
     const bankingTypeEl = document.getElementById("bankingType");
@@ -213,12 +239,44 @@
     const editorStatus = document.getElementById("editorStatus");
     const saveBtn = document.getElementById("saveBtn");
     const fileSearchEl = document.getElementById("fileSearch");
+    const logoutBtn = document.getElementById("logoutBtn");
     let allFiles = [];
     let currentPath = "";
+
+    function token() {
+      return localStorage.getItem(tokenKey) || "";
+    }
+
+    function authHeaders() {
+      return { Authorization: "Bearer " + token() };
+    }
 
     function setStatus(el, message, kind) {
       el.textContent = message || "";
       el.className = "status" + (kind ? " " + kind : "");
+    }
+
+    function showWorkspace() {
+      loginPanel.classList.add("hidden");
+      filesCard.classList.remove("hidden");
+      studioTopbar.classList.remove("hidden");
+      createSection.classList.remove("hidden");
+      editorSection.classList.remove("hidden");
+    }
+
+    function showLogin() {
+      localStorage.removeItem(tokenKey);
+      loginPanel.classList.remove("hidden");
+      filesCard.classList.add("hidden");
+      studioTopbar.classList.add("hidden");
+      createSection.classList.add("hidden");
+      editorSection.classList.add("hidden");
+      activeBankEl.textContent = "login required";
+      filesEl.innerHTML = "";
+      editor.value = "";
+      editor.disabled = true;
+      saveBtn.disabled = true;
+      currentPath = "";
     }
 
     function appendFileText(parent, className, text, title) {
@@ -262,8 +320,13 @@
     }
 
     async function loadContext() {
-      const res = await fetch("/kb/studio/context");
+      const res = await fetch("/kb/studio/context", { headers: authHeaders() });
+      if (!res.ok) {
+        showLogin();
+        throw new Error("Authentication required");
+      }
       const data = await res.json();
+      showWorkspace();
       activeBankEl.textContent = data.active_bank || "";
       documentTypeEl.innerHTML = "";
       (data.document_types || []).forEach(type => {
@@ -287,7 +350,7 @@
     async function openFile(path) {
       currentPath = path;
       setStatus(editorStatus, "Loading markdown...");
-      const res = await fetch("/kb/studio/file?path=" + encodeURIComponent(path));
+      const res = await fetch("/kb/studio/file?path=" + encodeURIComponent(path), { headers: authHeaders() });
       if (!res.ok) {
         setStatus(editorStatus, "Could not open file.", "err");
         return;
@@ -311,9 +374,9 @@
         banking_type: bankingTypeEl.value,
         raw_text: document.getElementById("rawText").value.trim(),
       };
-      const res = await fetch("/admin/kb/ingest-text", {
+      const res = await fetch("/kb/studio/ingest-text", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(payload),
       });
       uploadBtn.disabled = false;
@@ -334,7 +397,7 @@
       setStatus(editorStatus, "Saving markdown and re-ingesting...");
       const res = await fetch("/kb/studio/file", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ path: currentPath, content: editor.value }),
       });
       saveBtn.disabled = false;
@@ -350,7 +413,31 @@
     });
 
     fileSearchEl.addEventListener("input", () => renderFiles(allFiles));
-    loadContext().catch(() => setStatus(uploadStatus, "Could not load KB Studio context.", "err"));
+    logoutBtn.addEventListener("click", () => showLogin());
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      setStatus(loginStatus, "Checking credentials...");
+      const res = await fetch("/bank/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: document.getElementById("username").value,
+          password: document.getElementById("password").value,
+        }),
+      });
+      if (!res.ok) {
+        setStatus(loginStatus, "Invalid credentials.", "err");
+        return;
+      }
+      const data = await res.json();
+      localStorage.setItem(tokenKey, data.token);
+      setStatus(loginStatus, "");
+      await loadContext();
+    });
+    if (token()) {
+      loadContext().catch(() => setStatus(loginStatus, "Session expired. Login again.", "err"));
+    } else {
+      showLogin();
+    }
   </script>
 </body>
 </html>

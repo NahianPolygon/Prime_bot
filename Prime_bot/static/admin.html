@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PrimeBot Admin</title>
+  <title>PrimeBot Super Admin</title>
   <style>
     :root {
       --bg: #f4f7f6;
@@ -86,15 +86,17 @@
   <div class="shell">
     <aside class="panel side">
       <div>
-        <div class="eyebrow">Admin Portal</div>
+        <div class="eyebrow">Super Admin Portal</div>
         <h1>Control active bank routing.</h1>
       </div>
-      <p>Admin chooses which bank workspace the bot should use. Banks manage upload details inside KB Studio.</p>
+      <p>Super admin controls routing. Each bank admin manages only its own KB Studio workspace after login.</p>
       <div class="card">
         <h2>Navigation</h2>
         <div class="actions">
           <a class="link" href="/kb-uploader">KB Studio</a>
+          <a class="link" href="/admin">Super Admin</a>
           <a class="link" href="/">Assistant</a>
+          <button id="logoutBtn" type="button">Logout</button>
         </div>
       </div>
       <div id="stateCard" class="card hidden">
@@ -107,7 +109,7 @@
 
     <main class="panel main">
       <section id="loginPanel" class="card">
-        <h2>Admin login</h2>
+        <h2>Super admin login</h2>
         <div class="field">
           <label for="username">Username</label>
           <input id="username" autocomplete="username" />
@@ -142,14 +144,48 @@
 
       <section id="createBankPanel" class="card hidden">
         <h2>Create new bank</h2>
-        <p>Create the folder structure first, then select it as active above.</p>
+        <p>Create bank workspace and bank login in one step.</p>
         <div class="field">
           <label for="newBank">New Bank Directory</label>
           <input id="newBank" placeholder="city_bank" />
         </div>
         <div class="actions">
+          <div class="field" style="flex:1 1 220px;">
+            <label for="newBankUsername">Bank Username</label>
+            <input id="newBankUsername" placeholder="city_bank_admin" />
+          </div>
+          <div class="field" style="flex:1 1 220px;">
+            <label for="newBankPassword">Bank Password</label>
+            <input id="newBankPassword" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" />
+          </div>
+        </div>
+        <div class="actions">
           <div id="createBankStatus" class="status"></div>
           <button id="createBankBtn" class="primary">Create Bank</button>
+        </div>
+      </section>
+
+      <section id="bankAccessPanel" class="card hidden">
+        <h2>Bank admin access</h2>
+        <p>Create or reset KB Studio login for a bank workspace.</p>
+        <div class="actions">
+          <div class="field" style="flex:1 1 220px;">
+            <label for="accessBank">Bank Directory</label>
+            <select id="accessBank"></select>
+          </div>
+          <div class="field" style="flex:1 1 220px;">
+            <label for="bankUsername">Username</label>
+            <input id="bankUsername" placeholder="city_bank_admin" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="bankPassword">Password</label>
+          <input id="bankPassword" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" />
+        </div>
+        <div id="bankAccessMeta" class="status"></div>
+        <div class="actions">
+          <div id="bankAccessStatus" class="status"></div>
+          <button id="saveBankAccessBtn" class="primary">Save Bank Access</button>
         </div>
       </section>
 
@@ -175,7 +211,7 @@
       <section id="uploadPanel" class="card hidden">
         <div class="topbar">
           <div>
-            <h2>Admin raw text upload</h2>
+            <h2>Super admin raw text upload</h2>
             <p>Create markdown directly in the active bank workspace.</p>
           </div>
           <span class="pill">LLM normalization + auto-ingest</span>
@@ -209,7 +245,7 @@
       <section id="editorPanel" class="card hidden">
         <div class="topbar">
           <div>
-            <h2>Admin markdown editor</h2>
+            <h2>Super admin markdown editor</h2>
             <p id="editorPath">Select a markdown file above.</p>
           </div>
           <button id="saveFileBtn" class="primary" disabled>Save and Re-ingest</button>
@@ -225,6 +261,7 @@
     const loginPanel = document.getElementById("loginPanel");
     const adminPanel = document.getElementById("adminPanel");
     const createBankPanel = document.getElementById("createBankPanel");
+    const bankAccessPanel = document.getElementById("bankAccessPanel");
     const collectionsPanel = document.getElementById("collectionsPanel");
     const filesPanel = document.getElementById("filesPanel");
     const uploadPanel = document.getElementById("uploadPanel");
@@ -233,11 +270,16 @@
     const loginStatus = document.getElementById("loginStatus");
     const saveStatus = document.getElementById("saveStatus");
     const createBankStatus = document.getElementById("createBankStatus");
+    const bankAccessStatus = document.getElementById("bankAccessStatus");
+    const bankAccessMeta = document.getElementById("bankAccessMeta");
     const uploadStatus = document.getElementById("uploadStatus");
     const editorStatus = document.getElementById("editorStatus");
     const collectionsEl = document.getElementById("collections");
     const filesEl = document.getElementById("files");
     const activeBankEl = document.getElementById("activeBank");
+    const accessBankEl = document.getElementById("accessBank");
+    const bankUsernameEl = document.getElementById("bankUsername");
+    const bankPasswordEl = document.getElementById("bankPassword");
     const currentBankEl = document.getElementById("currentBank");
     const documentTypeEl = document.getElementById("documentType");
     const bankingTypeEl = document.getElementById("bankingType");
@@ -246,6 +288,8 @@
     const saveFileBtn = document.getElementById("saveFileBtn");
     const uploadBtn = document.getElementById("uploadBtn");
     const uploadForm = document.getElementById("uploadForm");
+    const logoutBtn = document.getElementById("logoutBtn");
+    let bankUsers = [];
     let allFiles = [];
     let currentPath = "";
 
@@ -256,11 +300,35 @@
       loginPanel.classList.add("hidden");
       adminPanel.classList.remove("hidden");
       createBankPanel.classList.remove("hidden");
+      bankAccessPanel.classList.remove("hidden");
       collectionsPanel.classList.remove("hidden");
       filesPanel.classList.remove("hidden");
       uploadPanel.classList.remove("hidden");
       editorPanel.classList.remove("hidden");
       stateCard.classList.remove("hidden");
+    }
+    function logout() {
+      localStorage.removeItem(tokenKey);
+      loginPanel.classList.remove("hidden");
+      adminPanel.classList.add("hidden");
+      createBankPanel.classList.add("hidden");
+      bankAccessPanel.classList.add("hidden");
+      collectionsPanel.classList.add("hidden");
+      filesPanel.classList.add("hidden");
+      uploadPanel.classList.add("hidden");
+      editorPanel.classList.add("hidden");
+      stateCard.classList.add("hidden");
+      status(loginStatus, "");
+    }
+    function syncBankAccessMeta() {
+      const selectedBank = accessBankEl.value || "";
+      const match = bankUsers.find(user => user.bank_slug === selectedBank);
+      bankAccessMeta.textContent = match
+        ? `Current username: ${match.username}`
+        : "No bank admin login set for this bank yet.";
+      if (match && !bankUsernameEl.value) {
+        bankUsernameEl.value = match.username || "";
+      }
     }
     function renderFiles(files) {
       const query = (document.getElementById("fileSearch")?.value || "").trim().toLowerCase();
@@ -293,14 +361,22 @@
     }
     function renderState(data) {
       activeBankEl.innerHTML = "";
+      accessBankEl.innerHTML = "";
       (data.banks || []).forEach(bank => {
         const opt = document.createElement("option");
         opt.value = bank;
         opt.textContent = bank;
         activeBankEl.appendChild(opt);
+        accessBankEl.appendChild(opt.cloneNode(true));
       });
       activeBankEl.value = data.active_bank || "";
+      if ((data.banks || []).includes(accessBankEl.value)) {
+        accessBankEl.value = accessBankEl.value;
+      } else {
+        accessBankEl.value = data.active_bank || (data.banks || [])[0] || "";
+      }
       currentBankEl.textContent = data.active_bank || "";
+      bankUsers = data.bank_users || [];
       documentTypeEl.innerHTML = "";
       (data.document_types || []).forEach(type => {
         const opt = document.createElement("option");
@@ -327,11 +403,12 @@
       });
       allFiles = data.files || [];
       renderFiles(allFiles);
+      syncBankAccessMeta();
     }
     async function openFile(path) {
       currentPath = path;
       status(editorStatus, "Loading markdown...");
-      const res = await fetch("/kb/studio/file?path=" + encodeURIComponent(path));
+      const res = await fetch("/kb/studio/file?path=" + encodeURIComponent(path), { headers: authHeaders() });
       if (!res.ok) {
         status(editorStatus, "Could not open markdown file.", "err");
         return;
@@ -347,8 +424,7 @@
     async function loadState() {
       const res = await fetch("/admin/kb/state", { headers: authHeaders() });
       if (!res.ok) {
-        localStorage.removeItem(tokenKey);
-        loginPanel.classList.remove("hidden");
+        logout();
         return;
       }
       showAdmin();
@@ -396,6 +472,12 @@
       editorPath.textContent = "Select a markdown file above.";
     };
     document.getElementById("createBankBtn").onclick = async () => {
+      const username = document.getElementById("newBankUsername").value.trim();
+      const password = document.getElementById("newBankPassword").value;
+      if (!username || !password) {
+        status(createBankStatus, "Username and password are required for new bank.", "err");
+        return;
+      }
       status(createBankStatus, "Creating bank workspace...");
       const res = await fetch("/admin/kb/banks", {
         method: "POST",
@@ -408,7 +490,24 @@
         return;
       }
       const data = await res.json();
+      const accessRes = await fetch("/admin/kb/bank-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          bank_name: data.bank,
+          username,
+          password,
+        }),
+      });
+      if (!accessRes.ok) {
+        const err = await accessRes.json().catch(() => ({}));
+        status(createBankStatus, err.detail || `Bank ${data.bank} created, but login setup failed.`, "err");
+        await loadState();
+        return;
+      }
       document.getElementById("newBank").value = "";
+      document.getElementById("newBankUsername").value = "";
+      document.getElementById("newBankPassword").value = "";
       const activateRes = await fetch("/admin/kb/state", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -421,8 +520,40 @@
         return;
       }
       renderState(await activateRes.json());
-      status(createBankStatus, `Created and activated ${data.bank}.`, "ok");
+      status(createBankStatus, `Created ${data.bank}, saved login, and activated workspace.`, "ok");
+      accessBankEl.value = data.bank;
+      bankUsernameEl.value = `${data.bank}_admin`;
+      bankPasswordEl.value = "";
+      syncBankAccessMeta();
     };
+    accessBankEl.addEventListener("change", () => {
+      bankUsernameEl.value = "";
+      bankPasswordEl.value = "";
+      syncBankAccessMeta();
+    });
+    document.getElementById("saveBankAccessBtn").onclick = async () => {
+      status(bankAccessStatus, "Saving bank login...");
+      const res = await fetch("/admin/kb/bank-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          bank_name: accessBankEl.value,
+          username: bankUsernameEl.value.trim(),
+          password: bankPasswordEl.value,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        status(bankAccessStatus, err.detail || "Could not save bank login.", "err");
+        return;
+      }
+      const data = await res.json();
+      bankUsers = data.bank_users || [];
+      bankPasswordEl.value = "";
+      syncBankAccessMeta();
+      status(bankAccessStatus, `Saved bank login for ${data.user.bank_slug}.`, "ok");
+    };
+    logoutBtn.onclick = () => logout();
     document.getElementById("fileSearch").addEventListener("input", () => renderFiles(allFiles));
     uploadForm.onsubmit = async event => {
       event.preventDefault();
@@ -434,9 +565,9 @@
         banking_type: bankingTypeEl.value,
         raw_text: document.getElementById("rawText").value.trim(),
       };
-      const res = await fetch("/admin/kb/ingest-text", {
+      const res = await fetch("/kb/studio/ingest-text", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(payload),
       });
       uploadBtn.disabled = false;
@@ -459,7 +590,7 @@
       status(editorStatus, "Saving markdown and re-ingesting...");
       const res = await fetch("/kb/studio/file", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ path: currentPath, content: editor.value }),
       });
       saveFileBtn.disabled = false;

@@ -13,6 +13,16 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from logging_utils import log_event
 from streaming_utils import iter_text_stream
+from auth_store import (
+    BANK_ADMIN_ROLE,
+    SUPER_ADMIN_ROLE,
+    authenticate_user,
+    ensure_default_super_admin,
+    issue_token,
+    list_bank_admins,
+    read_token,
+    upsert_bank_admin,
+)
 from ingestion.company_ingest import BANKING_TYPES, DOCUMENT_TYPES, ingest_company_text, ingest_markdown_path
 from kb_runtime import (
     BANKING_TYPES as RUNTIME_BANKING_TYPES,
@@ -183,12 +193,23 @@ class AdminLoginRequest(BaseModel):
     password: str
 
 
+class BankLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 class RuntimeKnowledgeBaseStateRequest(BaseModel):
     active_bank: str
 
 
 class BankCreateRequest(BaseModel):
     bank_name: str
+
+
+class BankUserUpsertRequest(BaseModel):
+    bank_name: str
+    username: str
+    password: str
 
 
 class MarkdownUpdateRequest(BaseModel):
@@ -198,25 +219,59 @@ class MarkdownUpdateRequest(BaseModel):
 
 ADMIN_USERNAME = "NahianPolygon"
 ADMIN_PASSWORD = "123456"
-ADMIN_TOKEN = "primebot-admin-token"
 PROJECT_ROOT = Path(".").resolve()
 BANKS_ROOT = (PROJECT_ROOT / "banks").resolve()
 
 
-def _require_admin(authorization: str = Header(default="")) -> None:
-    expected = f"Bearer {ADMIN_TOKEN}"
-    if not secrets.compare_digest(authorization, expected):
-        raise HTTPException(status_code=401, detail="Admin authentication required.")
+def _parse_bearer_token(authorization: str) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    return token
+
+
+def _require_user(authorization: str = Header(default="")) -> dict:
+    user = read_token(_parse_bearer_token(authorization))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    return user
+
+
+def _require_super_admin(authorization: str = Header(default="")) -> dict:
+    user = _require_user(authorization)
+    if user.get("role") != SUPER_ADMIN_ROLE:
+        raise HTTPException(status_code=403, detail="Super admin access required.")
+    return user
+
+
+def _require_workspace_user(authorization: str = Header(default="")) -> dict:
+    user = _require_user(authorization)
+    if user.get("role") not in {SUPER_ADMIN_ROLE, BANK_ADMIN_ROLE}:
+        raise HTTPException(status_code=403, detail="Workspace access required.")
+    return user
+
+
+def _workspace_bank_for_user(user: dict) -> str:
+    role = str(user.get("role") or "")
+    if role == SUPER_ADMIN_ROLE:
+        return get_active_bank()
+    if role == BANK_ADMIN_ROLE:
+        bank_slug = slugify_bank(str(user.get("bank_slug") or ""))
+        if bank_slug:
+            return bank_slug
+    raise HTTPException(status_code=403, detail="Bank workspace is not assigned.")
 
 
 def _ensure_active_bank_dirs(bank_slug: str) -> None:
     for banking_type in ("conventional", "islami"):
         for document_type in DOCUMENT_TYPES:
-            (Path("banks") / bank_slug / banking_type / "credit" / document_type).mkdir(parents=True, exist_ok=True)
+            (BANKS_ROOT / bank_slug / banking_type / "credit" / document_type).mkdir(parents=True, exist_ok=True)
 
 
 def _list_bank_dirs() -> list[str]:
-    root = Path("banks")
+    root = BANKS_ROOT
     if not root.exists():
         return []
     return sorted(
@@ -230,8 +285,8 @@ def _relative_markdown_path(path: Path) -> str:
     return str(path.relative_to(PROJECT_ROOT))
 
 
-def _resolve_active_markdown_path(path_value: str) -> Path:
-    active_root = (BANKS_ROOT / get_active_bank()).resolve()
+def _resolve_markdown_path_for_bank(bank_slug: str, path_value: str) -> Path:
+    active_root = (BANKS_ROOT / bank_slug).resolve()
     candidate = (PROJECT_ROOT / path_value).resolve()
     if candidate.suffix != ".md":
         raise HTTPException(status_code=400, detail="Only markdown files can be edited.")
@@ -244,9 +299,8 @@ def _resolve_active_markdown_path(path_value: str) -> Path:
     return Path(_relative_markdown_path(candidate))
 
 
-def _list_active_markdown_files() -> list[dict]:
-    active_bank = get_active_bank()
-    root = Path("banks") / active_bank
+def _list_markdown_files(bank_slug: str) -> list[dict]:
+    root = BANKS_ROOT / bank_slug
     files = []
     if not root.exists():
         return files
@@ -255,9 +309,9 @@ def _list_active_markdown_files() -> list[dict]:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             text = ""
-        parts = path.parts
-        banking_type = parts[2] if len(parts) > 2 else ""
-        document_type = parts[4] if len(parts) > 4 else ""
+        parts = path.relative_to(BANKS_ROOT).parts
+        banking_type = parts[1] if len(parts) > 1 else ""
+        document_type = parts[3] if len(parts) > 3 else ""
         heading = next((line.lstrip("# ").strip() for line in text.splitlines() if line.startswith("#")), path.stem)
         files.append({
             "path": str(path),
@@ -273,6 +327,8 @@ def _list_active_markdown_files() -> list[dict]:
 
 @app.on_event("startup")
 async def startup_event():
+    ensure_default_super_admin(ADMIN_USERNAME, ADMIN_PASSWORD)
+    _ensure_active_bank_dirs(get_active_bank())
     if _cfg.get("llm", {}).get("warmup_on_start", True):
         thread = threading.Thread(target=_warmup_model, daemon=True)
         thread.start()
@@ -541,20 +597,31 @@ async def health():
 
 @app.post("/admin/login")
 async def admin_login(payload: AdminLoginRequest):
-    if not secrets.compare_digest(payload.username, ADMIN_USERNAME) or not secrets.compare_digest(payload.password, ADMIN_PASSWORD):
+    user = authenticate_user(payload.username, payload.password, SUPER_ADMIN_ROLE)
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid admin credentials.")
-    return {"token": ADMIN_TOKEN}
+    return {"token": issue_token(user), "role": SUPER_ADMIN_ROLE}
+
+
+@app.post("/bank/login")
+async def bank_login(payload: BankLoginRequest):
+    user = authenticate_user(payload.username, payload.password, BANK_ADMIN_ROLE)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid bank credentials.")
+    return {"token": issue_token(user), "role": BANK_ADMIN_ROLE, "bank_slug": user.get("bank_slug")}
 
 
 @app.get("/admin/kb/state")
 async def admin_kb_state(authorization: str = Header(default="")):
-    _require_admin(authorization)
+    _require_super_admin(authorization)
+    active_bank = get_active_bank()
     return {
         **load_runtime_state(),
         "banks": _list_bank_dirs(),
+        "bank_users": list_bank_admins(),
         "document_types": sorted(DOCUMENT_TYPES),
         "banking_types": sorted(RUNTIME_BANKING_TYPES),
-        "files": _list_active_markdown_files(),
+        "files": _list_markdown_files(active_bank),
     }
 
 
@@ -563,7 +630,7 @@ async def update_admin_kb_state(
     payload: RuntimeKnowledgeBaseStateRequest,
     authorization: str = Header(default=""),
 ):
-    _require_admin(authorization)
+    _require_super_admin(authorization)
     bank_slug = slugify_bank(payload.active_bank)
     state = save_runtime_state({
         "active_bank": bank_slug,
@@ -579,7 +646,10 @@ async def update_admin_kb_state(
     return {
         **state,
         "banks": _list_bank_dirs(),
-        "files": _list_active_markdown_files(),
+        "bank_users": list_bank_admins(),
+        "document_types": sorted(DOCUMENT_TYPES),
+        "banking_types": sorted(RUNTIME_BANKING_TYPES),
+        "files": _list_markdown_files(bank_slug),
     }
 
 
@@ -588,7 +658,7 @@ async def create_admin_bank(
     payload: BankCreateRequest,
     authorization: str = Header(default=""),
 ):
-    _require_admin(authorization)
+    _require_super_admin(authorization)
     if not (payload.bank_name or "").strip():
         raise HTTPException(status_code=400, detail="Bank name is required.")
     bank_slug = slugify_bank(payload.bank_name)
@@ -600,19 +670,43 @@ async def create_admin_bank(
     }
 
 
-@app.get("/kb/studio/context")
-async def kb_studio_context():
+@app.post("/admin/kb/bank-users")
+async def upsert_admin_bank_user(
+    payload: BankUserUpsertRequest,
+    authorization: str = Header(default=""),
+):
+    _require_super_admin(authorization)
+    bank_slug = slugify_bank(payload.bank_name)
+    if bank_slug not in _list_bank_dirs():
+        raise HTTPException(status_code=404, detail="Bank workspace not found.")
+    try:
+        user = upsert_bank_admin(bank_slug, payload.username, payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    log_event("kb_bank_admin_updated", bank=bank_slug, username=user["username"])
     return {
-        **load_runtime_state(),
+        "user": user,
+        "bank_users": list_bank_admins(),
+    }
+
+
+@app.get("/kb/studio/context")
+async def kb_studio_context(authorization: str = Header(default="")):
+    user = _require_workspace_user(authorization)
+    workspace_bank = _workspace_bank_for_user(user)
+    return {
+        "active_bank": workspace_bank,
         "document_types": sorted(DOCUMENT_TYPES),
         "banking_types": sorted(RUNTIME_BANKING_TYPES),
-        "files": _list_active_markdown_files(),
+        "files": _list_markdown_files(workspace_bank),
+        "role": user.get("role"),
     }
 
 
 @app.get("/kb/studio/file")
-async def kb_studio_file(path: str):
-    md_path = _resolve_active_markdown_path(path)
+async def kb_studio_file(path: str, authorization: str = Header(default="")):
+    user = _require_workspace_user(authorization)
+    md_path = _resolve_markdown_path_for_bank(_workspace_bank_for_user(user), path)
     return {
         "path": str(md_path),
         "content": md_path.read_text(encoding="utf-8"),
@@ -620,8 +714,10 @@ async def kb_studio_file(path: str):
 
 
 @app.put("/kb/studio/file")
-async def update_kb_studio_file(payload: MarkdownUpdateRequest):
-    md_path = _resolve_active_markdown_path(payload.path)
+async def update_kb_studio_file(payload: MarkdownUpdateRequest, authorization: str = Header(default="")):
+    user = _require_workspace_user(authorization)
+    workspace_bank = _workspace_bank_for_user(user)
+    md_path = _resolve_markdown_path_for_bank(workspace_bank, payload.path)
     md_path.write_text(payload.content, encoding="utf-8")
     try:
         ingest_result = ingest_markdown_path(md_path, replace_existing=True)
@@ -634,22 +730,24 @@ async def update_kb_studio_file(payload: MarkdownUpdateRequest):
     return {
         "path": str(md_path),
         "ingestion": ingest_result,
-        "files": _list_active_markdown_files(),
+        "files": _list_markdown_files(workspace_bank),
     }
 
 
 @app.get("/admin/kb/options")
-async def kb_options():
+async def kb_options(authorization: str = Header(default="")):
+    user = _require_workspace_user(authorization)
     return {
         "document_types": sorted(DOCUMENT_TYPES),
         "banking_types": sorted(BANKING_TYPES),
-        "active_bank": get_active_bank(),
+        "active_bank": _workspace_bank_for_user(user),
     }
 
 
-@app.post("/admin/kb/ingest-text")
-async def kb_ingest_text(payload: KnowledgeBaseUploadRequest):
-    bank_name = get_active_bank()
+@app.post("/kb/studio/ingest-text")
+async def kb_ingest_text(payload: KnowledgeBaseUploadRequest, authorization: str = Header(default="")):
+    user = _require_workspace_user(authorization)
+    bank_name = _workspace_bank_for_user(user)
     banking_type = payload.banking_type
     try:
         result = ingest_company_text(
@@ -682,6 +780,11 @@ async def kb_ingest_text(payload: KnowledgeBaseUploadRequest):
         markdown_paths=result.get("markdown_paths", []),
     )
     return result
+
+
+@app.post("/admin/kb/ingest-text")
+async def legacy_kb_ingest_text(payload: KnowledgeBaseUploadRequest, authorization: str = Header(default="")):
+    return await kb_ingest_text(payload, authorization)
 
 
 @app.get("/")

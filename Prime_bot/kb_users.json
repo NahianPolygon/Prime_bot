@@ -1,0 +1,36 @@
+{
+  "users": [
+    {
+      "username": "NahianPolygon",
+      "password_hash": "pbkdf2_sha256$200000$8nJnQULeXL9WpJPfdUo-dg$3UgriXBw1Q0bCYlpWWg5D3PXY9iKCZImZnA8oEdCsYg",
+      "role": "super_admin",
+      "bank_slug": null,
+      "active": true,
+      "updated_at": 1778583327
+    },
+    {
+      "role": "bank_admin",
+      "bank_slug": "prime_bank",
+      "active": true,
+      "username": "primebank",
+      "password_hash": "pbkdf2_sha256$200000$wUGEBFvS_lsDxlgBu5BFzQ$ZYTgw1rCMbojDZeAMS63HpVcETf9ij05PCZg5xqW9h0",
+      "updated_at": 1778585875
+    },
+    {
+      "role": "bank_admin",
+      "bank_slug": "city_bank",
+      "active": true,
+      "username": "citybank",
+      "password_hash": "pbkdf2_sha256$200000$SgqTZgTIiwPCFOeUEwPZ7w$1Lx6ptoNhRVpe0btcCCuWmYMGyvP3lqCwTleom29k0U",
+      "updated_at": 1778585841
+    },
+    {
+      "role": "bank_admin",
+      "bank_slug": "eastern_bank",
+      "active": true,
+      "username": "easternbank",
+      "password_hash": "pbkdf2_sha256$200000$jat3evUrI834_2reUNSRqw$aPal-RosGAaf_IByqlXSwNiWcTRXx8_rW0pgXepNaMw",
+      "updated_at": 1778585861
+    }
+  ]
+}

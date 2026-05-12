@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Prime Bank - Credit Card Assistant</title>
+  <title>Bank Assistant</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -38,6 +38,16 @@
     .admin-link { height: 32px; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: var(--accent); background: #ffffff; border: 1px solid rgba(15, 118, 110, 0.22); border-radius: 8px; padding: 0 11px; font-size: 12px; font-weight: 700; box-shadow: 0 8px 18px rgba(17, 32, 29, 0.06); transition: transform 0.15s, border-color 0.15s, background 0.15s; }
     .admin-link svg { width: 15px; height: 15px; fill: currentColor; flex-shrink: 0; }
     .admin-link:hover { transform: translateY(-1px); border-color: rgba(15, 118, 110, 0.45); background: var(--accent-light); }
+    .account-menu { position: relative; }
+    .account-trigger { height: 32px; display: inline-flex; align-items: center; gap: 7px; color: var(--accent); background: #ffffff; border: 1px solid rgba(15, 118, 110, 0.22); border-radius: 8px; padding: 0 11px; font-family: var(--font); font-size: 12px; font-weight: 700; box-shadow: 0 8px 18px rgba(17, 32, 29, 0.06); cursor: pointer; transition: transform 0.15s, border-color 0.15s, background 0.15s; }
+    .account-trigger:hover { transform: translateY(-1px); border-color: rgba(15, 118, 110, 0.45); background: var(--accent-light); }
+    .account-trigger svg { width: 15px; height: 15px; fill: currentColor; flex-shrink: 0; }
+    .account-caret { width: 12px !important; height: 12px !important; opacity: 0.72; }
+    .account-dropdown { position: absolute; top: calc(100% + 10px); right: 0; min-width: 196px; background: rgba(255, 254, 249, 0.98); border: 1px solid rgba(16, 32, 29, 0.12); border-radius: 8px; box-shadow: 0 22px 48px rgba(17, 32, 29, 0.14); padding: 8px; display: none; z-index: 30; }
+    .account-dropdown.open { display: flex; flex-direction: column; gap: 6px; }
+    .account-item { min-height: 38px; display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--text-primary); border: 1px solid transparent; border-radius: 8px; padding: 0 10px; font-size: 12px; font-weight: 700; background: transparent; transition: background 0.15s, border-color 0.15s, transform 0.15s; }
+    .account-item svg { width: 15px; height: 15px; fill: var(--accent); flex-shrink: 0; }
+    .account-item:hover { background: var(--accent-light); border-color: rgba(15, 118, 110, 0.18); transform: translateY(-1px); }
     .token-meter { width: 112px; display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; background: #ffffff; border: 1px solid rgba(15, 118, 110, 0.18); border-radius: 8px; box-shadow: 0 8px 18px rgba(17, 32, 29, 0.05); }
     .token-meter-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 10px; line-height: 1; }
     .token-meter-label { color: var(--accent); font-weight: 800; letter-spacing: 0; white-space: nowrap; }
@@ -298,7 +308,7 @@
         <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
       </div>
       <div>
-        <div class="header-title" id="hdrTitle">Prime Bank Assistant</div>
+        <div class="header-title" id="hdrTitle">Bank Assistant</div>
         <div class="header-subtitle" id="hdrSub">Credit Card Help &amp; Guidance</div>
       </div>
     </div>
@@ -312,10 +322,23 @@
           <div class="token-meter-fill" id="tokenMeterFill"></div>
         </div>
       </div>
-      <a class="admin-link" href="/kb-uploader" title="Open KB uploader" aria-label="Open KB uploader">
-        <svg viewBox="0 0 24 24"><path d="M10 4l2 2h8c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2L2.01 6c0-1.1.89-2 1.99-2h6z"/></svg>
-        <span class="admin-link-text">KB Studio</span>
-      </a>
+      <div class="account-menu">
+        <button class="account-trigger" id="accountTrigger" type="button" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 24 24"><path d="M12 12c2.76 0 5-2.24 5-5S14.76 2 12 2 7 4.24 7 7s2.24 5 5 5zm0 2c-3.34 0-10 1.68-10 5v3h20v-3c0-3.32-6.66-5-10-5z"/></svg>
+          <span class="admin-link-text">Account Settings</span>
+          <svg class="account-caret" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </button>
+        <div class="account-dropdown" id="accountDropdown">
+          <a class="account-item" href="/kb-uploader">
+            <svg viewBox="0 0 24 24"><path d="M10 4l2 2h8c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2L2.01 6c0-1.1.89-2 1.99-2h6z"/></svg>
+            <span>KB Studio</span>
+          </a>
+          <a class="account-item" href="/admin">
+            <svg viewBox="0 0 24 24"><path d="M12 2l2.1 4.26 4.7.68-3.4 3.31.8 4.67L12 12.77 7.8 14.92l.8-4.67-3.4-3.31 4.7-.68L12 2z"/></svg>
+            <span>Super Admin</span>
+          </a>
+        </div>
+      </div>
       <button class="lang-btn" id="langBtn" title="Switch language" onclick="toggleLanguage()">&#2476;&#2494;&#2434;</button>
       <div class="status-dot" id="statusDot"></div>
       <span class="status-text" id="statusText">Connecting...</span>
@@ -355,7 +378,7 @@
   /* ── UI translations ── */
   var UI = {
     en: {
-      title: "Prime Bank Assistant", subtitle: "Credit Card Help & Guidance",
+      title: "Bank Assistant", subtitle: "Credit Card Help & Guidance",
       placeholder: "Ask about credit cards, eligibility, fees...",
       hint: 'Press <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Enter</kbd> to send \xB7 <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Shift+Enter</kbd> for new line',
       newChat: "New chat", thinking: "Thinking",
@@ -372,7 +395,7 @@
       langBtn: "\u09AC\u09BE\u0982",
     },
     bn: {
-      title: "\u09AA\u09CD\u09B0\u09BE\u0987\u09AE \u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u09B8\u09B9\u0995\u09BE\u09B0\u09C0",
+      title: "\u09AC\u09CD\u09AF\u09BE\u0982\u0995 \u0985\u09CD\u09AF\u09BE\u09B8\u09BF\u09B8\u09CD\u099F\u09CD\u09AF\u09BE\u09A8\u09CD\u099F",
       subtitle: "\u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1 \u09B8\u09BE\u09B9\u09BE\u09AF\u09CD\u09AF \u0993 \u0997\u09BE\u0987\u09A1\u09C7\u09A8\u09CD\u09B8",
       placeholder: "\u0995\u09CD\u09B0\u09C7\u09A1\u09BF\u099F \u0995\u09BE\u09B0\u09CD\u09A1, \u09AF\u09CB\u0997\u09CD\u09AF\u09A4\u09BE, \u09AB\u09BF \u09B8\u09AE\u09CD\u09AA\u09B0\u09CD\u0995\u09C7 \u099C\u09BF\u099C\u09CD\u099E\u09C7\u09B8 \u0995\u09B0\u09C1\u09A8...",
       hint: '\u09AA\u09BE\u09A0\u09BE\u09A4\u09C7 <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Enter</kbd> \xB7 \u09A8\u09A4\u09C1\u09A8 \u09B2\u09BE\u0987\u09A8\u09C7\u09B0 \u099C\u09A8\u09CD\u09AF <kbd style="font-family:var(--font-mono);font-size:10px;background:#f0f0f0;padding:1px 4px;border-radius:3px;border:1px solid #ddd;">Shift+Enter</kbd>',
@@ -447,6 +470,21 @@
   var scrollFab  = document.getElementById("scrollFab");
   var langBtn    = document.getElementById("langBtn");
   var btnClear   = document.getElementById("btnClear");
+  var accountTrigger = document.getElementById("accountTrigger");
+  var accountDropdown = document.getElementById("accountDropdown");
+
+  function closeAccountDropdown() {
+    if (!accountDropdown || !accountTrigger) return;
+    accountDropdown.classList.remove("open");
+    accountTrigger.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleAccountDropdown() {
+    if (!accountDropdown || !accountTrigger) return;
+    var willOpen = !accountDropdown.classList.contains("open");
+    accountDropdown.classList.toggle("open", willOpen);
+    accountTrigger.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  }
 
   /* ── Language ── */
   function applyUI() {
@@ -484,6 +522,19 @@
   function getBengaliSuffix() {
     return isBengali ? "\n\n\u0985\u09A8\u09C1\u0997\u09CD\u09B0\u09B9 \u0995\u09B0\u09C7 \u09AC\u09BE\u0982\u09B2\u09BE\u09AF\u09BC \u0989\u09A4\u09CD\u09A4\u09B0 \u09A6\u09BF\u09A8\u0964" : "";
   }
+
+  if (accountTrigger) {
+    accountTrigger.addEventListener("click", function(event) {
+      event.stopPropagation();
+      toggleAccountDropdown();
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    if (!accountDropdown || !accountTrigger) return;
+    if (accountDropdown.contains(event.target) || accountTrigger.contains(event.target)) return;
+    closeAccountDropdown();
+  });
 
   function followupText(key) {
     var labels = {
